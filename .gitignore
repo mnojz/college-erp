@@ -1,2 +1,7 @@
 node_modules
 .next
+/app/generated/prisma
+.agents
+.claude
+.windsurf
+.env

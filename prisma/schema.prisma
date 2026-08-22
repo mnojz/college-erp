@@ -1,0 +1,390 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// STUDENT
+// ============================================================
+
+model Student {
+  id Int @id @default(autoincrement())
+
+  fullName   String  @db.VarChar(160)
+  rollNumber String? @db.VarChar(30)
+  regNumber  String  @unique @db.VarChar(30)
+
+  email      String? @unique @db.VarChar(150)
+  mobile     String? @db.VarChar(20)
+  profilePic String? @db.VarChar(255)
+
+  dateOfBirth DateTime? @db.Date
+  gender      Gender
+
+  semester Int
+  program  Program
+
+  enrollDate DateTime @db.Date
+
+  guardianName  String? @db.VarChar(100)
+  guardianPhone String? @db.VarChar(20)
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  enrollments Enrollment[]
+  attendances Attendance[]
+  results     Result[]
+  submissions AssignmentSubmission[]
+  payments    Payment[]
+}
+
+// ============================================================
+// TEACHER
+// ============================================================
+
+model Teacher {
+  id Int @id @default(autoincrement())
+
+  fullName     String @db.VarChar(160)
+  employeeCode String @unique @db.VarChar(30)
+
+  email      String? @unique @db.VarChar(150)
+  mobile     String? @db.VarChar(20)
+  profilePic String? @db.VarChar(255)
+
+  dateOfBirth DateTime? @db.Date
+  gender      Gender
+
+  designation   String? @db.VarChar(100)
+  qualification String? @db.VarChar(120)
+
+  joiningDate DateTime @db.Date
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  teachingAssignments TeachingAssignment[]
+  assignments         Assignment[]
+  notices             Notice[]
+}
+
+// ============================================================
+// SUBJECT
+// ============================================================
+
+model Subject {
+  id Int @id @default(autoincrement())
+
+  code String @unique @db.VarChar(30)
+  name String @db.VarChar(150)
+
+  creditHours Int
+  semester    Int
+  program     Program
+
+  description String? @db.Text
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  enrollments         Enrollment[]
+  teachingAssignments TeachingAssignment[]
+  attendances         Attendance[]
+  exams               Exam[]
+  assignments         Assignment[]
+}
+
+// ============================================================
+// STUDENT ENROLLMENT
+// ============================================================
+
+model Enrollment {
+  id Int @id @default(autoincrement())
+
+  studentId Int
+  subjectId Int
+
+  semester     Int
+  academicYear String @db.VarChar(20)
+
+  status EnrollmentStatus @default(ENROLLED)
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([studentId, subjectId, academicYear])
+}
+
+// ============================================================
+// TEACHER - SUBJECT ASSIGNMENT
+// ============================================================
+
+model TeachingAssignment {
+  id Int @id @default(autoincrement())
+
+  teacherId Int
+  subjectId Int
+
+  semester     Int
+  academicYear String @db.VarChar(20)
+
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([teacherId, subjectId, academicYear])
+}
+
+// ============================================================
+// ATTENDANCE
+// ============================================================
+
+model Attendance {
+  id Int @id @default(autoincrement())
+
+  studentId Int
+  subjectId Int
+
+  date   DateTime         @db.Date
+  status AttendanceStatus
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([studentId, subjectId, date])
+}
+
+// ============================================================
+// EXAM
+// ============================================================
+
+model Exam {
+  id Int @id @default(autoincrement())
+
+  name String @db.VarChar(100)
+
+  subjectId Int
+
+  semester     Int
+  academicYear String @db.VarChar(20)
+
+  fullMarks Float
+  passMarks Float
+
+  examDate DateTime? @db.Date
+
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  results Result[]
+
+  createdAt DateTime @default(now())
+}
+
+// ============================================================
+// RESULT
+// ============================================================
+
+model Result {
+  id Int @id @default(autoincrement())
+
+  studentId Int
+  examId    Int
+
+  marks      Float
+  grade      String?      @db.VarChar(5)
+  gradePoint Float?
+  status     ResultStatus
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  exam    Exam    @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([studentId, examId])
+}
+
+// ============================================================
+// ASSIGNMENT
+// ============================================================
+
+model Assignment {
+  id Int @id @default(autoincrement())
+
+  title       String  @db.VarChar(200)
+  description String? @db.Text
+
+  subjectId Int
+  teacherId Int
+
+  deadline DateTime
+
+  isActive Boolean @default(true)
+
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  submissions AssignmentSubmission[]
+
+  createdAt DateTime @default(now())
+}
+
+// ============================================================
+// ASSIGNMENT SUBMISSION
+// ============================================================
+
+model AssignmentSubmission {
+  id Int @id @default(autoincrement())
+
+  assignmentId Int
+  studentId    Int
+
+  submittedAt DateTime?
+
+  fileUrl String? @db.VarChar(500)
+
+  marks    Float?
+  feedback String? @db.Text
+
+  status SubmissionStatus @default(PENDING)
+
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([assignmentId, studentId])
+}
+
+// ============================================================
+// FEE
+// ============================================================
+
+model Fee {
+  id Int @id @default(autoincrement())
+
+  name   String  @db.VarChar(150)
+  amount Decimal @db.Decimal(10, 2)
+
+  semester     Int
+  academicYear String @db.VarChar(20)
+
+  description String? @db.Text
+
+  createdAt DateTime @default(now())
+
+  payments Payment[]
+}
+
+// ============================================================
+// PAYMENT
+// ============================================================
+
+model Payment {
+  id Int @id @default(autoincrement())
+
+  studentId Int
+  feeId     Int
+
+  amount      Decimal  @db.Decimal(10, 2)
+  paymentDate DateTime @default(now())
+
+  method    PaymentMethod
+  reference String?       @db.VarChar(100)
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  fee Fee @relation(fields: [feeId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+// ============================================================
+// NOTICE
+// ============================================================
+
+model Notice {
+  id Int @id @default(autoincrement())
+
+  title   String @db.VarChar(200)
+  content String @db.Text
+
+  teacherId Int?
+
+  publishedAt DateTime  @default(now())
+  expiresAt   DateTime?
+
+  isPublished Boolean @default(true)
+
+  teacher Teacher? @relation(fields: [teacherId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum Program {
+  COMPUTER
+  CIVIL
+  ARCHITECTURE
+}
+
+enum EnrollmentStatus {
+  ENROLLED
+  PASSED
+  FAILED
+  BACKLOG
+  DROPPED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+enum ResultStatus {
+  PASS
+  FAIL
+  ABSENT
+}
+
+enum SubmissionStatus {
+  PENDING
+  SUBMITTED
+  LATE
+  GRADED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK
+  ONLINE
+}
