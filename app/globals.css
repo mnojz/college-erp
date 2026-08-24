@@ -92,6 +92,36 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px #
 .empty-state { padding: 35px 0; color: var(--ink-soft); font-family: Arial, sans-serif; }
 .submit-bar { max-width: 1240px; margin: 20px auto 0; padding: 0 4px; }
 .submit-bar p { color: var(--ink-soft); font: 0.78rem Arial, sans-serif; }
+.admin-grid { max-width: 1240px; margin: 0 auto 24px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.metric-card { display: grid; gap: 24px; padding: 22px; background: var(--panel); border: 1px solid var(--line); }
+.metric-card span { color: var(--ink-soft); font: 700 0.7rem Arial, sans-serif; letter-spacing: 0.08em; text-transform: uppercase; }
+.metric-card strong { font-size: 2.8rem; line-height: 1; font-weight: 500; }
+.admin-links { max-width: 1240px; margin: 24px auto 0; padding: 30px 34px; display: flex; justify-content: space-between; gap: 28px; background: var(--mint); }
+.admin-links h2 { margin: 12px 0 0; font-size: 2rem; font-weight: 500; }
+.admin-nav { display: grid; grid-template-columns: repeat(2, minmax(140px, 1fr)); gap: 12px 28px; align-content: center; }
+.admin-nav a { color: var(--accent-dark); font: 700 0.78rem Arial, sans-serif; text-decoration: none; }
+.admin-nav a:hover { text-decoration: underline; }
+.setup-grid { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.setup-card { padding: 26px; background: var(--panel); border: 1px solid var(--line); }
+.setup-card h2 { margin: 10px 0 22px; font-size: 1.8rem; font-weight: 500; }
+.setup-card form { display: grid; gap: 16px; }
+.setup-card .primary-button { justify-self: start; margin-top: 4px; }
+.inline-help { margin: 0; color: var(--ink-soft); font: 0.78rem/1.5 Arial, sans-serif; }
+.inline-help a { color: var(--accent-dark); font-weight: 700; }
+.announcement-form-panel { max-width: 760px; margin: 0 auto; padding: 34px; background: var(--panel); border: 1px solid var(--line); }
+.announcement-form-panel h2 { margin: 10px 0 24px; font-size: 2rem; font-weight: 500; }
+.announcement-form { display: grid; gap: 18px; }
+.announcement-form textarea { width: 100%; box-sizing: border-box; resize: vertical; border: 1px solid var(--line); padding: 14px; background: #fbfcfa; color: var(--foreground); outline: none; }
+.announcement-form textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px #f7d5c9; }
+.checkbox-label { display: flex; grid-template-columns: none; align-items: center; gap: 10px; }
+.checkbox-label input { width: 18px; height: 18px; accent-color: var(--accent); }
+.history-list { margin-top: 24px; border-top: 1px solid var(--line); }
+.history-row { display: grid; grid-template-columns: minmax(0, 1fr) 150px 90px; gap: 16px; align-items: center; padding: 16px 8px; border-bottom: 1px solid var(--line); font-family: Arial, sans-serif; }
+.history-row span { display: grid; gap: 5px; }
+.history-row small, .history-row time { color: var(--ink-soft); font-size: 0.78rem; }
+.history-row b { font-size: 0.68rem; letter-spacing: 0.06em; }
+.status-present { color: #26775c; }
+.status-absent { color: #a53b2c; }
 
 @media (max-width: 760px) {
   .auth-shell { grid-template-columns: 1fr; gap: 42px; padding: 48px 24px; }
@@ -101,10 +131,17 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px #
   .dashboard-header { align-items: flex-start; margin-bottom: 30px; }
   .dashboard-header h1 { font-size: 3rem; }
   .attendance-toolbar { grid-template-columns: 1fr; }
+  .admin-grid { grid-template-columns: repeat(2, 1fr); }
+  .admin-links { flex-direction: column; padding: 24px 20px; }
+  .admin-nav { grid-template-columns: 1fr 1fr; }
+  .setup-grid { grid-template-columns: 1fr; }
+  .announcement-form-panel { padding: 24px 18px; }
   .roster-section { padding: 22px 14px; }
   .section-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
   .student-row { grid-template-columns: 38px 38px minmax(0, 1fr) 20px; gap: 10px; }
   .presence-label { display: none; }
   .submit-bar { align-items: stretch; flex-direction: column; gap: 12px; }
   .submit-bar .primary-button { width: 100%; }
+  .history-row { grid-template-columns: minmax(0, 1fr) 72px; }
+  .history-row b { grid-column: 2; grid-row: 1; }
 }

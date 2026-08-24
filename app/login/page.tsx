@@ -28,7 +28,12 @@ export default function LoginPage() {
         return;
       }
 
-      router.push(result.user.role === "TEACHER" ? "/teacher/attendance" : "/");
+      const destination = result.user.role === "TEACHER"
+        ? "/teacher/attendance"
+        : result.user.role === "ADMIN"
+          ? "/admin"
+          : "/student";
+      router.push(destination);
       router.refresh();
     } catch {
       setError("Unable to reach the server");
