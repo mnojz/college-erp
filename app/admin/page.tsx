@@ -94,10 +94,10 @@ export default function AdminPage() {
           <a href="/admin/teaching">Classes and enrollment</a>
           <a href="/admin/people">Create teachers and students</a>
           <a href="/admin/announcements">Publish announcements</a>
-          <a href="/api/students">Student records</a>
-          <a href="/api/teachers">Teacher records</a>
-          <a href="/api/departments">Departments</a>
-          <a href="/api/courses">Courses</a>
+          <a href="/admin/people">Student records</a>
+          <a href="/admin/people">Teacher records</a>
+          <a href="/admin/setup">Departments</a>
+          <a href="/admin/setup">Courses</a>
         </nav>
       </section>
     </main>

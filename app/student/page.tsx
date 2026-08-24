@@ -1,96 +1,65 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { InfoCard } from "@/app/components/student/InfoCard";
+import { ProfileHero } from "@/app/components/student/ProfileHero";
+import { StudentNav } from "@/app/components/student/StudentNav";
+import { StudentSidebar } from "@/app/components/student/StudentSidebar";
+import { studentAssets } from "@/app/components/student/assets";
 
-type Attendance = {
-  status: "PRESENT" | "ABSENT";
-  session: {
-    heldAt: string;
-    offering: { section: string; course: { code: string; name: string } };
-  };
-};
-
-type Student = {
+type Profile = {
   admissionNo: string;
   rollNumber: string | null;
-  user: { firstName: string; lastName: string };
-  attendance: Attendance[];
+  profileImageUrl: string | null;
+  admissionDate: string;
+  user: { email: string; firstName: string; lastName: string; status: string };
+  program: { name: string; code: string; durationYears: number; department: { name: string; code: string } } | null;
 };
-type Result = { marks: string; grade: string | null; assessment: { name: string; maxMarks: string; assessmentDate: string | null; offering: { course: { code: string; name: string }; term: { name: string } } } };
 
 export default function StudentPage() {
   const router = useRouter();
-  const [student, setStudent] = useState<Student | null>(null);
-  const [results, setResults] = useState<Result[]>([]);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/student/attendance")
+    fetch("/api/student/profile")
       .then(async (response) => {
         const result = await response.json();
         if (!response.ok) {
           router.replace(response.status === 403 ? "/" : "/login");
           return;
         }
-        setStudent(result.student);
-        const resultsResponse = await fetch("/api/student/results");
-        if (resultsResponse.ok) setResults((await resultsResponse.json()).results ?? []);
+        setProfile(result.student);
       })
       .catch(() => setError("Unable to reach the server"));
   }, [router]);
 
-  const summary = useMemo(() => {
-    const records = student?.attendance ?? [];
-    const present = records.filter((record) => record.status === "PRESENT").length;
-    return { present, absent: records.length - present, total: records.length };
-  }, [student]);
+  if (error) return <main className="profile-error">{error}</main>;
+  if (!profile) return <main className="profile-loading">Loading profile...</main>;
 
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
-  }
+  const fullName = `${profile.user.firstName} ${profile.user.lastName}`;
+  const programName = profile.program?.name || "Not assigned";
+  const departmentName = profile.program?.department.name || "Not assigned";
+  const batch = profile.program
+    ? `${new Date(profile.admissionDate).getFullYear()} - ${new Date(profile.admissionDate).getFullYear() + profile.program.durationYears}`
+    : "Not provided";
 
   return (
-    <main className="dashboard-shell">
-      <header className="dashboard-header">
-        <div>
-          <p className="eyebrow">Student workspace</p>
-          <h1>{student ? `${student.user.firstName} ${student.user.lastName}` : "Your progress"}</h1>
-          {student && <p className="panel-copy">Roll {student.rollNumber ?? "Not assigned"} · {student.admissionNo}</p>}
-        </div>
-        <button className="quiet-button" type="button" onClick={logout}>Sign out</button>
-      </header>
-
-      {error && <p className="banner error-banner" role="alert">{error}</p>}
-
-      <section className="admin-grid" aria-label="Attendance summary">
-        <article className="metric-card"><span>Total classes</span><strong>{summary.total}</strong></article>
-        <article className="metric-card"><span>Present</span><strong>{summary.present}</strong></article>
-        <article className="metric-card"><span>Absent</span><strong>{summary.absent}</strong></article>
-        <article className="metric-card"><span>Attendance</span><strong>{summary.total ? `${Math.round((summary.present / summary.total) * 100)}%` : "-"}</strong></article>
-      </section>
-
-      <section className="roster-section">
-        <div className="section-heading">
-          <div><p className="eyebrow">Recent record</p><h2>Attendance history</h2></div>
-        </div>
-        {student?.attendance.length ? (
-          <div className="history-list">
-            {student.attendance.map((record, index) => (
-              <div className="history-row" key={`${record.session.heldAt}-${index}`}>
-                <span><strong>{record.session.offering.course.code}</strong><small>{record.session.offering.course.name}</small></span>
-                <time>{new Date(record.session.heldAt).toLocaleDateString()}</time>
-                <b className={record.status === "PRESENT" ? "status-present" : "status-absent"}>{record.status}</b>
-              </div>
-            ))}
+    <div className="student-app-shell">
+      <StudentNav name={fullName} studentId={profile.rollNumber || profile.admissionNo} avatarUrl={profile.profileImageUrl} />
+      <div className="student-page-body">
+        <StudentSidebar />
+        <main className="student-profile-content">
+          <ProfileHero name={fullName} email={profile.user.email} status={profile.user.status === "ACTIVE" ? "Active" : "Inactive"} program={programName} department={departmentName} admissionNo={profile.admissionNo} rollNumber={profile.rollNumber} profileImageUrl={profile.profileImageUrl} />
+          <div className="profile-card-grid">
+            <InfoCard title="Personal Information" icon={studentAssets.personal} rows={[["Full Name", fullName], ["Admission Date", new Date(profile.admissionDate).toLocaleDateString()], ["Gender", "Not provided"], ["Blood Group", "Not provided"], ["Nationality", "Not provided"], ["Religion", "Not provided"], ["Category", "Not provided"]]} />
+            <InfoCard title="Contact Information" icon={studentAssets.contact} rows={[["Email Address", profile.user.email], ["Phone Number", "Not provided"], ["Current Address", "Not provided"], ["Permanent Address", "Not provided"], ["Emergency Contact", "Not provided"]]} />
+            <InfoCard title="Academic Details" icon={studentAssets.academic} rows={[["Program", programName], ["Department", departmentName], ["Batch / Year", batch], ["Enrollment No.", profile.admissionNo], ["Roll Number", profile.rollNumber || "Not assigned"], ["Current CGPA", "Not provided"], ["Academic Advisor", "Not assigned"]]} />
+            <InfoCard title="Guardian / Parent Details" icon={studentAssets.guardian} rows={[["Father's Name", "Not provided"], ["Mother's Name", "Not provided"], ["Guardian Phone", "Not provided"], ["Guardian Email", "Not provided"], ["Relation", "Not provided"]]} />
           </div>
-        ) : <p className="empty-state">No attendance has been recorded yet.</p>}
-      </section>
-      <section className="roster-section">
-        <div className="section-heading"><div><p className="eyebrow">Academic record</p><h2>Results</h2></div></div>
-        {results.length ? <div className="history-list">{results.map((result, index) => <div className="history-row" key={`${result.assessment.name}-${index}`}><span><strong>{result.assessment.offering.course.code} · {result.assessment.name}</strong><small>{result.assessment.offering.course.name} · {result.assessment.offering.term.name}</small></span><time>{result.marks} / {result.assessment.maxMarks}</time><b>{result.grade ?? "-"}</b></div>)}</div> : <p className="empty-state">No results have been published yet.</p>}
-      </section>
-    </main>
+        </main>
+      </div>
+    </div>
   );
 }
