@@ -13,7 +13,7 @@ export default function AdminAnnouncementsPage() {
 
   useEffect(() => {
     fetch("/api/auth/me").then(async (response) => {
-      if (!response.ok) return router.replace("/login");
+      if (!response.ok) return router.replace("/");
       const result = await response.json();
       if (result.user.role !== "ADMIN") router.replace("/");
     }).catch(() => setError("Unable to verify your session"));

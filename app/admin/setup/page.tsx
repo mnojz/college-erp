@@ -25,7 +25,7 @@ export default function AdminSetupPage() {
     async function load() {
       const me = await fetch("/api/auth/me");
       if (!me.ok) {
-        router.replace("/login");
+        router.replace("/");
         return;
       }
       const meResult = await me.json();

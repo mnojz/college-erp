@@ -39,7 +39,7 @@ export default function TeacherAttendancePage() {
     async function loadOfferings() {
       const response = await fetch("/api/attendance");
       if (response.status === 403 || response.status === 401) {
-        router.replace("/login");
+        router.replace("/");
         return;
       }
       const result = await response.json();
@@ -102,7 +102,7 @@ export default function TeacherAttendancePage() {
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
+    router.replace("/");
   }
 
   return (

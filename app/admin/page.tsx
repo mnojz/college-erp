@@ -24,7 +24,7 @@ export default function AdminPage() {
     async function loadDashboard() {
       const meResponse = await fetch("/api/auth/me");
       if (!meResponse.ok) {
-        router.replace("/login");
+        router.replace("/");
         return;
       }
 
@@ -62,7 +62,7 @@ export default function AdminPage() {
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
+    router.replace("/");
   }
 
   return (

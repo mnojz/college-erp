@@ -27,7 +27,7 @@ export default function StudentPage() {
       .then(async (response) => {
         const result = await response.json();
         if (!response.ok) {
-          router.replace(response.status === 403 ? "/" : "/login");
+          router.replace("/");
           return;
         }
         setProfile(result.student);

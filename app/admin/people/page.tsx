@@ -23,7 +23,7 @@ export default function AdminPeoplePage() {
   useEffect(() => {
     async function load() {
       const meResponse = await fetch("/api/auth/me");
-      if (!meResponse.ok) return router.replace("/login");
+      if (!meResponse.ok) return router.replace("/");
       const me = await meResponse.json();
       if (me.user.role !== "ADMIN") return router.replace("/");
       const [departmentsResponse, programsResponse] = await Promise.all([

@@ -24,7 +24,7 @@ export default function AdminTeachingPage() {
   useEffect(() => {
     async function load() {
       const me = await fetch("/api/auth/me");
-      if (!me.ok) return router.replace("/login");
+      if (!me.ok) return router.replace("/");
       const meResult = await me.json();
       if (meResult.user.role !== "ADMIN") return router.replace("/");
 
