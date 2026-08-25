@@ -8,36 +8,44 @@ export async function GET() {
     return NextResponse.json({ error: "Student access required" }, { status: 403 });
   }
 
-  const student = await prisma.student.findUnique({
-    where: { userId: session.userId },
-    select: {
-      admissionNo: true,
-      rollNumber: true,
-      profileImageUrl: true,
-      admissionDate: true,
-      program: {
-        select: {
-          id: true,
-          name: true,
-          code: true,
-          durationYears: true,
-          department: { select: { name: true, code: true } },
+  try {
+    const student = await prisma.student.findUnique({
+      where: { userId: session.userId },
+      select: {
+        id: true,
+        enrollmentNumber: true,
+        registrationId: true,
+        rollNumber: true,
+        profileImageUrl: true,
+        admissionDate: true,
+        programEnrollmentStatus: true,
+        programId: true,
+        currentSemester: true,
+        program: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            durationYears: true,
+            departmentName: true,
+          },
+        },
+        user: {
+          select: {
+            email: true,
+            firstName: true,
+            lastName: true,
+            status: true,
+          },
         },
       },
-      user: {
-        select: {
-          email: true,
-          firstName: true,
-          lastName: true,
-          status: true,
-        },
-      },
-    },
-  });
+    });
 
-  if (!student) {
-    return NextResponse.json({ error: "Student profile not found" }, { status: 404 });
+    return student
+      ? NextResponse.json({ student })
+      : NextResponse.json({ error: "Student profile not found" }, { status: 404 });
+  } catch (error) {
+    console.error("GET /api/student/profile error:", error);
+    return NextResponse.json({ error: "Unable to load student profile" }, { status: 500 });
   }
-
-  return NextResponse.json({ student });
 }

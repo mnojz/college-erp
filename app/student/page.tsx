@@ -9,12 +9,14 @@ import { StudentSidebar } from "@/app/components/student/StudentSidebar";
 import { studentAssets } from "@/app/components/student/assets";
 
 type Profile = {
-  admissionNo: string;
+  enrollmentNumber: string;
+  registrationId: string;
   rollNumber: string | null;
   profileImageUrl: string | null;
   admissionDate: string;
   user: { email: string; firstName: string; lastName: string; status: string };
-  program: { name: string; code: string; durationYears: number; department: { name: string; code: string } } | null;
+  program: { name: string; code: string; durationYears: number; departmentName: string } | null;
+  currentSemester: number | null;
 };
 
 export default function StudentPage() {
@@ -40,22 +42,26 @@ export default function StudentPage() {
 
   const fullName = `${profile.user.firstName} ${profile.user.lastName}`;
   const programName = profile.program?.name || "Not assigned";
-  const departmentName = profile.program?.department.name || "Not assigned";
+  const departmentName = profile.program?.departmentName || "Not assigned";
+  const semesterName = profile.currentSemester
+    ? `Semester ${profile.currentSemester}`
+    : "Not assigned";
   const batch = profile.program
     ? `${new Date(profile.admissionDate).getFullYear()} - ${new Date(profile.admissionDate).getFullYear() + profile.program.durationYears}`
     : "Not provided";
 
+
   return (
     <div className="student-app-shell">
-      <StudentNav name={fullName} studentId={profile.rollNumber || profile.admissionNo} avatarUrl={profile.profileImageUrl} />
+      <StudentNav name={fullName} studentId={profile.rollNumber || profile.enrollmentNumber} avatarUrl={profile.profileImageUrl} />
       <div className="student-page-body">
         <StudentSidebar />
         <main className="student-profile-content">
-          <ProfileHero name={fullName} email={profile.user.email} status={profile.user.status === "ACTIVE" ? "Active" : "Inactive"} program={programName} department={departmentName} admissionNo={profile.admissionNo} rollNumber={profile.rollNumber} profileImageUrl={profile.profileImageUrl} />
+          <ProfileHero name={fullName} email={profile.user.email} status={profile.user.status === "ACTIVE" ? "Active" : "Inactive"} program={programName} department={departmentName} admissionNo={profile.registrationId} rollNumber={profile.rollNumber} profileImageUrl={profile.profileImageUrl} />
           <div className="profile-card-grid">
             <InfoCard title="Personal Information" icon={studentAssets.personal} rows={[["Full Name", fullName], ["Admission Date", new Date(profile.admissionDate).toLocaleDateString()], ["Gender", "Not provided"], ["Blood Group", "Not provided"], ["Nationality", "Not provided"], ["Religion", "Not provided"], ["Category", "Not provided"]]} />
             <InfoCard title="Contact Information" icon={studentAssets.contact} rows={[["Email Address", profile.user.email], ["Phone Number", "Not provided"], ["Current Address", "Not provided"], ["Permanent Address", "Not provided"], ["Emergency Contact", "Not provided"]]} />
-            <InfoCard title="Academic Details" icon={studentAssets.academic} rows={[["Program", programName], ["Department", departmentName], ["Batch / Year", batch], ["Enrollment No.", profile.admissionNo], ["Roll Number", profile.rollNumber || "Not assigned"], ["Current CGPA", "Not provided"], ["Academic Advisor", "Not assigned"]]} />
+            <InfoCard title="Academic Details" icon={studentAssets.academic} rows={[["Program", programName], ["Current Semester", semesterName], ["Department", departmentName], ["Batch / Year", batch], ["Enrollment No.", profile.enrollmentNumber], ["Registration ID", profile.registrationId], ["Roll Number", profile.rollNumber || "Not assigned"], ["Current CGPA", "Not provided"]]} />
             <InfoCard title="Guardian / Parent Details" icon={studentAssets.guardian} rows={[["Father's Name", "Not provided"], ["Mother's Name", "Not provided"], ["Guardian Phone", "Not provided"], ["Guardian Email", "Not provided"], ["Relation", "Not provided"]]} />
           </div>
         </main>

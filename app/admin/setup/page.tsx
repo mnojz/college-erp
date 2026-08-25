@@ -2,141 +2,136 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AdminShell } from "@/app/components/admin/AdminShell";
 
-type Department = { id: string; name: string; code: string };
-type FormValues = Record<string, string>;
+type Program = { id: string; name: string; code: string; durationYears: number };
 
-const emptyDepartment = { name: "", code: "" };
-const emptyYear = { name: "", startsOn: "", endsOn: "" };
-const emptyProgram = { name: "", code: "", durationYears: "4", departmentId: "" };
-const emptyCourse = { code: "", name: "", credits: "3", departmentId: "" };
+const emptyProgram = { name: "", code: "", durationYears: "4", departmentName: "" };
 
 export default function AdminSetupPage() {
   const router = useRouter();
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [department, setDepartment] = useState<FormValues>(emptyDepartment);
-  const [year, setYear] = useState<FormValues>(emptyYear);
-  const [program, setProgram] = useState<FormValues>(emptyProgram);
-  const [course, setCourse] = useState<FormValues>(emptyCourse);
-  const [message, setMessage] = useState("");
+  const [programs, setPrograms] = useState<Program[]>([]);
+  const [program, setProgram] = useState(emptyProgram);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     async function load() {
       const me = await fetch("/api/auth/me");
-      if (!me.ok) {
-        router.replace("/");
-        return;
-      }
-      const meResult = await me.json();
-      if (meResult.user.role !== "ADMIN") {
-        router.replace("/");
-        return;
-      }
-      const response = await fetch("/api/departments");
-      const result = await response.json();
-      setDepartments(result.departments ?? []);
+      if (!me.ok || (await me.json()).user.role !== "ADMIN") return router.replace("/");
+      const response = await fetch("/api/programs");
+      setPrograms((await response.json()).programs ?? []);
     }
-    load().catch(() => setError("Unable to load setup data"));
+    load().catch(() => setError("Unable to load programs"));
   }, [router]);
 
-  async function submit(
-    event: FormEvent<HTMLFormElement>,
-    endpoint: string,
-    values: FormValues,
-    reset: () => void,
-  ) {
-    event.preventDefault();
+  async function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     setError("");
     setMessage("");
-    const payload = { ...values };
-    if ("durationYears" in payload) payload.durationYears = Number(payload.durationYears) as unknown as string;
-    if ("credits" in payload) payload.credits = Number(payload.credits) as unknown as string;
-
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const result = await response.json();
-      if (!response.ok) {
-        setError(result.error ?? "Unable to save record");
-        return;
-      }
-      reset();
-      setMessage("Record created successfully");
-      if (endpoint === "/api/departments") {
-        setDepartments((current) => [...current, result.department].sort((a, b) => a.name.localeCompare(b.name)));
-      }
-    } catch {
-      setError("Unable to reach the server");
-    }
-  }
-
-  function update(setter: (value: FormValues) => void, current: FormValues, key: string, value: string) {
-    setter({ ...current, [key]: value });
+    const response = await fetch("/api/programs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...program, durationYears: Number(program.durationYears) }),
+    });
+    const data = await response.json();
+    if (!response.ok) return setError(data.error ?? "Unable to save record");
+    setPrograms([...programs, data.program]);
+    setProgram(emptyProgram);
+    setMessage("Program created successfully");
   }
 
   return (
-    <main className="dashboard-shell">
-      <header className="dashboard-header">
-        <div><p className="eyebrow">Administration</p><h1>Set up college records</h1></div>
-        <button className="quiet-button" type="button" onClick={() => router.push("/admin")}>Back to overview</button>
-      </header>
-      {error && <p className="banner error-banner" role="alert">{error}</p>}
-      {message && <p className="banner success-banner" role="status">{message}</p>}
-
-      <section className="setup-grid">
-        <SetupCard title="Department">
-          <form onSubmit={(event) => submit(event, "/api/departments", department, () => setDepartment(emptyDepartment))}>
-            <Field label="Name" value={department.name} onChange={(value) => update(setDepartment, department, "name", value)} />
-            <Field label="Code" value={department.code} onChange={(value) => update(setDepartment, department, "code", value)} />
-            <button className="primary-button" type="submit">Create department</button>
+    <AdminShell title="Programs" subtitle="Academic Program Structure" active="/admin/setup">
+      <section className="admin-form-layout">
+        {/* Create Program */}
+        <article className="profile-info-card admin-form-card">
+          <h2>Create a Program</h2>
+          <p style={{ fontSize: "0.82rem", color: "var(--ink-soft)", marginBottom: "16px" }}>
+            Semesters are automatically calculated from the program duration (e.g. 4 years = 8 semesters). No manual semester creation needed.
+          </p>
+          <form onSubmit={submit}>
+            <Field label="Program Name" value={program.name} update={(v) => setProgram({ ...program, name: v })} />
+            <Field label="Program Code" value={program.code} update={(v) => setProgram({ ...program, code: v })} />
+            <Field
+              label="Department Name"
+              value={program.departmentName}
+              update={(v) => setProgram({ ...program, departmentName: v })}
+            />
+            <Field
+              label="Duration (Years)"
+              type="number"
+              value={program.durationYears}
+              update={(v) => setProgram({ ...program, durationYears: v })}
+            />
+            <button className="admin-primary" type="submit">
+              + Create Program
+            </button>
           </form>
-        </SetupCard>
+        </article>
 
-        <SetupCard title="Academic year">
-          <form onSubmit={(event) => submit(event, "/api/academic-years", year, () => setYear(emptyYear))}>
-            <Field label="Name" placeholder="2026 / 27" value={year.name} onChange={(value) => update(setYear, year, "name", value)} />
-            <Field label="Starts" type="date" value={year.startsOn} onChange={(value) => update(setYear, year, "startsOn", value)} />
-            <Field label="Ends" type="date" value={year.endsOn} onChange={(value) => update(setYear, year, "endsOn", value)} />
-            <button className="primary-button" type="submit">Create academic year</button>
-          </form>
-        </SetupCard>
-
-        <SetupCard title="Program">
-          <form onSubmit={(event) => submit(event, "/api/programs", program, () => setProgram(emptyProgram))}>
-            <Field label="Name" value={program.name} onChange={(value) => update(setProgram, program, "name", value)} />
-            <Field label="Code" value={program.code} onChange={(value) => update(setProgram, program, "code", value)} />
-            <Field label="Duration in years" type="number" value={program.durationYears} onChange={(value) => update(setProgram, program, "durationYears", value)} />
-            <DepartmentSelect value={program.departmentId} departments={departments} onChange={(value) => update(setProgram, program, "departmentId", value)} />
-            <button className="primary-button" type="submit">Create program</button>
-          </form>
-        </SetupCard>
-
-        <SetupCard title="Course">
-          <form onSubmit={(event) => submit(event, "/api/courses", course, () => setCourse(emptyCourse))}>
-            <Field label="Code" value={course.code} onChange={(value) => update(setCourse, course, "code", value)} />
-            <Field label="Name" value={course.name} onChange={(value) => update(setCourse, course, "name", value)} />
-            <Field label="Credits" type="number" value={course.credits} onChange={(value) => update(setCourse, course, "credits", value)} />
-            <DepartmentSelect value={course.departmentId} departments={departments} onChange={(value) => update(setCourse, course, "departmentId", value)} />
-            <button className="primary-button" type="submit">Create course</button>
-          </form>
-        </SetupCard>
+        {/* Programs List */}
+        {programs.length > 0 && (
+          <article className="profile-info-card admin-form-card">
+            <h2>Existing Programs</h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {programs.map((p) => (
+                <div
+                  key={p.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "12px 16px",
+                    borderRadius: "8px",
+                    background: "var(--surface-2, #f8f9fa)",
+                    border: "1px solid var(--border, #e5e7eb)",
+                  }}
+                >
+                  <div>
+                    <strong style={{ fontSize: "0.95rem" }}>{p.code}</strong>
+                    <span style={{ marginLeft: "10px", color: "var(--ink-soft)", fontSize: "0.85rem" }}>{p.name}</span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: "0.75rem",
+                      padding: "3px 10px",
+                      borderRadius: "99px",
+                      background: "#dbeafe",
+                      color: "#1d4ed8",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {p.durationYears * 2} Semesters
+                  </span>
+                </div>
+              ))}
+            </div>
+          </article>
+        )}
       </section>
-    </main>
+
+      {error && <p className="admin-message error">{error}</p>}
+      {message && <p className="admin-message success">{message}</p>}
+    </AdminShell>
   );
 }
 
-function SetupCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return <article className="setup-card"><p className="eyebrow">New record</p><h2>{title}</h2>{children}</article>;
-}
-
-function Field({ label, value, onChange, type = "text", placeholder }: { label: string; value: string; onChange: (value: string) => void; type?: string; placeholder?: string }) {
-  return <label>{label}<input type={type} placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} required /></label>;
-}
-
-function DepartmentSelect({ value, departments, onChange }: { value: string; departments: Department[]; onChange: (value: string) => void }) {
-  return <label>Department<select value={value} onChange={(event) => onChange(event.target.value)} required><option value="">Select department</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}</select></label>;
+function Field({
+  label,
+  value,
+  update,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  update: (value: string) => void;
+  type?: string;
+}) {
+  return (
+    <label>
+      {label}
+      <input type={type} value={value} onChange={(e) => update(e.target.value)} required />
+    </label>
+  );
 }

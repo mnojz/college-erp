@@ -60,7 +60,7 @@ export default function Home() {
         setError(result.error ?? "Unable to sign in");
         return;
       }
-      router.push(result.user.role === "ADMIN" ? "/admin" : result.user.role === "TEACHER" ? "/teacher/attendance" : "/student");
+      router.push(result.user.role === "ADMIN" ? "/admin" : result.user.role === "TEACHER" ? "/teacher" : "/student");
       router.refresh();
     } catch {
       setError("Unable to reach the server");

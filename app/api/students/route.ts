@@ -1,4 +1,3 @@
-import { hash } from "bcryptjs";
 import { NextResponse } from "next/server";
 import { Prisma } from "@/app/generated/prisma/client";
 import { requireAdmin } from "@/app/lib/auth";
@@ -9,11 +8,13 @@ type CreateStudentBody = {
   password?: unknown;
   firstName?: unknown;
   lastName?: unknown;
-  admissionNo?: unknown;
+  enrollmentNumber?: unknown;
+  registrationId?: unknown;
   rollNumber?: unknown;
   profileImageUrl?: unknown;
   admissionDate?: unknown;
   programId?: unknown;
+  currentSemester?: unknown;
 };
 
 export async function POST(request: Request) {
@@ -22,7 +23,6 @@ export async function POST(request: Request) {
   }
 
   let body: CreateStudentBody;
-
   try {
     body = (await request.json()) as CreateStudentBody;
   } catch {
@@ -33,15 +33,22 @@ export async function POST(request: Request) {
   const password = typeof body.password === "string" ? body.password : "";
   const firstName = typeof body.firstName === "string" ? body.firstName.trim() : "";
   const lastName = typeof body.lastName === "string" ? body.lastName.trim() : "";
-  const admissionNo = typeof body.admissionNo === "string" ? body.admissionNo.trim() : "";
+  const enrollmentNumber = typeof body.enrollmentNumber === "string" ? body.enrollmentNumber.trim() : "";
+  const registrationId = typeof body.registrationId === "string" ? body.registrationId.trim() : "";
   const rollNumber = typeof body.rollNumber === "string" ? body.rollNumber.trim() : undefined;
   const profileImageUrl = typeof body.profileImageUrl === "string" ? body.profileImageUrl.trim() : undefined;
   const admissionDate = typeof body.admissionDate === "string" ? new Date(body.admissionDate) : null;
   const programId = typeof body.programId === "string" ? body.programId : undefined;
+  const currentSemester =
+    typeof body.currentSemester === "number"
+      ? body.currentSemester
+      : typeof body.currentSemester === "string" && body.currentSemester !== ""
+        ? Number(body.currentSemester)
+        : undefined;
 
-  if (!email || !password || !firstName || !lastName || !admissionNo || !admissionDate) {
+  if (!email || !password || !firstName || !lastName || !enrollmentNumber || !registrationId || !admissionDate) {
     return NextResponse.json(
-      { error: "Email, password, name, admission number, and admission date are required" },
+      { error: "Email, password, name, enrollment number, registration ID, and admission date are required" },
       { status: 400 },
     );
   }
@@ -51,66 +58,45 @@ export async function POST(request: Request) {
   }
 
   if (password.length < 8) {
-    return NextResponse.json(
-      { error: "Password must be at least 8 characters" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
+  }
+
+  // Validate semester range against program if both provided
+  if (programId && currentSemester !== undefined) {
+    const program = await prisma.program.findUnique({ where: { id: programId }, select: { durationYears: true } });
+    if (!program) return NextResponse.json({ error: "Program does not exist" }, { status: 400 });
+    if (currentSemester < 1 || currentSemester > program.durationYears * 2) {
+      return NextResponse.json(
+        { error: `Semester must be between 1 and ${program.durationYears * 2} for this program` },
+        { status: 400 },
+      );
+    }
   }
 
   try {
-    const student = await prisma.$transaction(async (transaction) => {
-      const user = await transaction.user.create({
-        data: {
-          email,
-          passwordHash: await hash(password, 12),
-          firstName,
-          lastName,
-          role: "STUDENT",
-        },
+    const { hash } = await import("bcryptjs");
+    const student = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: { email, passwordHash: await hash(password, 12), firstName, lastName, role: "STUDENT" },
       });
-
-      return transaction.student.create({
-        data: {
-          userId: user.id,
-          admissionNo,
-          rollNumber,
-          profileImageUrl,
-          admissionDate,
-          programId,
-        },
+      return tx.student.create({
+        data: { userId: user.id, enrollmentNumber, registrationId, rollNumber, profileImageUrl, admissionDate, programId, currentSemester },
         select: {
-          id: true,
-          admissionNo: true,
-          rollNumber: true,
-          profileImageUrl: true,
-          admissionDate: true,
-          programId: true,
-          user: {
-            select: {
-              id: true,
-              email: true,
-              firstName: true,
-              lastName: true,
-              role: true,
-            },
-          },
+          id: true, enrollmentNumber: true, registrationId: true, rollNumber: true, profileImageUrl: true,
+          admissionDate: true, programId: true, currentSemester: true,
+          user: { select: { id: true, email: true, firstName: true, lastName: true, role: true } },
         },
       });
     });
-
     return NextResponse.json({ student }, { status: 201 });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return NextResponse.json(
-        { error: "Email or admission number is already registered" },
-        { status: 409 },
-      );
+      return NextResponse.json({ error: "Email, enrollment number, registration ID, or roll number is already registered" }, { status: 409 });
     }
-
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
       return NextResponse.json({ error: "Program does not exist" }, { status: 400 });
     }
-
+    console.error("POST /api/students error:", error);
     return NextResponse.json({ error: "Unable to create student" }, { status: 500 });
   }
 }
@@ -120,26 +106,19 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const students = await prisma.student.findMany({
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      admissionNo: true,
-      rollNumber: true,
-      profileImageUrl: true,
-      admissionDate: true,
-      program: { select: { id: true, name: true, code: true } },
-      user: {
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          status: true,
-        },
+  try {
+    const students = await prisma.student.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true, enrollmentNumber: true, registrationId: true, rollNumber: true,
+        profileImageUrl: true, admissionDate: true, programId: true, currentSemester: true,
+        program: { select: { id: true, name: true, code: true } },
+        user: { select: { id: true, email: true, firstName: true, lastName: true, status: true } },
       },
-    },
-  });
-
-  return NextResponse.json({ students });
+    });
+    return NextResponse.json({ students });
+  } catch (error) {
+    console.error("GET /api/students error:", error);
+    return NextResponse.json({ error: "Unable to load students" }, { status: 500 });
+  }
 }

@@ -10,7 +10,7 @@ type CreateTeacherBody = {
   firstName?: unknown;
   lastName?: unknown;
   employeeNo?: unknown;
-  departmentId?: unknown;
+  profileImageUrl?: unknown;
 };
 
 export async function POST(request: Request) {
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   const firstName = typeof body.firstName === "string" ? body.firstName.trim() : "";
   const lastName = typeof body.lastName === "string" ? body.lastName.trim() : "";
   const employeeNo = typeof body.employeeNo === "string" ? body.employeeNo.trim() : "";
-  const departmentId = typeof body.departmentId === "string" ? body.departmentId : undefined;
+  const profileImageUrl = typeof body.profileImageUrl === "string" ? body.profileImageUrl.trim() : undefined;
 
   if (!email || !password || !firstName || !lastName || !employeeNo) {
     return NextResponse.json(
@@ -63,12 +63,12 @@ export async function POST(request: Request) {
         data: {
           userId: user.id,
           employeeNo,
-          departmentId,
+          profileImageUrl,
         },
         select: {
           id: true,
           employeeNo: true,
-          departmentId: true,
+          profileImageUrl: true,
           user: {
             select: {
               id: true,
@@ -91,10 +91,6 @@ export async function POST(request: Request) {
       );
     }
 
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
-      return NextResponse.json({ error: "Department does not exist" }, { status: 400 });
-    }
-
     return NextResponse.json({ error: "Unable to create teacher" }, { status: 500 });
   }
 }
@@ -104,23 +100,28 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const teachers = await prisma.teacher.findMany({
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      employeeNo: true,
-      department: { select: { id: true, name: true, code: true } },
-      user: {
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          status: true,
+  try {
+    const teachers = await prisma.teacher.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        employeeNo: true,
+        profileImageUrl: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            status: true,
+          },
         },
       },
-    },
-  });
+    });
 
-  return NextResponse.json({ teachers });
+    return NextResponse.json({ teachers });
+  } catch (error) {
+    console.error("GET /api/teachers error:", error);
+    return NextResponse.json({ error: "Unable to load teachers" }, { status: 500 });
+  }
 }

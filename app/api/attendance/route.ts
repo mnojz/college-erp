@@ -4,61 +4,69 @@ import { getSession } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
 
 type AttendanceBody = {
-  offeringId?: unknown;
-  heldAt?: unknown;
+  classId?: unknown;
+  sessionDate?: unknown;
   presentStudentIds?: unknown;
 };
 
-async function getTeacherForSession() {
+async function getTeacher() {
   const session = await getSession();
-  if (!session || session.role !== "TEACHER") {
-    return null;
-  }
-
-  return prisma.teacher.findUnique({
-    where: { userId: session.userId },
-    select: { id: true },
-  });
+  return session?.role === "TEACHER"
+    ? prisma.teacher.findUnique({
+        where: { userId: session.userId },
+        select: { id: true },
+      })
+    : null;
 }
 
 export async function GET() {
-  const teacher = await getTeacherForSession();
-  if (!teacher) {
+  const current = await getTeacher();
+  if (!current) {
     return NextResponse.json({ error: "Teacher access required" }, { status: 403 });
   }
 
-  const offerings = await prisma.courseOffering.findMany({
-    where: { teacherId: teacher.id },
-    orderBy: { course: { code: "asc" } },
-    select: {
-      id: true,
-      section: true,
-      course: { select: { code: true, name: true } },
-      term: { select: { name: true, number: true, academicYear: { select: { name: true } } } },
-      enrollments: {
-        where: { status: "ENROLLED" },
-        orderBy: [{ student: { rollNumber: "asc" } }, { student: { admissionNo: "asc" } }],
-        select: {
-          student: {
-            select: {
-              id: true,
-              rollNumber: true,
-              admissionNo: true,
-              profileImageUrl: true,
-              user: { select: { firstName: true, lastName: true } },
+  try {
+    const classes = await prisma.class.findMany({
+      where: { teacherId: current.id },
+      select: {
+        id: true,
+        dayOfWeek: true,
+        startTime: true,
+        endTime: true,
+        semester: true,
+        subjectId: true,
+        programId: true,
+        subject: { select: { name: true, code: true } },
+        program: {
+          select: {
+            name: true,
+            code: true,
+            students: {
+              where: { programEnrollmentStatus: "ENROLLED" },
+              select: {
+                id: true,
+                enrollmentNumber: true,
+                rollNumber: true,
+                profileImageUrl: true,
+                currentSemester: true,
+                user: { select: { firstName: true, lastName: true } },
+              },
             },
           },
         },
       },
-    },
-  });
+    });
 
-  return NextResponse.json({ offerings });
+    return NextResponse.json({ classes });
+  } catch (error) {
+    console.error("GET /api/attendance error:", error);
+    return NextResponse.json({ error: "Unable to load classes" }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
-  const teacher = await getTeacherForSession();
-  if (!teacher) {
+  const current = await getTeacher();
+  if (!current) {
     return NextResponse.json({ error: "Teacher access required" }, { status: 403 });
   }
 
@@ -69,77 +77,64 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const offeringId = typeof body.offeringId === "string" ? body.offeringId : "";
-  const heldAt = typeof body.heldAt === "string" ? new Date(body.heldAt) : new Date();
-  const presentStudentIds = Array.isArray(body.presentStudentIds)
+  const classId = typeof body.classId === "string" ? body.classId : "";
+  const sessionDate = typeof body.sessionDate === "string" ? new Date(body.sessionDate) : null;
+  const present = Array.isArray(body.presentStudentIds)
     ? body.presentStudentIds.filter((id): id is string => typeof id === "string")
     : null;
 
-  if (!offeringId || Number.isNaN(heldAt.getTime()) || !presentStudentIds) {
-    return NextResponse.json(
-      { error: "Offering, valid date, and present student IDs are required" },
-      { status: 400 },
-    );
+  if (!classId || !sessionDate || Number.isNaN(sessionDate.getTime()) || !present) {
+    return NextResponse.json({ error: "Class, date, and present students are required" }, { status: 400 });
   }
 
-  const uniquePresentStudentIds = [...new Set(presentStudentIds)];
-  const offering = await prisma.courseOffering.findFirst({
-    where: { id: offeringId, teacherId: teacher.id },
-    select: {
-      id: true,
-      enrollments: {
-        where: { status: "ENROLLED" },
-        select: { studentId: true },
-      },
-    },
+  const classRecord = await prisma.class.findFirst({
+    where: { id: classId, teacherId: current.id },
+    select: { id: true, programId: true, semester: true },
   });
-
-  if (!offering) {
-    return NextResponse.json({ error: "Course offering not found" }, { status: 404 });
+  if (!classRecord) {
+    return NextResponse.json({ error: "Class not found" }, { status: 404 });
   }
 
-  const enrolledStudentIds = new Set(offering.enrollments.map((enrollment) => enrollment.studentId));
-  if (uniquePresentStudentIds.some((studentId) => !enrolledStudentIds.has(studentId))) {
-    return NextResponse.json(
-      { error: "Every present student must be enrolled in this offering" },
-      { status: 400 },
-    );
+  const studentIds = (
+    await prisma.student.findMany({
+      where: { programId: classRecord.programId, programEnrollmentStatus: "ENROLLED" },
+      select: { id: true },
+    })
+  ).map((s) => s.id);
+
+  if (present.some((id) => !studentIds.includes(id))) {
+    return NextResponse.json({ error: "Students must belong to the class program" }, { status: 400 });
   }
 
   try {
-    const session = await prisma.$transaction(async (transaction) => {
-      const attendanceSession = await transaction.attendanceSession.create({
-        data: {
-          offeringId: offering.id,
-          teacherId: teacher.id,
-          heldAt,
-          records: {
-            create: offering.enrollments.map(({ studentId }) => ({
-              studentId,
-              status: uniquePresentStudentIds.includes(studentId) ? "PRESENT" : "ABSENT",
-            })),
-          },
+    const session = await prisma.attendanceSession.create({
+      data: {
+        classId,
+        sessionDate,
+        records: {
+          create: studentIds.map((studentId) => ({
+            studentId,
+            status: present.includes(studentId) ? "PRESENT" : "ABSENT",
+          })),
         },
-        select: {
-          id: true,
-          offeringId: true,
-          teacherId: true,
-          heldAt: true,
-          records: { select: { studentId: true, status: true } },
-        },
-      });
-
-      return attendanceSession;
+      },
+      select: {
+        id: true,
+        classId: true,
+        sessionDate: true,
+        records: { select: { studentId: true, status: true } },
+      },
     });
 
     return NextResponse.json({ session }, { status: 201 });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return NextResponse.json(
-        { error: "Attendance has already been submitted for this class time" },
-        { status: 409 },
+        { error: "Attendance has already been submitted for this class date" },
+        { status: 400 },
       );
     }
+    console.error("POST /api/attendance error:", error);
     return NextResponse.json({ error: "Unable to submit attendance" }, { status: 500 });
   }
 }

@@ -2,57 +2,97 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { TeacherShell } from "@/app/components/teacher/TeacherShell";
 
 type Student = {
   id: string;
+  enrollmentNumber: string;
   rollNumber: string | null;
-  admissionNo: string;
   profileImageUrl: string | null;
   user: { firstName: string; lastName: string };
 };
 
-type Offering = {
+type ClassItem = {
   id: string;
-  section: string;
-  course: { code: string; name: string };
-  term: { name: string; number: number; academicYear: { name: string } };
-  enrollments: { student: Student }[];
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  subject: { code: string; name: string };
+  semester?: number;
+  program: {
+    name: string;
+    code: string;
+    students: Student[];
+  };
+};
+
+type TeacherInfo = {
+  firstName: string;
+  lastName: string;
+  employeeNo: string;
+  profileImageUrl: string | null;
 };
 
 export default function TeacherAttendancePage() {
   const router = useRouter();
-  const [offerings, setOfferings] = useState<Offering[]>([]);
-  const [selectedOfferingId, setSelectedOfferingId] = useState("");
+  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [teacherInfo, setTeacherInfo] = useState<TeacherInfo | null>(null);
+  const [selectedClassId, setSelectedClassId] = useState("");
   const [presentStudentIds, setPresentStudentIds] = useState<Set<string>>(new Set());
-  const [heldAt, setHeldAt] = useState(() => new Date().toISOString().slice(0, 16));
+  const [sessionDate, setSessionDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const selectedOffering = useMemo(
-    () => offerings.find((offering) => offering.id === selectedOfferingId),
-    [offerings, selectedOfferingId],
+  const selectedClass = useMemo(
+    () => classes.find((c) => c.id === selectedClassId),
+    [classes, selectedClassId],
   );
 
   useEffect(() => {
-    async function loadOfferings() {
-      const response = await fetch("/api/attendance");
-      if (response.status === 403 || response.status === 401) {
-        router.replace("/");
-        return;
+    async function loadData() {
+      try {
+        const [attRes, profRes] = await Promise.all([
+          fetch("/api/attendance"),
+          fetch("/api/teacher/profile"),
+        ]);
+
+        if (attRes.status === 403 || attRes.status === 401 || profRes.status === 403 || profRes.status === 401) {
+          router.replace("/");
+          return;
+        }
+
+        const attResult = await attRes.json();
+        const profResult = await profRes.json();
+
+        if (!attRes.ok) {
+          setError(attResult.error ?? "Unable to load classes");
+          return;
+        }
+
+        setClasses(attResult.classes ?? []);
+        if (attResult.classes?.length > 0) {
+          setSelectedClassId(attResult.classes[0].id);
+        }
+
+        if (profRes.ok && profResult.teacher) {
+          setTeacherInfo({
+            firstName: profResult.teacher.user.firstName,
+            lastName: profResult.teacher.user.lastName,
+            employeeNo: profResult.teacher.employeeNo,
+            profileImageUrl: profResult.teacher.profileImageUrl,
+          });
+        }
+      } catch {
+        setError("Unable to reach the server");
+      } finally {
+        setIsLoading(false);
       }
-      const result = await response.json();
-      if (!response.ok) {
-        setError(result.error ?? "Unable to load classes");
-        return;
-      }
-      setOfferings(result.offerings);
-      setSelectedOfferingId(result.offerings[0]?.id ?? "");
-      setIsLoading(false);
     }
 
-    loadOfferings().catch(() => setError("Unable to reach the server"));
+    loadData();
   }, [router]);
 
   function toggleStudent(studentId: string) {
@@ -64,15 +104,24 @@ export default function TeacherAttendancePage() {
     });
   }
 
-  function selectOffering(offeringId: string) {
-    setSelectedOfferingId(offeringId);
+  function selectClass(classId: string) {
+    setSelectedClassId(classId);
     setPresentStudentIds(new Set());
     setMessage("");
     setError("");
   }
 
+  function selectAll() {
+    if (!selectedClass) return;
+    setPresentStudentIds(new Set(selectedClass.program.students.map((s) => s.id)));
+  }
+
+  function clearAll() {
+    setPresentStudentIds(new Set());
+  }
+
   async function submitAttendance() {
-    if (!selectedOffering) return;
+    if (!selectedClass) return;
     setError("");
     setMessage("");
     setIsSubmitting(true);
@@ -82,8 +131,8 @@ export default function TeacherAttendancePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          offeringId: selectedOffering.id,
-          heldAt: new Date(heldAt).toISOString(),
+          classId: selectedClass.id,
+          sessionDate: new Date(sessionDate).toISOString(),
           presentStudentIds: [...presentStudentIds],
         }),
       });
@@ -92,7 +141,9 @@ export default function TeacherAttendancePage() {
         setError(result.error ?? "Unable to submit attendance");
         return;
       }
-      setMessage(`Attendance saved: ${presentStudentIds.size} present, ${selectedOffering.enrollments.length - presentStudentIds.size} absent.`);
+      const total = selectedClass.program.students.length;
+      const present = presentStudentIds.size;
+      setMessage(`Attendance successfully recorded: ${present} Present, ${total - present} Absent.`);
     } catch {
       setError("Unable to reach the server");
     } finally {
@@ -100,90 +151,359 @@ export default function TeacherAttendancePage() {
     }
   }
 
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/");
-  }
+  const totalStudents = selectedClass?.program.students.length ?? 0;
+  const presentCount = presentStudentIds.size;
+  const absentCount = totalStudents - presentCount;
+  const attendanceRate = totalStudents > 0 ? ((presentCount / totalStudents) * 100).toFixed(0) : "0";
+
+  // Filter students by search
+  const filteredStudents = useMemo(() => {
+    if (!selectedClass) return [];
+    if (!searchQuery.trim()) return selectedClass.program.students;
+    const q = searchQuery.toLowerCase();
+    return selectedClass.program.students.filter(
+      (s) =>
+        s.user.firstName.toLowerCase().includes(q) ||
+        s.user.lastName.toLowerCase().includes(q) ||
+        s.enrollmentNumber.toLowerCase().includes(q) ||
+        (s.rollNumber && s.rollNumber.toLowerCase().includes(q)),
+    );
+  }, [selectedClass, searchQuery]);
 
   return (
-    <main className="dashboard-shell">
-      <header className="dashboard-header">
-        <div>
-          <p className="eyebrow">Teacher workspace</p>
-          <h1>Take attendance</h1>
-        </div>
-        <button className="quiet-button" type="button" onClick={logout}>Sign out</button>
-      </header>
+    <TeacherShell
+      title="Class Attendance Management"
+      subtitle="Roll Call & Attendance Logs"
+      teacherName={teacherInfo ? `${teacherInfo.firstName} ${teacherInfo.lastName}` : "Faculty Member"}
+      employeeNo={teacherInfo?.employeeNo}
+      avatarUrl={teacherInfo?.profileImageUrl}
+    >
+      {/* Attendance Control Card */}
+      <section className="profile-info-card" style={{ padding: "22px", marginBottom: "20px" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(240px, 1.8fr) minmax(180px, 1fr) auto",
+            gap: "16px",
+            alignItems: "end",
+          }}
+        >
+          <div>
+            <label style={{ display: "block", marginBottom: "6px", fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+              Select Class / Subject
+            </label>
+            <select
+              value={selectedClassId}
+              onChange={(e) => selectClass(e.target.value)}
+              disabled={isLoading}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "8px",
+                border: "1px solid var(--line, #e2e8f0)",
+                background: "var(--panel, #fff)",
+                color: "inherit",
+              }}
+            >
+              {classes.length === 0 && <option value="">No assigned classes found</option>}
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.subject.code} · {c.subject.name} ({c.dayOfWeek})
+                </option>
+              ))}
+            </select>
+          </div>
 
-      <section className="attendance-toolbar">
-        <label>
-          Class
-          <select value={selectedOfferingId} onChange={(event) => selectOffering(event.target.value)} disabled={isLoading}>
-            {offerings.length === 0 && <option value="">No assigned classes</option>}
-            {offerings.map((offering) => (
-              <option key={offering.id} value={offering.id}>
-                {offering.course.code} · {offering.course.name} · Section {offering.section}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Class date and time
-          <input type="datetime-local" value={heldAt} onChange={(event) => setHeldAt(event.target.value)} />
-        </label>
-        <div className="attendance-summary">
-          <span>{selectedOffering?.term.academicYear.name ?? "Academic year"}</span>
-          <strong>{selectedOffering?.enrollments.length ?? 0} students</strong>
+          <div>
+            <label style={{ display: "block", marginBottom: "6px", fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+              Session Date
+            </label>
+            <input
+              type="date"
+              value={sessionDate}
+              onChange={(e) => setSessionDate(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "8px",
+                border: "1px solid var(--line, #e2e8f0)",
+                background: "var(--panel, #fff)",
+                color: "inherit",
+              }}
+            />
+          </div>
+
+          <div style={{ textAlign: "right", paddingBottom: "4px" }}>
+            <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)", display: "block" }}>
+              Enrolled in Program
+            </span>
+            <strong style={{ fontSize: "1.1rem", color: "#0ea5e9" }}>
+              {selectedClass?.program.code || "—"} ({totalStudents} Students)
+            </strong>
+          </div>
         </div>
       </section>
 
-      {error && <p className="banner error-banner" role="alert">{error}</p>}
-      {message && <p className="banner success-banner" role="status">{message}</p>}
+      {/* Metrics Row */}
+      <section className="admin-metric-grid" style={{ marginBottom: "20px" }}>
+        <article className="admin-metric-card">
+          <span>Enrolled Students</span>
+          <strong>{totalStudents}</strong>
+          <small>Total in {selectedClass?.program.code ?? "class"}</small>
+        </article>
+        <article className="admin-metric-card">
+          <span>Marked Present</span>
+          <strong style={{ color: "#16a34a" }}>{presentCount}</strong>
+          <small>In-person attendance</small>
+        </article>
+        <article className="admin-metric-card">
+          <span>Marked Absent</span>
+          <strong style={{ color: "#dc2626" }}>{absentCount}</strong>
+          <small>Absentee students</small>
+        </article>
+        <article className="admin-metric-card">
+          <span>Attendance Rate</span>
+          <strong style={{ color: "#0ea5e9" }}>{attendanceRate}%</strong>
+          <small>Current session</small>
+        </article>
+      </section>
 
-      <section className="roster-section">
-        <div className="section-heading">
+      {/* Error & Success Messages */}
+      {error && (
+        <div
+          style={{
+            padding: "12px 16px",
+            borderRadius: "8px",
+            background: "#fef2f2",
+            color: "#b91c1c",
+            border: "1px solid #fecaca",
+            marginBottom: "16px",
+            fontSize: "0.88rem",
+          }}
+          role="alert"
+        >
+          {error}
+        </div>
+      )}
+      {message && (
+        <div
+          style={{
+            padding: "12px 16px",
+            borderRadius: "8px",
+            background: "#ecfdf5",
+            color: "#047857",
+            border: "1px solid #a7f3d0",
+            marginBottom: "16px",
+            fontSize: "0.88rem",
+          }}
+          role="status"
+        >
+          {message}
+        </div>
+      )}
+
+      {/* Roster & Roll Call Card */}
+      <section className="profile-info-card" style={{ padding: "24px" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "12px",
+            paddingBottom: "16px",
+            borderBottom: "1px solid var(--line, #e2e8f0)",
+          }}
+        >
           <div>
-            <p className="eyebrow">Roll call</p>
-            <h2>{selectedOffering ? `${selectedOffering.course.code} roster` : "Student roster"}</h2>
+            <h2 style={{ margin: 0, padding: 0, fontSize: "1.15rem", fontWeight: "700" }}>
+              Student Roll Call Checklist
+            </h2>
+            <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+              {selectedClass ? `${selectedClass.subject.code}: ${selectedClass.subject.name}` : "Select a class"}
+            </span>
           </div>
-          <p className="attendance-count">{presentStudentIds.size} of {selectedOffering?.enrollments.length ?? 0} present</p>
+
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <input
+              type="search"
+              placeholder="Search student or roll..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: "200px",
+                padding: "6px 12px",
+                borderRadius: "6px",
+                border: "1px solid var(--line, #e2e8f0)",
+                fontSize: "0.82rem",
+                background: "var(--panel, #fff)",
+                color: "inherit",
+              }}
+            />
+            <button
+              type="button"
+              onClick={selectAll}
+              disabled={!selectedClass || totalStudents === 0}
+              style={{
+                padding: "6px 12px",
+                borderRadius: "6px",
+                border: "1px solid var(--line, #e2e8f0)",
+                background: "var(--panel, #fff)",
+                color: "inherit",
+                fontSize: "0.8rem",
+                fontWeight: "600",
+                cursor: "pointer",
+              }}
+            >
+              Mark All Present
+            </button>
+            <button
+              type="button"
+              onClick={clearAll}
+              disabled={!selectedClass || totalStudents === 0}
+              style={{
+                padding: "6px 12px",
+                borderRadius: "6px",
+                border: "1px solid var(--line, #e2e8f0)",
+                background: "var(--panel, #fff)",
+                color: "inherit",
+                fontSize: "0.8rem",
+                fontWeight: "600",
+                cursor: "pointer",
+              }}
+            >
+              Clear All
+            </button>
+          </div>
         </div>
 
         {isLoading ? (
-          <p className="empty-state">Loading assigned classes...</p>
-        ) : selectedOffering?.enrollments.length ? (
-          <div className="roster-list">
-            {selectedOffering.enrollments.map(({ student }) => {
+          <p className="empty-state" style={{ textAlign: "center", padding: "40px 0" }}>
+            Loading student roster...
+          </p>
+        ) : !selectedClass || totalStudents === 0 ? (
+          <p className="empty-state" style={{ textAlign: "center", padding: "40px 0" }}>
+            No enrolled students in this class program yet.
+          </p>
+        ) : filteredStudents.length === 0 ? (
+          <p className="empty-state" style={{ textAlign: "center", padding: "40px 0" }}>
+            No students matching &quot;{searchQuery}&quot;
+          </p>
+        ) : (
+          <div style={{ display: "grid", gap: "8px", marginTop: "16px" }}>
+            {filteredStudents.map((student) => {
               const isPresent = presentStudentIds.has(student.id);
               return (
-                <label className={`student-row ${isPresent ? "is-present" : ""}`} key={student.id}>
-                  <span className="roll-number">{student.rollNumber ?? student.admissionNo}</span>
-                  {student.profileImageUrl ? (
-                    <img className="student-avatar" src={student.profileImageUrl} alt="" />
-                  ) : (
-                    <span className="student-avatar avatar-fallback">{student.user.firstName[0]}{student.user.lastName[0]}</span>
-                  )}
-                  <span className="student-name">
-                    <strong>{student.user.firstName} {student.user.lastName}</strong>
-                    <small>{student.admissionNo}</small>
-                  </span>
-                  <span className="presence-label">{isPresent ? "Present" : "Absent"}</span>
-                  <input type="checkbox" checked={isPresent} onChange={() => toggleStudent(student.id)} />
-                </label>
+                <div
+                  key={student.id}
+                  onClick={() => toggleStudent(student.id)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "12px 16px",
+                    borderRadius: "10px",
+                    border: `1px solid ${isPresent ? "#86efac" : "var(--line, #e2e8f0)"}`,
+                    background: isPresent ? "rgba(34, 197, 94, 0.06)" : "var(--panel, #fff)",
+                    cursor: "pointer",
+                    transition: "all 120ms ease",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                    <div
+                      style={{
+                        width: "38px",
+                        height: "38px",
+                        borderRadius: "50%",
+                        background: isPresent ? "#dcfce7" : "#f1f5f9",
+                        color: isPresent ? "#15803d" : "#475569",
+                        display: "grid",
+                        placeItems: "center",
+                        fontSize: "0.85rem",
+                        fontWeight: "700",
+                      }}
+                    >
+                      {student.user.firstName[0]}
+                      {student.user.lastName[0]}
+                    </div>
+                    <div>
+                      <strong style={{ display: "block", fontSize: "0.92rem" }}>
+                        {student.user.firstName} {student.user.lastName}
+                      </strong>
+                      <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
+                        Roll: {student.rollNumber || "N/A"} · Enrollment: {student.enrollmentNumber}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                    <span
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: "6px",
+                        fontSize: "0.75rem",
+                        fontWeight: "700",
+                        background: isPresent ? "#dcfce7" : "#fee2e2",
+                        color: isPresent ? "#15803d" : "#b91c1c",
+                      }}
+                    >
+                      {isPresent ? "PRESENT" : "ABSENT"}
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={isPresent}
+                      onChange={() => toggleStudent(student.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        width: "18px",
+                        height: "18px",
+                        cursor: "pointer",
+                        accentColor: "#0ea5e9",
+                      }}
+                    />
+                  </div>
+                </div>
               );
             })}
           </div>
-        ) : (
-          <p className="empty-state">No enrolled students in this class yet.</p>
         )}
-      </section>
 
-      <footer className="submit-bar">
-        <p>Students are marked absent unless checked present.</p>
-        <button className="primary-button" type="button" onClick={submitAttendance} disabled={!selectedOffering || isSubmitting || !selectedOffering.enrollments.length}>
-          {isSubmitting ? "Saving attendance..." : "Submit attendance"}
-        </button>
-      </footer>
-    </main>
+        {/* Submit Bar */}
+        <div
+          style={{
+            marginTop: "24px",
+            paddingTop: "16px",
+            borderTop: "1px solid var(--line, #e2e8f0)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "12px",
+          }}
+        >
+          <span style={{ fontSize: "0.82rem", color: "var(--ink-soft)" }}>
+            Unchecked students are marked Absent automatically.
+          </span>
+          <button
+            className="primary-button"
+            type="button"
+            onClick={submitAttendance}
+            disabled={!selectedClass || isSubmitting || totalStudents === 0}
+            style={{
+              padding: "10px 24px",
+              borderRadius: "8px",
+              background: "#0ea5e9",
+              color: "#fff",
+              fontWeight: "700",
+              fontSize: "0.85rem",
+              border: 0,
+              cursor: "pointer",
+            }}
+          >
+            {isSubmitting ? "Submitting Session..." : `Save Attendance (${presentCount} Present)`}
+          </button>
+        </div>
+      </section>
+    </TeacherShell>
   );
 }
