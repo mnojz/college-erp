@@ -305,7 +305,9 @@ export function ImageUploadCrop({
         >
           <div
             style={{
-              background: "var(--panel, #fff)",
+              background: "var(--modal-bg, var(--panel, #fff))",
+              border: "1px solid var(--modal-border, var(--line, #e2e8f0))",
+              color: "var(--foreground)",
               borderRadius: "16px",
               padding: "24px",
               maxWidth: "380px",
@@ -316,7 +318,7 @@ export function ImageUploadCrop({
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <strong style={{ fontSize: "16px" }}>Crop &amp; Resize Photo</strong>
+              <strong style={{ fontSize: "16px", color: "var(--foreground)" }}>Crop &amp; Resize Photo</strong>
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}

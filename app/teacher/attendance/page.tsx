@@ -172,6 +172,7 @@ export default function TeacherAttendancePage() {
 
   return (
     <TeacherShell
+      active="/teacher/attendance"
       title="Class Attendance Management"
       subtitle="Roll Call & Attendance Logs"
       teacherName={teacherInfo ? `${teacherInfo.firstName} ${teacherInfo.lastName}` : "Faculty Member"}

@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { AssetIcon, studentAssets } from "./assets";
+import { DashboardSidebar } from "@/app/components/layout/DashboardSidebar";
+import { studentAssets } from "./assets";
 
 const items = [
   ["Profile", "/student", studentAssets.user],
@@ -12,27 +11,6 @@ const items = [
   ["Schedules", "/student/schedules", studentAssets.schedules],
 ] as const;
 
-export function StudentSidebar() {
-  const pathname = usePathname();
-
-  return (
-    <aside className="student-sidebar">
-      <nav aria-label="Student navigation">
-        {items.map(([label, href, icon]) => {
-          const isActive = pathname === href;
-          return (
-            <Link
-              className={`student-sidebar-link ${isActive ? "active" : ""}`}
-              href={href}
-              key={label}
-            >
-              <AssetIcon src={icon} size={20} />
-              <span>{label}</span>
-              {isActive && <i />}
-            </Link>
-          );
-        })}
-      </nav>
-    </aside>
-  );
+export function StudentSidebar({ active }: { active?: string }) {
+  return <DashboardSidebar items={items} activeHref={active} />;
 }

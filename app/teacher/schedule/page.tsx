@@ -107,6 +107,7 @@ export default function TeacherSchedulePage() {
 
   return (
     <TeacherShell
+      active="/teacher/schedule"
       title="Weekly Teaching Schedule"
       subtitle="Faculty Timetable & Lectures"
       teacherName={teacherInfo ? `${teacherInfo.firstName} ${teacherInfo.lastName}` : "Faculty Member"}

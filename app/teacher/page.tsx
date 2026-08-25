@@ -112,6 +112,7 @@ export default function TeacherOverviewPage() {
 
   return (
     <TeacherShell
+      active="/teacher"
       title="Faculty Overview & Workspace"
       subtitle="Teacher Portal"
       teacherName={fullName}

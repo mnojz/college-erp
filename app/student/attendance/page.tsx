@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { StudentNav } from "@/app/components/student/StudentNav";
-import { StudentSidebar } from "@/app/components/student/StudentSidebar";
+import { StudentShell } from "@/app/components/student/StudentShell";
 
 type Profile = {
   enrollmentNumber: string;
@@ -96,15 +95,14 @@ export default function StudentAttendancePage() {
       : records.filter((r) => r.session.class.subject.code === selectedSubject);
 
   return (
-    <div className="student-app-shell">
-      <StudentNav name={fullName} studentId={studentId} avatarUrl={profile.profileImageUrl} />
-      <div className="student-page-body">
-        <StudentSidebar />
-        <main className="student-profile-content">
-          <header className="admin-page-heading" style={{ marginBottom: "24px" }}>
-            <p>Attendance Tracking</p>
-            <h1>Lecture &amp; Lab Attendance Records</h1>
-          </header>
+    <StudentShell
+      active="/student/attendance"
+      name={fullName}
+      studentId={studentId}
+      avatarUrl={profile.profileImageUrl}
+      title="Lecture & Lab Attendance Records"
+      subtitle="Attendance Tracking"
+    >
 
           <section className="admin-metric-grid" style={{ marginBottom: "24px" }}>
             <article className="admin-metric-card">
@@ -272,8 +270,6 @@ export default function StudentAttendancePage() {
               </table>
             </div>
           )}
-        </main>
-      </div>
-    </div>
+    </StudentShell>
   );
 }

@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { StudentNav } from "@/app/components/student/StudentNav";
-import { StudentSidebar } from "@/app/components/student/StudentSidebar";
+import { StudentShell } from "@/app/components/student/StudentShell";
 
 type Profile = {
   enrollmentNumber: string;
@@ -95,15 +94,14 @@ export default function StudentSchedulesPage() {
   const activeDays = Object.keys(groupedByDay);
 
   return (
-    <div className="student-app-shell">
-      <StudentNav name={fullName} studentId={studentId} avatarUrl={profile.profileImageUrl} />
-      <div className="student-page-body">
-        <StudentSidebar />
-        <main className="student-profile-content">
-          <header className="admin-page-heading" style={{ marginBottom: "24px" }}>
-            <p>Weekly Routine</p>
-            <h1>Class Schedules &amp; Timetable</h1>
-          </header>
+    <StudentShell
+      active="/student/schedules"
+      name={fullName}
+      studentId={studentId}
+      avatarUrl={profile.profileImageUrl}
+      title="Class Schedules & Timetable"
+      subtitle="Weekly Routine"
+    >
 
           <section className="admin-metric-grid" style={{ marginBottom: "24px" }}>
             <article className="admin-metric-card">
@@ -204,8 +202,6 @@ export default function StudentSchedulesPage() {
               ))}
             </div>
           )}
-        </main>
-      </div>
-    </div>
+    </StudentShell>
   );
 }

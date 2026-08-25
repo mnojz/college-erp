@@ -233,6 +233,7 @@ export default function TeacherAssessmentsPage() {
 
   return (
     <TeacherShell
+      active="/teacher/assessments"
       title="Assessments &amp; Student Grading"
       subtitle="Evaluation & Marks Management"
       teacherName={teacherInfo ? `${teacherInfo.firstName} ${teacherInfo.lastName}` : "Faculty Member"}

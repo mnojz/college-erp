@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { StudentNav } from "@/app/components/student/StudentNav";
-import { StudentSidebar } from "@/app/components/student/StudentSidebar";
+import { StudentShell } from "@/app/components/student/StudentShell";
 
 type Profile = {
   enrollmentNumber: string;
@@ -84,15 +83,14 @@ export default function StudentSubjectsPage() {
         );
 
   return (
-    <div className="student-app-shell">
-      <StudentNav name={fullName} studentId={studentId} avatarUrl={profile.profileImageUrl} />
-      <div className="student-page-body">
-        <StudentSidebar />
-        <main className="student-profile-content">
-          <header className="admin-page-heading" style={{ marginBottom: "24px" }}>
-            <p>Curriculum &amp; Coursework</p>
-            <h1>Program Subjects &amp; Modules</h1>
-          </header>
+    <StudentShell
+      active="/student/subjects"
+      name={fullName}
+      studentId={studentId}
+      avatarUrl={profile.profileImageUrl}
+      title="Program Subjects & Modules"
+      subtitle="Curriculum & Coursework"
+    >
 
           <section className="admin-metric-grid" style={{ marginBottom: "24px" }}>
             <article className="admin-metric-card">
@@ -187,8 +185,6 @@ export default function StudentSubjectsPage() {
               ))}
             </div>
           )}
-        </main>
-      </div>
-    </div>
+    </StudentShell>
   );
 }
