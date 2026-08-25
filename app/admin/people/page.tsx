@@ -384,7 +384,7 @@ export default function AdminPeoplePage() {
   }
 
   return (
-    <AdminShell title="People & Accounts" subtitle="Faculty & Student Directory" active="/admin/people">
+    <AdminShell title="People & Accounts" subtitle="Teachers & Student Directory" active="/admin/people">
       {/* Top action bar */}
       <div className="admin-topbar">
         <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
@@ -416,16 +416,16 @@ export default function AdminPeoplePage() {
           {/* Search input */}
           <input
             type="text"
-            placeholder={activeTab === "teachers" ? "Search faculty name, emp #, email..." : "Search student, roll, reg #..."}
+            placeholder={activeTab === "teachers" ? "Search teacher name, emp #, email..." : "Search student, roll, reg #..."}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
               padding: "9px 14px",
               borderRadius: "8px",
-              border: "1px solid #e2e8f0",
+              border: "1px solid var(--input-border)",
               fontSize: "13px",
-              background: "var(--panel, #fff)",
-              color: "inherit",
+              background: "var(--input-bg)",
+              color: "var(--input-color)",
               width: "260px",
             }}
           />
@@ -440,7 +440,7 @@ export default function AdminPeoplePage() {
               setError("");
             }}
           >
-            + Add Faculty
+            + Add Teacher
           </button>
           <button
             className="btn-add"
@@ -463,7 +463,7 @@ export default function AdminPeoplePage() {
           className={`admin-tab ${activeTab === "teachers" ? "active" : ""}`}
           onClick={() => setActiveTab("teachers")}
         >
-          Faculty / Teachers ({teachers.length})
+          Teachers ({teachers.length})
         </button>
         <button
           type="button"
