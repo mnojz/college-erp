@@ -3,135 +3,153 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminShell } from "@/app/components/admin/AdminShell";
+import { AdminModal } from "@/app/components/admin/AdminModal";
 
-type Program = { id: string; name: string; code: string; durationYears: number };
+type Program = {
+  id: string;
+  name: string;
+  code: string;
+  departmentName: string;
+  durationYears: number;
+};
 
-const emptyProgram = { name: "", code: "", durationYears: "4", departmentName: "" };
+const empty = { name: "", code: "", departmentName: "", durationYears: "4" };
 
 export default function AdminSetupPage() {
   const router = useRouter();
   const [programs, setPrograms] = useState<Program[]>([]);
-  const [program, setProgram] = useState(emptyProgram);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState(empty);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     async function load() {
       const me = await fetch("/api/auth/me");
-      if (!me.ok || (await me.json()).user.role !== "ADMIN") return router.replace("/");
-      const response = await fetch("/api/programs");
-      setPrograms((await response.json()).programs ?? []);
+      if (!me.ok || (await me.json()).user.role !== "ADMIN") {
+        router.replace("/");
+        return;
+      }
+      const res = await fetch("/api/programs");
+      const data = await res.json();
+      setPrograms(data.programs ?? []);
+      setLoading(false);
     }
-    load().catch(() => setError("Unable to load programs"));
+    load().catch(() => { setError("Unable to load programs"); setLoading(false); });
   }, [router]);
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
-    setMessage("");
-    const response = await fetch("/api/programs", {
+    setSaving(true);
+    const res = await fetch("/api/programs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...program, durationYears: Number(program.durationYears) }),
+      body: JSON.stringify({ ...form, durationYears: Number(form.durationYears) }),
     });
-    const data = await response.json();
-    if (!response.ok) return setError(data.error ?? "Unable to save record");
-    setPrograms([...programs, data.program]);
-    setProgram(emptyProgram);
-    setMessage("Program created successfully");
+    const data = await res.json();
+    setSaving(false);
+    if (!res.ok) { setError(data.error ?? "Unable to create program"); return; }
+    setPrograms((p) => [...p, data.program]);
+    setForm(empty);
+    setShowModal(false);
+    setMessage("Program created successfully.");
+  }
+
+  function field(label: string, key: keyof typeof form, type = "text") {
+    return (
+      <label>
+        {label}
+        <input
+          type={type}
+          value={form[key]}
+          onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+          required
+        />
+      </label>
+    );
   }
 
   return (
     <AdminShell title="Programs" subtitle="Academic Program Structure" active="/admin/setup">
-      <section className="admin-form-layout">
-        {/* Create Program */}
-        <article className="profile-info-card admin-form-card">
-          <h2>Create a Program</h2>
-          <p style={{ fontSize: "0.82rem", color: "var(--ink-soft)", marginBottom: "16px" }}>
-            Semesters are automatically calculated from the program duration (e.g. 4 years = 8 semesters). No manual semester creation needed.
-          </p>
-          <form onSubmit={submit}>
-            <Field label="Program Name" value={program.name} update={(v) => setProgram({ ...program, name: v })} />
-            <Field label="Program Code" value={program.code} update={(v) => setProgram({ ...program, code: v })} />
-            <Field
-              label="Department Name"
-              value={program.departmentName}
-              update={(v) => setProgram({ ...program, departmentName: v })}
-            />
-            <Field
-              label="Duration (Years)"
-              type="number"
-              value={program.durationYears}
-              update={(v) => setProgram({ ...program, durationYears: v })}
-            />
-            <button className="admin-primary" type="submit">
-              + Create Program
-            </button>
-          </form>
-        </article>
+      {/* Top bar */}
+      <div className="admin-topbar">
+        <p style={{ margin: 0, color: "#64748b", fontSize: 13, fontFamily: "Arial, sans-serif" }}>
+          {loading ? "Loading…" : `${programs.length} program${programs.length !== 1 ? "s" : ""} registered`}
+        </p>
+        <div className="admin-topbar-actions">
+          <button className="btn-add" type="button" onClick={() => { setShowModal(true); setError(""); }}>
+            + Add Program
+          </button>
+        </div>
+      </div>
 
-        {/* Programs List */}
-        {programs.length > 0 && (
-          <article className="profile-info-card admin-form-card">
-            <h2>Existing Programs</h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {programs.map((p) => (
-                <div
-                  key={p.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "12px 16px",
-                    borderRadius: "8px",
-                    background: "var(--surface-2, #f8f9fa)",
-                    border: "1px solid var(--border, #e5e7eb)",
-                  }}
-                >
-                  <div>
-                    <strong style={{ fontSize: "0.95rem" }}>{p.code}</strong>
-                    <span style={{ marginLeft: "10px", color: "var(--ink-soft)", fontSize: "0.85rem" }}>{p.name}</span>
-                  </div>
-                  <span
-                    style={{
-                      fontSize: "0.75rem",
-                      padding: "3px 10px",
-                      borderRadius: "99px",
-                      background: "#dbeafe",
-                      color: "#1d4ed8",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {p.durationYears * 2} Semesters
-                  </span>
-                </div>
-              ))}
-            </div>
-          </article>
-        )}
-      </section>
+      {/* Data table */}
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Program Name</th>
+              <th>Department</th>
+              <th>Duration</th>
+              <th>Semesters</th>
+            </tr>
+          </thead>
+          <tbody>
+            {programs.length === 0 && !loading ? (
+              <tr>
+                <td colSpan={5} className="admin-table-empty">
+                  No programs yet. Click <strong>+ Add Program</strong> to create one.
+                </td>
+              </tr>
+            ) : (
+              programs.map((p) => (
+                <tr key={p.id}>
+                  <td>
+                    <span className="badge badge-blue">{p.code}</span>
+                  </td>
+                  <td style={{ fontWeight: 600 }}>{p.name}</td>
+                  <td style={{ color: "#64748b" }}>{p.departmentName}</td>
+                  <td>{p.durationYears} years</td>
+                  <td>
+                    <span className="badge badge-slate">{p.durationYears * 2} semesters</span>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {error && <p className="admin-message error">{error}</p>}
       {message && <p className="admin-message success">{message}</p>}
-    </AdminShell>
-  );
-}
 
-function Field({
-  label,
-  value,
-  update,
-  type = "text",
-}: {
-  label: string;
-  value: string;
-  update: (value: string) => void;
-  type?: string;
-}) {
-  return (
-    <label>
-      {label}
-      <input type={type} value={value} onChange={(e) => update(e.target.value)} required />
-    </label>
+      {/* Add Program Modal */}
+      {showModal && (
+        <AdminModal title="Add New Program" onClose={() => setShowModal(false)}>
+          <form className="modal-form" onSubmit={submit}>
+            {field("Program Name", "name")}
+            {field("Program Code (e.g. BCT)", "code")}
+            {field("Department Name", "departmentName")}
+            {field("Duration (Years)", "durationYears", "number")}
+            <p style={{ margin: 0, fontSize: 12, color: "#94a3b8", fontFamily: "Arial, sans-serif" }}>
+              Semesters = duration × 2 (auto-calculated, no manual creation needed)
+            </p>
+            {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
+            <div className="modal-actions">
+              <button className="btn-primary" type="submit" disabled={saving}>
+                {saving ? "Creating…" : "Create Program"}
+              </button>
+              <button className="btn-ghost" type="button" onClick={() => setShowModal(false)}>
+                Cancel
+              </button>
+            </div>
+          </form>
+        </AdminModal>
+      )}
+    </AdminShell>
   );
 }
