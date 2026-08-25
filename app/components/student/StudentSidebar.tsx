@@ -33,11 +33,6 @@ export function StudentSidebar() {
           );
         })}
       </nav>
-      <div className="student-support">
-        <strong>Need Support?</strong>
-        <p>Contact campus helpdesk for academic and technical queries.</p>
-        <a href="mailto:helpdesk@college.edu">Contact Helpdesk</a>
-      </div>
     </aside>
   );
 }

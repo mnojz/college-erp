@@ -55,6 +55,16 @@ function formatTime(isoTime: string) {
   }
 }
 
+function timeToHHMM(isoTime: string) {
+  try {
+    const d = new Date(isoTime);
+    if (isNaN(d.getTime())) return isoTime.slice(11, 16);
+    return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+  } catch {
+    return "09:00";
+  }
+}
+
 export default function AdminTeachingPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"subjects" | "classes">("subjects");
@@ -68,11 +78,20 @@ export default function AdminTeachingPage() {
   const [selectedProgramFilter, setSelectedProgramFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Modals
+  // Create Modals
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [showClassModal, setShowClassModal] = useState(false);
   const [subjectForm, setSubjectForm] = useState(emptySubjectForm);
   const [classForm, setClassForm] = useState(emptyClassForm);
+
+  // Edit Modals
+  const [editingSubject, setEditingSubject] = useState<{ id: string } & typeof emptySubjectForm | null>(null);
+  const [editingClass, setEditingClass] = useState<{ id: string } & typeof emptyClassForm | null>(null);
+
+  // Delete Confirmations
+  const [deletingSubject, setDeletingSubject] = useState<SubjectItem | null>(null);
+  const [deletingClass, setDeletingClass] = useState<ClassItem | null>(null);
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -113,27 +132,49 @@ export default function AdminTeachingPage() {
     load();
   }, [router]);
 
-  // Compute available semesters for Subject form
+  // Derived Semesters for Create Subject Form
   const subjectProgram = useMemo(
     () => programs.find((p) => p.id === subjectForm.programId),
     [programs, subjectForm.programId],
   );
   const subjectSemestersCount = subjectProgram ? subjectProgram.durationYears * 2 : 0;
 
-  // Compute available semesters for Class form
+  // Derived Semesters for Edit Subject Form
+  const editSubjectProgram = useMemo(
+    () => programs.find((p) => p.id === editingSubject?.programId),
+    [programs, editingSubject],
+  );
+  const editSubjectSemestersCount = editSubjectProgram ? editSubjectProgram.durationYears * 2 : 0;
+
+  // Derived Semesters for Create Class Form
   const classProgram = useMemo(
     () => programs.find((p) => p.id === classForm.programId),
     [programs, classForm.programId],
   );
   const classSemestersCount = classProgram ? classProgram.durationYears * 2 : 0;
 
-  // Compute subjects available for chosen program & semester in Class form
+  // Derived Semesters for Edit Class Form
+  const editClassProgram = useMemo(
+    () => programs.find((p) => p.id === editingClass?.programId),
+    [programs, editingClass],
+  );
+  const editClassSemestersCount = editClassProgram ? editClassProgram.durationYears * 2 : 0;
+
+  // Subjects for Create Class
   const availableClassSubjects = useMemo(() => {
     if (!classForm.programId || !classForm.semester) return [];
     return subjects.filter(
       (s) => s.programId === classForm.programId && s.semester === Number(classForm.semester),
     );
   }, [subjects, classForm.programId, classForm.semester]);
+
+  // Subjects for Edit Class
+  const editAvailableClassSubjects = useMemo(() => {
+    if (!editingClass?.programId || !editingClass?.semester) return [];
+    return subjects.filter(
+      (s) => s.programId === editingClass.programId && s.semester === Number(editingClass.semester),
+    );
+  }, [subjects, editingClass]);
 
   // Filtered lists
   const filteredSubjects = useMemo(() => {
@@ -160,6 +201,7 @@ export default function AdminTeachingPage() {
     });
   }, [classes, selectedProgramFilter, searchQuery]);
 
+  // Handle Create Subject
   async function handleCreateSubject(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
@@ -180,7 +222,6 @@ export default function AdminTeachingPage() {
         setError(data.error ?? "Failed to create subject");
         return;
       }
-      // Re-fetch subjects to ensure full program relation is populated
       const refresh = await fetch("/api/subjects");
       const refreshData = await refresh.json();
       setSubjects(refreshData.subjects ?? []);
@@ -194,6 +235,64 @@ export default function AdminTeachingPage() {
     }
   }
 
+  // Handle Update Subject
+  async function handleUpdateSubject(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!editingSubject) return;
+    setError("");
+    setSaving(true);
+    try {
+      const res = await fetch("/api/subjects", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingSubject.id,
+          name: editingSubject.name,
+          code: editingSubject.code,
+          programId: editingSubject.programId,
+          semester: Number(editingSubject.semester),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Failed to update subject");
+        return;
+      }
+      const refresh = await fetch("/api/subjects");
+      const refreshData = await refresh.json();
+      setSubjects(refreshData.subjects ?? []);
+      setEditingSubject(null);
+      setMessage(`Subject ${data.subject.code} updated successfully.`);
+    } catch {
+      setError("Failed to update subject");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Handle Delete Subject
+  async function handleDeleteSubject() {
+    if (!deletingSubject) return;
+    setError("");
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/subjects?id=${deletingSubject.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Failed to delete subject");
+        return;
+      }
+      setSubjects((prev) => prev.filter((s) => s.id !== deletingSubject.id));
+      setMessage(`Subject ${deletingSubject.code} has been deleted.`);
+      setDeletingSubject(null);
+    } catch {
+      setError("Failed to delete subject");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Handle Create Class
   async function handleCreateClass(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
@@ -217,7 +316,6 @@ export default function AdminTeachingPage() {
         setError(data.error ?? "Failed to create class slot");
         return;
       }
-      // Re-fetch classes
       const refresh = await fetch("/api/classes");
       const refreshData = await refresh.json();
       setClasses(refreshData.classes ?? []);
@@ -226,6 +324,66 @@ export default function AdminTeachingPage() {
       setMessage("Class slot scheduled successfully.");
     } catch {
       setError("Failed to schedule class");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Handle Update Class
+  async function handleUpdateClass(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!editingClass) return;
+    setError("");
+    setSaving(true);
+    try {
+      const res = await fetch("/api/classes", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingClass.id,
+          programId: editingClass.programId,
+          semester: Number(editingClass.semester),
+          subjectId: editingClass.subjectId,
+          teacherId: editingClass.teacherId,
+          dayOfWeek: editingClass.dayOfWeek,
+          startTime: editingClass.startTime,
+          endTime: editingClass.endTime,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Failed to update class slot");
+        return;
+      }
+      const refresh = await fetch("/api/classes");
+      const refreshData = await refresh.json();
+      setClasses(refreshData.classes ?? []);
+      setEditingClass(null);
+      setMessage("Class slot updated successfully.");
+    } catch {
+      setError("Failed to update class schedule");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Handle Delete Class
+  async function handleDeleteClass() {
+    if (!deletingClass) return;
+    setError("");
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/classes?id=${deletingClass.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Failed to delete class slot");
+        return;
+      }
+      setClasses((prev) => prev.filter((c) => c.id !== deletingClass.id));
+      setMessage("Class slot deleted successfully.");
+      setDeletingClass(null);
+    } catch {
+      setError("Failed to delete class slot");
     } finally {
       setSaving(false);
     }
@@ -243,7 +401,7 @@ export default function AdminTeachingPage() {
             style={{
               padding: "9px 14px",
               borderRadius: "8px",
-              border: "1px solid #e2e8f0",
+              border: "1px solid var(--line, #e2e8f0)",
               fontSize: "13px",
               background: "var(--panel, #fff)",
               color: "inherit",
@@ -268,7 +426,7 @@ export default function AdminTeachingPage() {
             style={{
               padding: "9px 14px",
               borderRadius: "8px",
-              border: "1px solid #e2e8f0",
+              border: "1px solid var(--line, #e2e8f0)",
               fontSize: "13px",
               background: "var(--panel, #fff)",
               color: "inherit",
@@ -330,12 +488,13 @@ export default function AdminTeachingPage() {
                 <th>Subject Name</th>
                 <th>Program</th>
                 <th>Semester</th>
+                <th style={{ textAlign: "right" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredSubjects.length === 0 && !loading ? (
                 <tr>
-                  <td colSpan={4} className="admin-table-empty">
+                  <td colSpan={5} className="admin-table-empty">
                     No subjects found. Click <strong>+ Add Subject</strong> to add curriculum courses.
                   </td>
                 </tr>
@@ -347,11 +506,53 @@ export default function AdminTeachingPage() {
                     </td>
                     <td style={{ fontWeight: 600 }}>{s.name}</td>
                     <td>
-                      <span style={{ color: "#64748b" }}>{s.program.code} · </span>
+                      <span style={{ color: "var(--ink-soft)" }}>{s.program.code} · </span>
                       {s.program.name}
                     </td>
                     <td>
                       <span className="badge badge-slate">Semester {s.semester}</span>
+                    </td>
+                    <td>
+                      <div className="table-actions">
+                        <button
+                          type="button"
+                          className="btn-action-edit"
+                          title="Edit Subject"
+                          aria-label="Edit Subject"
+                          onClick={() => {
+                            setError("");
+                            setEditingSubject({
+                              id: s.id,
+                              name: s.name,
+                              code: s.code,
+                              programId: s.programId,
+                              semester: String(s.semester),
+                            });
+                          }}
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-action-delete"
+                          title="Delete Subject"
+                          aria-label="Delete Subject"
+                          onClick={() => {
+                            setError("");
+                            setDeletingSubject(s);
+                          }}
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -372,12 +573,13 @@ export default function AdminTeachingPage() {
                 <th>Faculty / Teacher</th>
                 <th>Day of Week</th>
                 <th>Time Slot</th>
+                <th style={{ textAlign: "right" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredClasses.length === 0 && !loading ? (
                 <tr>
-                  <td colSpan={5} className="admin-table-empty">
+                  <td colSpan={6} className="admin-table-empty">
                     No scheduled classes found. Click <strong>+ Add Class Slot</strong> to assign lecture times.
                   </td>
                 </tr>
@@ -398,22 +600,60 @@ export default function AdminTeachingPage() {
                       <div style={{ fontWeight: 500 }}>
                         {c.teacher.user.firstName} {c.teacher.user.lastName}
                       </div>
-                      <small style={{ color: "#64748b" }}>{c.teacher.employeeNo}</small>
+                      <small style={{ color: "var(--ink-soft)" }}>{c.teacher.employeeNo}</small>
                     </td>
                     <td>
-                      <span
-                        className="badge"
-                        style={{
-                          background: "#f0fdf4",
-                          color: "#166534",
-                          fontWeight: 700,
-                        }}
-                      >
+                      <span className="badge badge-green">
                         {c.dayOfWeek}
                       </span>
                     </td>
                     <td style={{ fontWeight: 500 }}>
                       {formatTime(c.startTime)} – {formatTime(c.endTime)}
+                    </td>
+                    <td>
+                      <div className="table-actions">
+                        <button
+                          type="button"
+                          className="btn-action-edit"
+                          title="Edit Class Schedule"
+                          aria-label="Edit Class Schedule"
+                          onClick={() => {
+                            setError("");
+                            setEditingClass({
+                              id: c.id,
+                              programId: c.programId,
+                              semester: String(c.semester),
+                              subjectId: c.subjectId,
+                              teacherId: c.teacherId,
+                              dayOfWeek: c.dayOfWeek,
+                              startTime: timeToHHMM(c.startTime),
+                              endTime: timeToHHMM(c.endTime),
+                            });
+                          }}
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-action-delete"
+                          title="Delete Class Schedule"
+                          aria-label="Delete Class Schedule"
+                          onClick={() => {
+                            setError("");
+                            setDeletingClass(c);
+                          }}
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -514,7 +754,104 @@ export default function AdminTeachingPage() {
         </AdminModal>
       )}
 
-      {/* Modal 2: Add Class Slot */}
+      {/* Modal 2: Edit Subject */}
+      {editingSubject && (
+        <AdminModal
+          title={`Edit Subject: ${editingSubject.code}`}
+          onClose={() => setEditingSubject(null)}
+        >
+          <form className="modal-form" onSubmit={handleUpdateSubject}>
+            <label>
+              Program
+              <select
+                value={editingSubject.programId}
+                onChange={(e) => setEditingSubject({ ...editingSubject, programId: e.target.value, semester: "1" })}
+                required
+              >
+                {programs.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.code} — {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Semester
+              <select
+                value={editingSubject.semester}
+                onChange={(e) => setEditingSubject({ ...editingSubject, semester: e.target.value })}
+                required
+              >
+                {Array.from({ length: editSubjectSemestersCount }, (_, i) => i + 1).map((n) => (
+                  <option key={n} value={String(n)}>
+                    Semester {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Subject Name
+              <input
+                type="text"
+                value={editingSubject.name}
+                onChange={(e) => setEditingSubject({ ...editingSubject, name: e.target.value })}
+                required
+              />
+            </label>
+
+            <label>
+              Subject Code
+              <input
+                type="text"
+                value={editingSubject.code}
+                onChange={(e) => setEditingSubject({ ...editingSubject, code: e.target.value.toUpperCase() })}
+                required
+              />
+            </label>
+
+            {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
+
+            <div className="modal-actions">
+              <button className="btn-primary" type="submit" disabled={saving}>
+                {saving ? "Saving Changes…" : "Save Changes"}
+              </button>
+              <button className="btn-ghost" type="button" onClick={() => setEditingSubject(null)}>
+                Cancel
+              </button>
+            </div>
+          </form>
+        </AdminModal>
+      )}
+
+      {/* Modal 3: Delete Subject Confirmation */}
+      {deletingSubject && (
+        <AdminModal
+          title={`Delete Subject: ${deletingSubject.code}`}
+          onClose={() => setDeletingSubject(null)}
+        >
+          <div className="modal-confirm-box">
+            <p>
+              Are you sure you want to delete the course <strong>{deletingSubject.name} ({deletingSubject.code})</strong>?
+            </p>
+            <p style={{ fontSize: "13px", color: "#dc2626", background: "rgba(220, 38, 38, 0.08)", padding: "10px 14px", borderRadius: "8px" }}>
+              ⚠️ Deleting this subject will permanently remove all scheduled lecture slots, assessments, and attendance records associated with it.
+            </p>
+            {error && <p style={{ margin: "12px 0 0", fontSize: 13, color: "#b91c1c" }}>{error}</p>}
+            <div className="modal-actions" style={{ marginTop: "20px" }}>
+              <button className="btn-danger" type="button" onClick={handleDeleteSubject} disabled={saving}>
+                {saving ? "Deleting…" : "Yes, Delete Subject"}
+              </button>
+              <button className="btn-ghost" type="button" onClick={() => setDeletingSubject(null)} disabled={saving}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </AdminModal>
+      )}
+
+      {/* Modal 4: Add Class Slot */}
       {showClassModal && (
         <AdminModal
           title="Schedule New Class Slot"
@@ -667,6 +1004,171 @@ export default function AdminTeachingPage() {
               </button>
             </div>
           </form>
+        </AdminModal>
+      )}
+
+      {/* Modal 5: Edit Class Slot */}
+      {editingClass && (
+        <AdminModal
+          title="Edit Class Schedule Slot"
+          onClose={() => setEditingClass(null)}
+        >
+          <form className="modal-form" onSubmit={handleUpdateClass}>
+            <div className="inline-pair">
+              <label>
+                Program
+                <select
+                  value={editingClass.programId}
+                  onChange={(e) =>
+                    setEditingClass({
+                      ...editingClass,
+                      programId: e.target.value,
+                      semester: "1",
+                      subjectId: "",
+                    })
+                  }
+                  required
+                >
+                  {programs.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.code} — {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                Semester
+                <select
+                  value={editingClass.semester}
+                  onChange={(e) =>
+                    setEditingClass({
+                      ...editingClass,
+                      semester: e.target.value,
+                      subjectId: "",
+                    })
+                  }
+                  required
+                >
+                  {Array.from({ length: editClassSemestersCount }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={String(n)}>
+                      Semester {n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <label>
+              Subject Course
+              <select
+                value={editingClass.subjectId}
+                onChange={(e) => setEditingClass({ ...editingClass, subjectId: e.target.value })}
+                required
+              >
+                <option value="">
+                  {editAvailableClassSubjects.length === 0
+                    ? "No subjects registered for this semester"
+                    : "Select Subject"}
+                </option>
+                {editAvailableClassSubjects.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.code} · {s.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Assigned Faculty / Teacher
+              <select
+                value={editingClass.teacherId}
+                onChange={(e) => setEditingClass({ ...editingClass, teacherId: e.target.value })}
+                required
+              >
+                {teachers.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} ({t.employeeNo})
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Weekday
+              <select
+                value={editingClass.dayOfWeek}
+                onChange={(e) => setEditingClass({ ...editingClass, dayOfWeek: e.target.value })}
+                required
+              >
+                {DAYS.map((day) => (
+                  <option key={day} value={day}>
+                    {day}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="inline-pair">
+              <label>
+                Start Time
+                <input
+                  type="time"
+                  value={editingClass.startTime}
+                  onChange={(e) => setEditingClass({ ...editingClass, startTime: e.target.value })}
+                  required
+                />
+              </label>
+              <label>
+                End Time
+                <input
+                  type="time"
+                  value={editingClass.endTime}
+                  onChange={(e) => setEditingClass({ ...editingClass, endTime: e.target.value })}
+                  required
+                />
+              </label>
+            </div>
+
+            {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
+
+            <div className="modal-actions">
+              <button className="btn-primary" type="submit" disabled={saving}>
+                {saving ? "Saving Changes…" : "Save Changes"}
+              </button>
+              <button className="btn-ghost" type="button" onClick={() => setEditingClass(null)}>
+                Cancel
+              </button>
+            </div>
+          </form>
+        </AdminModal>
+      )}
+
+      {/* Modal 6: Delete Class Confirmation */}
+      {deletingClass && (
+        <AdminModal
+          title="Delete Class Schedule Slot"
+          onClose={() => setDeletingClass(null)}
+        >
+          <div className="modal-confirm-box">
+            <p>
+              Are you sure you want to delete this lecture slot for{" "}
+              <strong>{deletingClass.subject.name} ({deletingClass.subject.code})</strong> on {deletingClass.dayOfWeek} (
+              {formatTime(deletingClass.startTime)} - {formatTime(deletingClass.endTime)})?
+            </p>
+            <p style={{ fontSize: "13px", color: "#dc2626", background: "rgba(220, 38, 38, 0.08)", padding: "10px 14px", borderRadius: "8px" }}>
+              ⚠️ Deleting this schedule will remove its associated attendance sessions and student attendance records.
+            </p>
+            {error && <p style={{ margin: "12px 0 0", fontSize: 13, color: "#b91c1c" }}>{error}</p>}
+            <div className="modal-actions" style={{ marginTop: "20px" }}>
+              <button className="btn-danger" type="button" onClick={handleDeleteClass} disabled={saving}>
+                {saving ? "Deleting…" : "Yes, Delete Slot"}
+              </button>
+              <button className="btn-ghost" type="button" onClick={() => setDeletingClass(null)} disabled={saving}>
+                Cancel
+              </button>
+            </div>
+          </div>
         </AdminModal>
       )}
     </AdminShell>

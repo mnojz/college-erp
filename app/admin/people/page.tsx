@@ -40,6 +40,13 @@ type StudentItem = {
 
 type ProgramOption = { id: string; name: string; code: string; durationYears: number };
 
+type DeleteTarget = {
+  type: "teacher" | "student";
+  id: string;
+  name: string;
+  identifier: string;
+};
+
 const teacherEmpty = {
   email: "",
   password: "",
@@ -75,11 +82,19 @@ export default function AdminPeoplePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProgramFilter, setSelectedProgramFilter] = useState("ALL");
 
-  // Modals
+  // Create Modals
   const [showTeacherModal, setShowTeacherModal] = useState(false);
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [teacherForm, setTeacherForm] = useState(teacherEmpty);
   const [studentForm, setStudentForm] = useState(studentEmpty);
+
+  // Edit Modals
+  const [editingTeacher, setEditingTeacher] = useState<{ id: string } & typeof teacherEmpty | null>(null);
+  const [editingStudent, setEditingStudent] = useState<{ id: string } & typeof studentEmpty | null>(null);
+
+  // Delete Confirmation Modal
+  const [deletingTarget, setDeletingTarget] = useState<DeleteTarget | null>(null);
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -111,11 +126,18 @@ export default function AdminPeoplePage() {
   }, [router]);
 
   // Derived semester count for student creation form
-  const selectedStudentProgram = useMemo(
+  const createStudentProgram = useMemo(
     () => programs.find((p) => p.id === studentForm.programId),
     [programs, studentForm.programId],
   );
-  const studentSemestersCount = selectedStudentProgram ? selectedStudentProgram.durationYears * 2 : 0;
+  const createStudentSemestersCount = createStudentProgram ? createStudentProgram.durationYears * 2 : 0;
+
+  // Derived semester count for student edit form
+  const editStudentProgram = useMemo(
+    () => programs.find((p) => p.id === editingStudent?.programId),
+    [programs, editingStudent?.programId],
+  );
+  const editStudentSemestersCount = editStudentProgram ? editStudentProgram.durationYears * 2 : 0;
 
   // Filtered teachers
   const filteredTeachers = useMemo(() => {
@@ -149,6 +171,42 @@ export default function AdminPeoplePage() {
     });
   }, [students, searchQuery, selectedProgramFilter]);
 
+  // Open Edit Teacher modal
+  function openEditTeacher(teacher: TeacherItem) {
+    setError("");
+    setMessage("");
+    setEditingTeacher({
+      id: teacher.id,
+      firstName: teacher.user.firstName,
+      lastName: teacher.user.lastName,
+      email: teacher.user.email,
+      password: "",
+      employeeNo: teacher.employeeNo,
+      profileImageUrl: teacher.profileImageUrl || "",
+    });
+  }
+
+  // Open Edit Student modal
+  function openEditStudent(student: StudentItem) {
+    setError("");
+    setMessage("");
+    setEditingStudent({
+      id: student.id,
+      firstName: student.user.firstName,
+      lastName: student.user.lastName,
+      email: student.user.email,
+      password: "",
+      enrollmentNumber: student.enrollmentNumber,
+      registrationId: student.registrationId,
+      rollNumber: student.rollNumber || "",
+      admissionDate: student.admissionDate ? new Date(student.admissionDate).toISOString().slice(0, 10) : "",
+      programId: student.programId || "",
+      currentSemester: student.currentSemester ? String(student.currentSemester) : "1",
+      profileImageUrl: student.profileImageUrl || "",
+    });
+  }
+
+  // Handle Create Teacher
   async function handleCreateTeacher(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
@@ -177,6 +235,48 @@ export default function AdminPeoplePage() {
     }
   }
 
+  // Handle Update Teacher
+  async function handleUpdateTeacher(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!editingTeacher) return;
+    setError("");
+    setSaving(true);
+    try {
+      const payload: Record<string, string | undefined> = {
+        id: editingTeacher.id,
+        firstName: editingTeacher.firstName,
+        lastName: editingTeacher.lastName,
+        email: editingTeacher.email,
+        employeeNo: editingTeacher.employeeNo,
+        profileImageUrl: editingTeacher.profileImageUrl || undefined,
+      };
+      if (editingTeacher.password) {
+        payload.password = editingTeacher.password;
+      }
+
+      const res = await fetch("/api/teachers", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Failed to update faculty account");
+        return;
+      }
+      const refresh = await fetch("/api/teachers");
+      const refreshData = await refresh.json();
+      setTeachers(refreshData.teachers ?? []);
+      setEditingTeacher(null);
+      setMessage(`Profile updated for ${data.teacher.user.firstName} ${data.teacher.user.lastName}.`);
+    } catch {
+      setError("Failed to update faculty account");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Handle Create Student
   async function handleCreateStudent(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
@@ -205,6 +305,79 @@ export default function AdminPeoplePage() {
       setMessage(`Student account created for ${data.student.user.firstName} ${data.student.user.lastName}.`);
     } catch {
       setError("Failed to create student account");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Handle Update Student
+  async function handleUpdateStudent(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!editingStudent) return;
+    setError("");
+    setSaving(true);
+    try {
+      const payload: Record<string, string | number | undefined> = {
+        id: editingStudent.id,
+        firstName: editingStudent.firstName,
+        lastName: editingStudent.lastName,
+        email: editingStudent.email,
+        enrollmentNumber: editingStudent.enrollmentNumber,
+        registrationId: editingStudent.registrationId,
+        rollNumber: editingStudent.rollNumber || undefined,
+        admissionDate: editingStudent.admissionDate,
+        programId: editingStudent.programId || undefined,
+        currentSemester: editingStudent.currentSemester ? Number(editingStudent.currentSemester) : undefined,
+        profileImageUrl: editingStudent.profileImageUrl || undefined,
+      };
+      if (editingStudent.password) {
+        payload.password = editingStudent.password;
+      }
+
+      const res = await fetch("/api/students", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Failed to update student account");
+        return;
+      }
+      const refresh = await fetch("/api/students");
+      const refreshData = await refresh.json();
+      setStudents(refreshData.students ?? []);
+      setEditingStudent(null);
+      setMessage(`Student profile updated for ${data.student.user.firstName} ${data.student.user.lastName}.`);
+    } catch {
+      setError("Failed to update student account");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Handle Delete Confirmation
+  async function handleConfirmDelete() {
+    if (!deletingTarget) return;
+    setError("");
+    setSaving(true);
+    const endpoint = deletingTarget.type === "teacher" ? `/api/teachers?id=${deletingTarget.id}` : `/api/students?id=${deletingTarget.id}`;
+    try {
+      const res = await fetch(endpoint, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Failed to delete account");
+        return;
+      }
+      if (deletingTarget.type === "teacher") {
+        setTeachers((prev) => prev.filter((t) => t.id !== deletingTarget.id));
+      } else {
+        setStudents((prev) => prev.filter((s) => s.id !== deletingTarget.id));
+      }
+      setMessage(`${deletingTarget.name} has been removed successfully.`);
+      setDeletingTarget(null);
+    } catch {
+      setError("Unable to process deletion");
     } finally {
       setSaving(false);
     }
@@ -311,12 +484,13 @@ export default function AdminPeoplePage() {
                 <th>Employee Number</th>
                 <th>Email Address</th>
                 <th>Status</th>
+                <th style={{ textAlign: "right" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredTeachers.length === 0 && !loading ? (
                 <tr>
-                  <td colSpan={4} className="admin-table-empty">
+                  <td colSpan={5} className="admin-table-empty">
                     No faculty records found. Click <strong>+ Add Faculty</strong> to create an account.
                   </td>
                 </tr>
@@ -366,6 +540,43 @@ export default function AdminPeoplePage() {
                         {t.user.status}
                       </span>
                     </td>
+                    <td>
+                      <div className="table-actions">
+                        <button
+                          type="button"
+                          className="btn-action-edit"
+                          onClick={() => openEditTeacher(t)}
+                          title="Edit Faculty Profile"
+                          aria-label="Edit Faculty Profile"
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-action-delete"
+                          onClick={() =>
+                            setDeletingTarget({
+                              type: "teacher",
+                              id: t.id,
+                              name: `${t.user.firstName} ${t.user.lastName}`,
+                              identifier: t.employeeNo,
+                            })
+                          }
+                          title="Delete Faculty Account"
+                          aria-label="Delete Faculty Account"
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -386,12 +597,13 @@ export default function AdminPeoplePage() {
                 <th>Program & Semester</th>
                 <th>Admission Date</th>
                 <th>Status</th>
+                <th style={{ textAlign: "right" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredStudents.length === 0 && !loading ? (
                 <tr>
-                  <td colSpan={6} className="admin-table-empty">
+                  <td colSpan={7} className="admin-table-empty">
                     No student records found. Click <strong>+ Add Student</strong> to enroll students.
                   </td>
                 </tr>
@@ -464,6 +676,43 @@ export default function AdminPeoplePage() {
                       <span className={`badge ${s.user.status === "ACTIVE" ? "badge-green" : "badge-slate"}`}>
                         {s.user.status}
                       </span>
+                    </td>
+                    <td>
+                      <div className="table-actions">
+                        <button
+                          type="button"
+                          className="btn-action-edit"
+                          onClick={() => openEditStudent(s)}
+                          title="Edit Student Profile"
+                          aria-label="Edit Student Profile"
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-action-delete"
+                          onClick={() =>
+                            setDeletingTarget({
+                              type: "student",
+                              id: s.id,
+                              name: `${s.user.firstName} ${s.user.lastName}`,
+                              identifier: s.enrollmentNumber,
+                            })
+                          }
+                          title="Delete Student Account"
+                          aria-label="Delete Student Account"
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -570,7 +819,90 @@ export default function AdminPeoplePage() {
         </AdminModal>
       )}
 
-      {/* Modal 2: Create Student */}
+      {/* Modal 2: Edit Faculty */}
+      {editingTeacher && (
+        <AdminModal
+          title={`Edit Faculty: ${editingTeacher.firstName} ${editingTeacher.lastName}`}
+          onClose={() => setEditingTeacher(null)}
+        >
+          <form className="modal-form" onSubmit={handleUpdateTeacher}>
+            <div className="inline-pair">
+              <label>
+                First Name
+                <input
+                  type="text"
+                  value={editingTeacher.firstName}
+                  onChange={(e) => setEditingTeacher({ ...editingTeacher, firstName: e.target.value })}
+                  required
+                />
+              </label>
+              <label>
+                Last Name
+                <input
+                  type="text"
+                  value={editingTeacher.lastName}
+                  onChange={(e) => setEditingTeacher({ ...editingTeacher, lastName: e.target.value })}
+                  required
+                />
+              </label>
+            </div>
+
+            <div className="inline-pair">
+              <label>
+                Employee ID Number
+                <input
+                  type="text"
+                  value={editingTeacher.employeeNo}
+                  onChange={(e) => setEditingTeacher({ ...editingTeacher, employeeNo: e.target.value })}
+                  required
+                />
+              </label>
+              <label>
+                Email Address
+                <input
+                  type="email"
+                  value={editingTeacher.email}
+                  onChange={(e) => setEditingTeacher({ ...editingTeacher, email: e.target.value })}
+                  required
+                />
+              </label>
+            </div>
+
+            <label>
+              Change Password (Optional)
+              <input
+                type="password"
+                placeholder="Leave blank to keep existing password"
+                value={editingTeacher.password}
+                onChange={(e) => setEditingTeacher({ ...editingTeacher, password: e.target.value })}
+              />
+            </label>
+
+            <ImageUploadCrop
+              label="Profile Photo (Crop to Square)"
+              value={editingTeacher.profileImageUrl || ""}
+              onChange={(val) => setEditingTeacher({ ...editingTeacher, profileImageUrl: val })}
+            />
+
+            {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
+
+            <div className="modal-actions">
+              <button className="btn-primary" type="submit" disabled={saving}>
+                {saving ? "Saving Changes…" : "Save Changes"}
+              </button>
+              <button
+                className="btn-ghost"
+                type="button"
+                onClick={() => setEditingTeacher(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </AdminModal>
+      )}
+
+      {/* Modal 3: Create Student */}
       {showStudentModal && (
         <AdminModal
           title="Create Student Account"
@@ -698,7 +1030,7 @@ export default function AdminPeoplePage() {
                   <option value="">
                     {studentForm.programId ? "Select Semester" : "← Pick Program first"}
                   </option>
-                  {Array.from({ length: studentSemestersCount }, (_, i) => i + 1).map((n) => (
+                  {Array.from({ length: createStudentSemestersCount }, (_, i) => i + 1).map((n) => (
                     <option key={n} value={String(n)}>
                       Semester {n}
                     </option>
@@ -731,6 +1063,197 @@ export default function AdminPeoplePage() {
               </button>
             </div>
           </form>
+        </AdminModal>
+      )}
+
+      {/* Modal 4: Edit Student */}
+      {editingStudent && (
+        <AdminModal
+          title={`Edit Student: ${editingStudent.firstName} ${editingStudent.lastName}`}
+          onClose={() => setEditingStudent(null)}
+        >
+          <form className="modal-form" onSubmit={handleUpdateStudent}>
+            <div className="inline-pair">
+              <label>
+                First Name
+                <input
+                  type="text"
+                  value={editingStudent.firstName}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, firstName: e.target.value })}
+                  required
+                />
+              </label>
+              <label>
+                Last Name
+                <input
+                  type="text"
+                  value={editingStudent.lastName}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, lastName: e.target.value })}
+                  required
+                />
+              </label>
+            </div>
+
+            <div className="inline-pair">
+              <label>
+                Email Address
+                <input
+                  type="email"
+                  value={editingStudent.email}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, email: e.target.value })}
+                  required
+                />
+              </label>
+              <label>
+                Change Password (Optional)
+                <input
+                  type="password"
+                  placeholder="Leave blank to keep existing"
+                  value={editingStudent.password}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, password: e.target.value })}
+                />
+              </label>
+            </div>
+
+            <div className="inline-pair">
+              <label>
+                Enrollment Number
+                <input
+                  type="text"
+                  value={editingStudent.enrollmentNumber}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, enrollmentNumber: e.target.value })}
+                  required
+                />
+              </label>
+              <label>
+                Registration ID
+                <input
+                  type="text"
+                  value={editingStudent.registrationId}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, registrationId: e.target.value })}
+                  required
+                />
+              </label>
+            </div>
+
+            <div className="inline-pair">
+              <label>
+                Roll Number (Optional)
+                <input
+                  type="text"
+                  value={editingStudent.rollNumber}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, rollNumber: e.target.value })}
+                />
+              </label>
+              <label>
+                Admission Date
+                <input
+                  type="date"
+                  value={editingStudent.admissionDate}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, admissionDate: e.target.value })}
+                  required
+                />
+              </label>
+            </div>
+
+            <div className="inline-pair">
+              <label>
+                Academic Program
+                <select
+                  value={editingStudent.programId}
+                  onChange={(e) =>
+                    setEditingStudent({ ...editingStudent, programId: e.target.value, currentSemester: "1" })
+                  }
+                >
+                  <option value="">No program assigned yet</option>
+                  {programs.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.code} — {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                Current Semester
+                <select
+                  value={editingStudent.currentSemester}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, currentSemester: e.target.value })}
+                  disabled={!editingStudent.programId}
+                >
+                  <option value="">
+                    {editingStudent.programId ? "Select Semester" : "← Pick Program first"}
+                  </option>
+                  {Array.from({ length: editStudentSemestersCount }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={String(n)}>
+                      Semester {n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <ImageUploadCrop
+              label="Profile Photo (Crop to Square)"
+              value={editingStudent.profileImageUrl || ""}
+              onChange={(val) => setEditingStudent({ ...editingStudent, profileImageUrl: val })}
+            />
+
+            {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
+
+            <div className="modal-actions">
+              <button className="btn-primary" type="submit" disabled={saving}>
+                {saving ? "Saving Changes…" : "Save Changes"}
+              </button>
+              <button
+                className="btn-ghost"
+                type="button"
+                onClick={() => setEditingStudent(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </AdminModal>
+      )}
+
+      {/* Modal 5: Delete Confirmation Modal */}
+      {deletingTarget && (
+        <AdminModal
+          title={`Delete ${deletingTarget.type === "teacher" ? "Faculty" : "Student"} Account`}
+          onClose={() => setDeletingTarget(null)}
+        >
+          <div className="modal-confirm-box">
+            <p>
+              Are you sure you want to permanently delete the account for{" "}
+              <strong style={{ color: "var(--foreground, #1e293b)" }}>{deletingTarget.name}</strong>{" "}
+              ({deletingTarget.identifier})?
+            </p>
+            <p style={{ fontSize: "13px", color: "#dc2626", background: "rgba(220, 38, 38, 0.08)", padding: "10px 14px", borderRadius: "8px" }}>
+              ⚠️ This action cannot be undone. All associated records, enrollments, attendance, and credentials will be removed.
+            </p>
+
+            {error && <p style={{ margin: "12px 0 0", fontSize: 13, color: "#b91c1c" }}>{error}</p>}
+
+            <div className="modal-actions" style={{ marginTop: "20px" }}>
+              <button
+                className="btn-danger"
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={saving}
+              >
+                {saving ? "Deleting…" : "Yes, Delete Account"}
+              </button>
+              <button
+                className="btn-ghost"
+                type="button"
+                onClick={() => setDeletingTarget(null)}
+                disabled={saving}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </AdminModal>
       )}
     </AdminShell>

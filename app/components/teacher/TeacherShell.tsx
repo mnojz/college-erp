@@ -63,13 +63,16 @@ export function TeacherShell({
     <div className="student-app-shell">
       <header className="student-nav">
         <div className="student-brand">
-          <span className="student-brand-mark" style={{ background: "#0ea5e9" }}>
-            <AssetIcon src={studentAssets.graduationCap} size={22} />
+          <span className="home-brand-icon" style={{ width: 36, height: 36, background: "#0ea5e9" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+              <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
+            </svg>
           </span>
-          <span>
+          <div className="home-brand-text">
             <strong>College-ERP</strong>
-            <small>FWU-Faculty</small>
-          </span>
+            <small>Faculty Portal</small>
+          </div>
         </div>
         <div className="student-nav-actions">
           <div className="theme-switch" aria-label="Theme options">
@@ -127,11 +130,6 @@ export function TeacherShell({
               );
             })}
           </nav>
-          <div className="student-support">
-            <strong>Faculty Support</strong>
-            <p>Need assistance with attendance records, grades, or timetable?</p>
-            <a href="mailto:helpdesk@college.edu">Contact IT Helpdesk</a>
-          </div>
         </aside>
 
         <main className="student-profile-content">

@@ -39,8 +39,16 @@ export function StudentNav({ name, studentId, avatarUrl }: StudentNavProps) {
   return (
     <header className="student-nav">
       <div className="student-brand">
-        <span className="student-brand-mark"><AssetIcon src={studentAssets.graduationCap} size={22} /></span>
-        <span><strong>College-ERP</strong><small>FWU-Engineering</small></span>
+        <span className="home-brand-icon" style={{ width: 36, height: 36 }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+            <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
+          </svg>
+        </span>
+        <div className="home-brand-text">
+          <strong>College-ERP</strong>
+          <small>Student Portal</small>
+        </div>
       </div>
       <div className="student-nav-actions">
         <div className="theme-switch" aria-label="Theme options">
