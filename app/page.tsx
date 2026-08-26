@@ -1,10 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { PublicLayout, usePublicLayout } from "@/app/components/layout/PublicLayout";
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { ThemeToggle } from "@/app/components/common/ThemeToggle";
-import { useTheme } from "@/app/lib/useTheme";
 
 type Announcement = {
   id: string;
@@ -79,19 +77,31 @@ const featureCards = [
   },
 ];
 
+function HomeHeroCtas() {
+  const { openLogin } = usePublicLayout();
+
+  return (
+    <div className="home-hero-actions gap-2 flex">
+      <button
+        type="button"
+        className="home-hero-btn-primary"
+        onClick={openLogin}
+      >
+        <span>Sign In to Portal</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+          <polyline points="12 5 19 12 12 19"></polyline>
+        </svg>
+      </button>
+
+      <Link href="/public/course-structure" className="home-hero-btn-secondary">
+        <span>Browse Programs</span>
+      </Link>
+    </div>
+  );
+}
+
 export default function Home() {
-  const router = useRouter();
-  useTheme(); // ensure theme initialized
-
-  // Login Modal State
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [remember, setRemember] = useState(true);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
   // Announcements State
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
 
@@ -106,89 +116,14 @@ export default function Home() {
       .catch(() => {});
   }, []);
 
-  async function handleSignIn(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const result = await response.json();
-      if (!response.ok) {
-        setError(result.error ?? "Invalid email or password");
-        return;
-      }
-      setShowLoginModal(false);
-      router.push(result.user.role === "ADMIN" ? "/admin" : result.user.role === "TEACHER" ? "/teacher" : "/student");
-      router.refresh();
-    } catch {
-      setError("Unable to reach the server");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function fillDemo(demoEmail: string, demoPass: string) {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    setError("");
-  }
-
   return (
-    <div className="home-modern-root">
-      {/* ─── Top Navbar ─────────────────────────────────────────────── */}
-      <header className="home-nav">
-        <div className="home-nav-container">
-          <Link href="/" className="home-nav-brand">
-            <span className="home-brand-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
-                <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
-              </svg>
-            </span>
-            <div className="home-brand-text">
-              <strong>College-ERP</strong>
-              <small>Far Western University</small>
-            </div>
-          </Link>
-
-          <nav className="home-nav-links">
-            <Link href="/public/course-structure">Curriculum</Link>
-            <Link href="/public/fee-structure">Fees</Link>
-            <Link href="/public/syllabus">Syllabus</Link>
-            <Link href="/public/notices">Notices</Link>
-          </nav>
-
-          <div className="home-nav-actions">
-            <ThemeToggle />
-            <button
-              type="button"
-              className="home-btn-signin"
-              onClick={() => {
-                setShowLoginModal(true);
-                setError("");
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
-                <polyline points="10 17 15 12 10 7"></polyline>
-                <line x1="15" y1="12" x2="3" y2="12"></line>
-              </svg>
-              <span>Sign In</span>
-            </button>
-          </div>
-        </div>
-      </header>
-
+    <PublicLayout>
       {/* ─── Hero Section ───────────────────────────────────────────── */}
       <section className="home-hero-section">
         <div className="home-hero-container">
           <div className="home-hero-badge">
             <span className="badge-pulse"></span>
-            <span>Far Western University · Central Academic Portal</span>
+            <span>Far Western University • Central Academic Portal</span>
           </div>
 
           <h1 className="home-hero-title">
@@ -200,32 +135,13 @@ export default function Home() {
             A secure digital workspace for students, faculty, and administration. Access semester courses, attendance logs, exam grading, syllabus blueprints, and campus notices.
           </p>
 
-          <div className="home-hero-ctas">
-            <button
-              type="button"
-              className="home-hero-btn-primary"
-              onClick={() => {
-                setShowLoginModal(true);
-                setError("");
-              }}
-            >
-              <span>Sign In to Portal</span>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-                <polyline points="12 5 19 12 12 19"></polyline>
-              </svg>
-            </button>
-
-            <Link href="/public/course-structure" className="home-hero-btn-secondary">
-              <span>Browse Programs</span>
-            </Link>
-          </div>
+          <HomeHeroCtas />
         </div>
       </section>
 
       {/* ─── 4 Feature Cards ────────────────────────────────────────── */}
       <section className="home-cards-section">
-        <div className="home-section-container">
+        <div className="home-cards-container">
           <div className="home-cards-grid">
             {featureCards.map((card) => (
               <Link href={card.href} key={card.title} className="home-card">
@@ -250,205 +166,36 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── Recent Bulletins Section ───────────────────────────────── */}
+      {/* ─── Announcements ──────────────────────────────────────────── */}
       {announcements.length > 0 && (
         <section className="home-notices-section">
-          <div className="home-section-container">
-            <div className="home-notices-header">
+          <div className="home-notices-container">
+            <div className="home-section-header">
               <div>
-                <span className="badge badge-green">LATEST UPDATES</span>
-                <h2 style={{ margin: "8px 0 0", fontSize: "22px", fontWeight: 700 }}>
-                  Recent Campus Notices &amp; Announcements
-                </h2>
+                <h2>Recent Announcements</h2>
+                <p>Stay up-to-date with the latest news and updates from the university.</p>
               </div>
               <Link href="/public/notices" className="home-link-all">
-                <span>View all bulletins</span>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                  <polyline points="12 5 19 12 12 19"></polyline>
-                </svg>
+                View All Notices
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
               </Link>
             </div>
-
             <div className="home-notices-grid">
-              {announcements.map((item) => (
-                <article key={item.id} className="home-notice-card">
-                  <span className="home-notice-date">
-                    {item.publishedAt
-                      ? new Date(item.publishedAt).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })
-                      : new Date(item.createdAt).toLocaleDateString()}
-                  </span>
-                  <h3>{item.title}</h3>
-                  <p>{item.body.slice(0, 140)}...</p>
-                </article>
+              {announcements.map((announcement) => (
+                <div key={announcement.id} className="home-notice-card">
+                  {announcement.publishedAt && (
+                    <span className="home-notice-date">
+                      {new Date(announcement.publishedAt).toLocaleDateString()}
+                    </span>
+                  )}
+                  <h3>{announcement.title}</h3>
+                  <p>{announcement.body}</p>
+                </div>
               ))}
             </div>
           </div>
         </section>
       )}
-
-      {/* ─── Minimal Institutional Footer ──────────────────────────── */}
-      <footer className="home-modern-footer">
-        <div className="home-section-container">
-          <div className="home-footer-inner">
-            <div className="home-footer-brand">
-              <strong>Far Western University</strong>
-              <small>Central Academic College-ERP Terminal · Session 2026</small>
-            </div>
-            <div className="home-footer-links">
-              <Link href="/public/course-structure">Courses</Link>
-              <Link href="/public/fee-structure">Fees</Link>
-              <Link href="/public/syllabus">Syllabus</Link>
-              <Link href="/public/notices">Notices</Link>
-            </div>
-          </div>
-        </div>
-      </footer>
-
-      {/* ─── Login Modal Dialog ─────────────────────────────────────── */}
-      {showLoginModal && (
-        <div
-          className="modal-backdrop"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowLoginModal(false);
-          }}
-        >
-          <div className="modal-box home-login-modal" role="dialog" aria-modal="true">
-            <button
-              className="modal-close"
-              type="button"
-              onClick={() => setShowLoginModal(false)}
-              aria-label="Close"
-            >
-              ×
-            </button>
-
-            <div className="home-modal-header">
-              <span className="home-brand-icon" style={{ width: 44, height: 44, margin: "0 auto 12px" }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
-                  <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
-                </svg>
-              </span>
-              <h2>Sign In to College-ERP</h2>
-              <p>Enter your institutional credentials to access your dashboard.</p>
-            </div>
-
-            {/* Quick Demo Credentials */}
-            <div className="home-demo-chips">
-              <small style={{ color: "var(--ink-soft)", fontWeight: 600 }}>Quick demo:</small>
-              <button
-                type="button"
-                className="chip-btn"
-                onClick={() => fillDemo("admin@fwu.edu.np", "admin1234")}
-              >
-                Admin
-              </button>
-              <button
-                type="button"
-                className="chip-btn"
-                onClick={() => fillDemo("teacher@fwu.edu.np", "teacher1234")}
-              >
-                Teacher
-              </button>
-              <button
-                type="button"
-                className="chip-btn"
-                onClick={() => fillDemo("student@fwu.edu.np", "student1234")}
-              >
-                Student
-              </button>
-            </div>
-
-            <form className="modal-form" onSubmit={handleSignIn}>
-              <label>
-                Institutional Email
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@fwu.edu.np"
-                  autoComplete="email"
-                  required
-                />
-              </label>
-
-              <label>
-                Account Password
-                <div style={{ position: "relative" }}>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    autoComplete="current-password"
-                    style={{ paddingRight: "40px" }}
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    style={{
-                      position: "absolute",
-                      right: "10px",
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      border: 0,
-                      background: "transparent",
-                      color: "var(--ink-soft)",
-                      cursor: "pointer",
-                    }}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                        <line x1="1" y1="1" x2="23" y2="23"></line>
-                      </svg>
-                    ) : (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                        <circle cx="12" cy="12" r="3"></circle>
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </label>
-
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", textTransform: "none", fontWeight: 500 }}>
-                  <input
-                    type="checkbox"
-                    checked={remember}
-                    onChange={(e) => setRemember(e.target.checked)}
-                    style={{ width: "auto", margin: 0 }}
-                  />
-                  Remember login
-                </label>
-              </div>
-
-              {error && (
-                <p style={{ margin: 0, padding: "10px", borderRadius: "8px", background: "rgba(220, 38, 38, 0.08)", color: "#dc2626", fontSize: "13px" }}>
-                  {error}
-                </p>
-              )}
-
-              <button
-                type="submit"
-                className="btn-primary"
-                style={{ width: "100%", padding: "12px", fontSize: "14px", marginTop: "6px" }}
-                disabled={loading}
-              >
-                {loading ? "Signing in…" : "Sign In to Dashboard"}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+    </PublicLayout>
   );
 }

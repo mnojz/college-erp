@@ -1,49 +1,66 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { AdminModal } from "@/app/components/admin/AdminModal";
 
 type ProgramOption = { id: string; name: string; code: string; durationYears: number };
-type SubjectItem = {
-  id: string;
-  name: string;
-  code: string;
-  programId: string;
-  semester: number;
-  program: { name: string; code: string };
-};
+type SubjectItem = { id: string; name: string; code: string; programId: string; semester: number };
 type TeacherOption = { id: string; name: string; employeeNo: string };
 type ClassItem = {
   id: string;
   dayOfWeek: string;
   startTime: string;
   endTime: string;
+  type?: string | null;
+  group?: string | null;
   subjectId: string;
   teacherId: string;
   programId: string;
   semester: number;
   subject: { name: string; code: string };
   program: { name: string; code: string };
-  teacher: {
-    employeeNo: string;
-    user: { firstName: string; lastName: string };
-  };
+  teacher: { employeeNo: string; user: { firstName: string; lastName: string } };
 };
+type CurriculumCourseRow = {
+  key: string;
+  courseId: string;
+  code: string;
+  name: string;
+  semesterNo: number; // global semester number across the program
+  programId: string;
+};
+type Block = ClassItem & { startMin: number; endMin: number; colorIndex: number; conflict: boolean };
 
-const emptySubjectForm = { name: "", code: "", programId: "", semester: "" };
+// Full week on the timetable (Sat & Sun typically stay empty but keep the
+// week visually complete).
+const WORK_DAYS = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"] as const;
+const PX_PER_MIN = 1.6;
+const FALLBACK_START = 9 * 60;
+const FALLBACK_END = 15 * 60;
+const PALETTE = [
+  "#0ea5e9",
+  "#8b5cf6",
+  "#f59e0b",
+  "#10b981",
+  "#ef4444",
+  "#3b82f6",
+  "#ec4899",
+  "#14b8a6",
+  "#f97316",
+  "#6366f1",
+];
+
 const emptyClassForm = {
-  programId: "",
-  semester: "",
   subjectId: "",
   teacherId: "",
-  dayOfWeek: "MONDAY",
+  dayOfWeek: "SUNDAY",
   startTime: "09:00",
   endTime: "10:30",
+  type: "Lecture",
+  group: "",
 };
-
-const DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"] as const;
 
 function formatTime(isoTime: string) {
   try {
@@ -65,31 +82,55 @@ function timeToHHMM(isoTime: string) {
   }
 }
 
+function toMinutes(isoTime: string) {
+  try {
+    const d = new Date(isoTime);
+    if (isNaN(d.getTime())) return null;
+    return d.getUTCHours() * 60 + d.getUTCMinutes();
+  } catch {
+    return null;
+  }
+}
+
+function minutesToHHMM(totalMinutes: number) {
+  const m = Math.max(0, Math.min(24 * 60 - 30, totalMinutes));
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+}
+
+function colorIndexFor(code: string) {
+  let hash = 0;
+  for (let i = 0; i < code.length; i += 1) hash = (hash * 31 + code.charCodeAt(i)) >>> 0;
+  return hash % PALETTE.length;
+}
+
 export default function AdminTeachingPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"subjects" | "classes">("subjects");
   const [programs, setPrograms] = useState<ProgramOption[]>([]);
   const [subjects, setSubjects] = useState<SubjectItem[]>([]);
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [teachers, setTeachers] = useState<TeacherOption[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Filters
-  const [selectedProgramFilter, setSelectedProgramFilter] = useState("ALL");
-  const [searchQuery, setSearchQuery] = useState("");
+  // Published curricula (source of truth for subjects)
+  const [curricula, setCurricula] = useState<
+    Array<{
+      programId: string;
+      years: Array<{
+        semesters: Array<{
+          courses: Array<{ id: string; code: string | null; name: string }>;
+        }>;
+      }>;
+    }>
+  >([]);
 
-  // Create Modals
-  const [showSubjectModal, setShowSubjectModal] = useState(false);
+  // Scheduling context
+  const [selectedProgramId, setSelectedProgramId] = useState("");
+  const [selectedSemester, setSelectedSemester] = useState("");
+
+  // Modals
   const [showClassModal, setShowClassModal] = useState(false);
-  const [subjectForm, setSubjectForm] = useState(emptySubjectForm);
   const [classForm, setClassForm] = useState(emptyClassForm);
-
-  // Edit Modals
-  const [editingSubject, setEditingSubject] = useState<{ id: string } & typeof emptySubjectForm | null>(null);
   const [editingClass, setEditingClass] = useState<{ id: string } & typeof emptyClassForm | null>(null);
-
-  // Delete Confirmations
-  const [deletingSubject, setDeletingSubject] = useState<SubjectItem | null>(null);
   const [deletingClass, setDeletingClass] = useState<ClassItem | null>(null);
 
   const [saving, setSaving] = useState(false);
@@ -104,14 +145,22 @@ export default function AdminTeachingPage() {
           router.replace("/");
           return;
         }
-        const [pRes, sRes, cRes, tRes] = await Promise.all([
+        const [pRes, sRes, cRes, tRes, curRes] = await Promise.all([
           fetch("/api/programs"),
           fetch("/api/subjects"),
           fetch("/api/classes"),
           fetch("/api/teachers"),
+          fetch("/api/curriculum"),
         ]);
-        const [pd, sd, cd, td] = await Promise.all([pRes.json(), sRes.json(), cRes.json(), tRes.json()]);
-        setPrograms(pd.programs ?? []);
+        const [pd, sd, cd, td, curd] = await Promise.all([
+          pRes.json(),
+          sRes.json(),
+          cRes.json(),
+          tRes.json(),
+          curRes.json(),
+        ]);
+        const loadedPrograms: ProgramOption[] = pd.programs ?? [];
+        setPrograms(loadedPrograms);
         setSubjects(sd.subjects ?? []);
         setClasses(cd.classes ?? []);
         setTeachers(
@@ -123,8 +172,10 @@ export default function AdminTeachingPage() {
             }),
           ),
         );
+        setCurricula(curd.curricula ?? []);
+        if (loadedPrograms.length > 0) setSelectedProgramId(loadedPrograms[0].id);
       } catch {
-        setError("Unable to load teaching and curriculum records");
+        setError("Unable to load scheduling records");
       } finally {
         setLoading(false);
       }
@@ -132,169 +183,195 @@ export default function AdminTeachingPage() {
     load();
   }, [router]);
 
-  // Derived Semesters for Create Subject Form
-  const subjectProgram = useMemo(
-    () => programs.find((p) => p.id === subjectForm.programId),
-    [programs, subjectForm.programId],
+  // ─── Derived: curriculum subjects for the selected program+semester ──
+  const selectedProgram = useMemo(
+    () => programs.find((p) => p.id === selectedProgramId) ?? null,
+    [programs, selectedProgramId],
   );
-  const subjectSemestersCount = subjectProgram ? subjectProgram.durationYears * 2 : 0;
+  const semesterCount = selectedProgram ? selectedProgram.durationYears * 2 : 0;
 
-  // Derived Semesters for Edit Subject Form
-  const editSubjectProgram = useMemo(
-    () => programs.find((p) => p.id === editingSubject?.programId),
-    [programs, editingSubject],
+  const programCurriculum = useMemo(
+    () => curricula.find((c) => c.programId === selectedProgramId) ?? null,
+    [curricula, selectedProgramId],
   );
-  const editSubjectSemestersCount = editSubjectProgram ? editSubjectProgram.durationYears * 2 : 0;
 
-  // Derived Semesters for Create Class Form
-  const classProgram = useMemo(
-    () => programs.find((p) => p.id === classForm.programId),
-    [programs, classForm.programId],
+  // Flatten the published curriculum into per-course rows (with global
+  // semester numbers) for the selected program.
+  const semesterCourses = useMemo<CurriculumCourseRow[]>(() => {
+    if (!programCurriculum) return [];
+    const rows: CurriculumCourseRow[] = [];
+    let semesterNo = 0;
+    for (const year of programCurriculum.years) {
+      for (const sem of year.semesters) {
+        semesterNo += 1;
+        for (const course of sem.courses) {
+          if (!course.code || semesterNo !== Number(selectedSemester)) continue;
+          rows.push({
+            key: `${semesterNo}-${course.id}`,
+            courseId: course.id,
+            code: course.code,
+            name: course.name,
+            semesterNo,
+            programId: selectedProgramId,
+          });
+        }
+      }
+    }
+    return rows;
+  }, [programCurriculum, selectedProgramId, selectedSemester]);
+
+  // Resolve a curriculum course to its synced Subject row id.
+  const resolveSubjectId = useCallback(
+    (course: { code: string; semesterNo: number; programId: string }) =>
+      subjects.find(
+        (s) =>
+          s.programId === course.programId &&
+          s.semester === course.semesterNo &&
+          s.code.toUpperCase() === course.code.toUpperCase(),
+      )?.id ?? "",
+    [subjects],
   );
-  const classSemestersCount = classProgram ? classProgram.durationYears * 2 : 0;
 
-  // Derived Semesters for Edit Class Form
-  const editClassProgram = useMemo(
-    () => programs.find((p) => p.id === editingClass?.programId),
-    [programs, editingClass],
-  );
-  const editClassSemestersCount = editClassProgram ? editClassProgram.durationYears * 2 : 0;
+  // ─── Derived: timetable blocks for the grid ─────────────────────────
+  const scheduledBlocks = useMemo<Block[]>(() => {
+    return classes
+      .filter((c) => c.programId === selectedProgramId && c.semester === Number(selectedSemester))
+      .map((c) => ({
+        ...c,
+        startMin: toMinutes(c.startTime) ?? FALLBACK_START,
+        endMin: toMinutes(c.endTime) ?? FALLBACK_START + 90,
+        colorIndex: colorIndexFor(c.subject.code),
+        conflict: false,
+      }))
+      .sort((a, b) => a.startMin - b.startMin);
+  }, [classes, selectedProgramId, selectedSemester]);
 
-  // Subjects for Create Class
-  const availableClassSubjects = useMemo(() => {
-    if (!classForm.programId || !classForm.semester) return [];
-    return subjects.filter(
-      (s) => s.programId === classForm.programId && s.semester === Number(classForm.semester),
-    );
-  }, [subjects, classForm.programId, classForm.semester]);
+  // Flag overlapping blocks that share a teacher or the same semester
+  // (different practical groups are allowed to overlap).
+  const conflictedBlocks = useMemo(() => {
+    const flagged = new Set<string>();
+    for (let i = 0; i < scheduledBlocks.length; i += 1) {
+      for (let j = i + 1; j < scheduledBlocks.length; j += 1) {
+        const a = scheduledBlocks[i];
+        const b = scheduledBlocks[j];
+        if (a.dayOfWeek !== b.dayOfWeek) continue;
+        const overlaps = a.startMin < b.endMin && a.endMin > b.startMin;
+        const differentGroups = !!a.group && !!b.group && a.group !== b.group;
+        const related =
+          a.teacherId === b.teacherId ||
+          (a.programId === b.programId && a.semester === b.semester && !differentGroups);
+        if (overlaps && related) {
+          flagged.add(a.id);
+          flagged.add(b.id);
+        }
+      }
+    }
+    return flagged;
+  }, [scheduledBlocks]);
 
-  // Subjects for Edit Class
-  const editAvailableClassSubjects = useMemo(() => {
-    if (!editingClass?.programId || !editingClass?.semester) return [];
-    return subjects.filter(
-      (s) => s.programId === editingClass.programId && s.semester === Number(editingClass.semester),
-    );
-  }, [subjects, editingClass]);
+  // Time window of the week grid (floored/ceiling hours).
+  const dayStart = useMemo(() => {
+    if (scheduledBlocks.length === 0) return FALLBACK_START;
+    return Math.floor(Math.min(...scheduledBlocks.map((b) => b.startMin)) / 60) * 60;
+  }, [scheduledBlocks]);
+  const dayEnd = useMemo(() => {
+    if (scheduledBlocks.length === 0) return FALLBACK_END;
+    return Math.ceil(Math.max(...scheduledBlocks.map((b) => b.endMin)) / 60) * 60;
+  }, [scheduledBlocks]);
+  const gridMinutes = Math.max(60, dayEnd - dayStart);
+  const gridHeight = Math.round(gridMinutes * PX_PER_MIN);
 
-  // Filtered lists
-  const filteredSubjects = useMemo(() => {
-    return subjects.filter((s) => {
-      const matchProgram = selectedProgramFilter === "ALL" || s.programId === selectedProgramFilter;
-      const matchQuery =
-        !searchQuery ||
-        s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.program.name.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchProgram && matchQuery;
+  // Stats chips
+  const stats = useMemo(() => {
+    let minutes = 0;
+    const teacherIds = new Set<string>();
+    for (const b of scheduledBlocks) {
+      minutes += b.endMin - b.startMin;
+      teacherIds.add(b.teacherId);
+    }
+    return {
+      slots: scheduledBlocks.length,
+      hours: Math.round((minutes / 60) * 10) / 10,
+      teachers: teacherIds.size,
+    };
+  }, [scheduledBlocks]);
+
+  // Curriculum subjects of this semester that have no scheduled slot yet.
+  const unscheduledSubjects = useMemo(() => {
+    const scheduledSubjectIds = new Set(scheduledBlocks.map((b) => b.subjectId));
+    return semesterCourses.filter((course) => {
+      const subjectId = resolveSubjectId(course);
+      return !subjectId || !scheduledSubjectIds.has(subjectId);
     });
-  }, [subjects, selectedProgramFilter, searchQuery]);
+  }, [semesterCourses, scheduledBlocks, resolveSubjectId]);
 
-  const filteredClasses = useMemo(() => {
-    return classes.filter((c) => {
-      const matchProgram = selectedProgramFilter === "ALL" || c.programId === selectedProgramFilter;
-      const matchQuery =
-        !searchQuery ||
-        c.subject.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.subject.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        `${c.teacher.user.firstName} ${c.teacher.user.lastName}`.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchProgram && matchQuery;
+  // Subject options for the class modal (curriculum courses → synced ids)
+  const classSubjectOptions = useMemo(
+    () =>
+      semesterCourses
+        .map((course) => {
+          const id = resolveSubjectId(course);
+          return id ? { id, label: `${course.code} · ${course.name}` } : null;
+        })
+        .filter((x): x is { id: string; label: string } => x !== null),
+    [semesterCourses, resolveSubjectId],
+  );
+
+  // Same mapping, but for the slot being edited (may differ if the stored
+  // subject no longer maps cleanly — keep its current value selectable).
+  const editClassSubjectOptions = useMemo(() => {
+    const options = [...classSubjectOptions];
+    if (editingClass && !options.some((o) => o.id === editingClass.subjectId)) {
+      const cls = classes.find((c) => c.id === editingClass.id);
+      options.unshift({
+        id: editingClass.subjectId,
+        label: cls
+          ? `${cls.subject.code} · ${cls.subject.name}`
+          : "Current subject",
+      });
+    }
+    return options;
+  }, [classSubjectOptions, editingClass, classes]);
+
+  // ─── Handlers ────────────────────────────────────────────────────
+  function openCreate(day?: string, startMin?: number) {
+    const start = startMin ?? FALLBACK_START;
+    setError("");
+        setClassForm({
+      subjectId: "",
+      teacherId: "",
+      dayOfWeek: day ?? WORK_DAYS[0],
+      startTime: minutesToHHMM(start),
+      endTime: minutesToHHMM(start + 90),
+      type: "Lecture",
+      group: "",
     });
-  }, [classes, selectedProgramFilter, searchQuery]);
-
-  // Handle Create Subject
-  async function handleCreateSubject(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError("");
-    setSaving(true);
-    try {
-      const res = await fetch("/api/subjects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: subjectForm.name,
-          code: subjectForm.code,
-          programId: subjectForm.programId,
-          semester: Number(subjectForm.semester),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Failed to create subject");
-        return;
-      }
-      const refresh = await fetch("/api/subjects");
-      const refreshData = await refresh.json();
-      setSubjects(refreshData.subjects ?? []);
-      setSubjectForm(emptySubjectForm);
-      setShowSubjectModal(false);
-      setMessage(`Subject ${data.subject.code} created successfully.`);
-    } catch {
-      setError("Failed to submit subject");
-    } finally {
-      setSaving(false);
-    }
+    setShowClassModal(true);
   }
 
-  // Handle Update Subject
-  async function handleUpdateSubject(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!editingSubject) return;
+  function openEdit(block: Block) {
     setError("");
-    setSaving(true);
-    try {
-      const res = await fetch("/api/subjects", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: editingSubject.id,
-          name: editingSubject.name,
-          code: editingSubject.code,
-          programId: editingSubject.programId,
-          semester: Number(editingSubject.semester),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Failed to update subject");
-        return;
-      }
-      const refresh = await fetch("/api/subjects");
-      const refreshData = await refresh.json();
-      setSubjects(refreshData.subjects ?? []);
-      setEditingSubject(null);
-      setMessage(`Subject ${data.subject.code} updated successfully.`);
-    } catch {
-      setError("Failed to update subject");
-    } finally {
-      setSaving(false);
-    }
+    setEditingClass({
+      id: block.id,
+      subjectId: block.subjectId,
+      teacherId: block.teacherId,
+      dayOfWeek: block.dayOfWeek,
+      startTime: timeToHHMM(block.startTime),
+      endTime: timeToHHMM(block.endTime),
+      type: block.type ?? "Lecture",
+      group: block.group ?? "",
+    });
   }
 
-  // Handle Delete Subject
-  async function handleDeleteSubject() {
-    if (!deletingSubject) return;
-    setError("");
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/subjects?id=${deletingSubject.id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Failed to delete subject");
-        return;
-      }
-      setSubjects((prev) => prev.filter((s) => s.id !== deletingSubject.id));
-      setMessage(`Subject ${deletingSubject.code} has been deleted.`);
-      setDeletingSubject(null);
-    } catch {
-      setError("Failed to delete subject");
-    } finally {
-      setSaving(false);
-    }
+  async function refreshClasses() {
+    const res = await fetch("/api/classes");
+    const data = await res.json();
+    setClasses(data.classes ?? []);
   }
 
-  // Handle Create Class
   async function handleCreateClass(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!selectedProgramId || !selectedSemester) return;
     setError("");
     setSaving(true);
     try {
@@ -302,34 +379,32 @@ export default function AdminTeachingPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          programId: classForm.programId,
-          semester: Number(classForm.semester),
+          programId: selectedProgramId,
+          semester: Number(selectedSemester),
           subjectId: classForm.subjectId,
           teacherId: classForm.teacherId,
           dayOfWeek: classForm.dayOfWeek,
           startTime: classForm.startTime,
           endTime: classForm.endTime,
+          type: classForm.type,
+          group: classForm.group,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Failed to create class slot");
+        setError(data.error ?? "Failed to schedule class");
         return;
       }
-      const refresh = await fetch("/api/classes");
-      const refreshData = await refresh.json();
-      setClasses(refreshData.classes ?? []);
-      setClassForm(emptyClassForm);
+      await refreshClasses();
       setShowClassModal(false);
-      setMessage("Class slot scheduled successfully.");
+      setMessage("Class scheduled successfully.");
     } catch {
-      setError("Failed to schedule class");
+      setError("Unable to reach the server");
     } finally {
       setSaving(false);
     }
   }
 
-  // Handle Update Class
   async function handleUpdateClass(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!editingClass) return;
@@ -341,13 +416,15 @@ export default function AdminTeachingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: editingClass.id,
-          programId: editingClass.programId,
-          semester: Number(editingClass.semester),
+          programId: selectedProgramId,
+          semester: Number(selectedSemester),
           subjectId: editingClass.subjectId,
           teacherId: editingClass.teacherId,
           dayOfWeek: editingClass.dayOfWeek,
           startTime: editingClass.startTime,
           endTime: editingClass.endTime,
+          type: editingClass.type,
+          group: editingClass.group,
         }),
       });
       const data = await res.json();
@@ -355,19 +432,16 @@ export default function AdminTeachingPage() {
         setError(data.error ?? "Failed to update class slot");
         return;
       }
-      const refresh = await fetch("/api/classes");
-      const refreshData = await refresh.json();
-      setClasses(refreshData.classes ?? []);
+      await refreshClasses();
       setEditingClass(null);
-      setMessage("Class slot updated successfully.");
+      setMessage("Class updated successfully.");
     } catch {
-      setError("Failed to update class schedule");
+      setError("Unable to reach the server");
     } finally {
       setSaving(false);
     }
   }
 
-  // Handle Delete Class
   async function handleDeleteClass() {
     if (!deletingClass) return;
     setError("");
@@ -383,794 +457,551 @@ export default function AdminTeachingPage() {
       setMessage("Class slot deleted successfully.");
       setDeletingClass(null);
     } catch {
-      setError("Failed to delete class slot");
+      setError("Unable to reach the server");
     } finally {
       setSaving(false);
     }
   }
 
+  // Click an empty spot on a day column to schedule at that time.
+  function handleDayClick(day: string, e: React.MouseEvent<HTMLDivElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    let minutes = dayStart + Math.round(y / PX_PER_MIN / 30) * 30;
+    minutes = Math.max(dayStart, Math.min(dayEnd - 60, minutes));
+    openCreate(day, minutes);
+  }
+
+  const teacherName = (id: string) =>
+    teachers.find((t) => t.id === id)?.name ?? "Unknown";
+
+  const hourMarks: number[] = [];
+  for (let h = Math.floor(dayStart / 60); h <= Math.floor(dayEnd / 60); h += 1) {
+    hourMarks.push(h * 60);
+  }
+
+  const ttInput: React.CSSProperties = {
+    padding: "9px 12px",
+    border: "1px solid var(--line)",
+    borderRadius: "8px",
+    background: "var(--input-bg)",
+    color: "var(--input-color, inherit)",
+    fontSize: "13px",
+    width: "100%",
+    boxSizing: "border-box",
+  };
+
   return (
-    <AdminShell title="Curriculum & Schedules" subtitle="Academic Management" active="/admin/teaching">
-      {/* Top action bar */}
-      <div className="admin-topbar">
-        <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
-          {/* Program filter */}
-          <select
-            value={selectedProgramFilter}
-            onChange={(e) => setSelectedProgramFilter(e.target.value)}
-            style={{
-              padding: "9px 14px",
-              borderRadius: "8px",
-              border: "1px solid var(--line, #e2e8f0)",
-              fontSize: "13px",
-              background: "var(--panel, #fff)",
-              color: "inherit",
-              width: "auto",
-              cursor: "pointer",
-            }}
-          >
-            <option value="ALL">All Programs</option>
-            {programs.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.code} — {p.name}
-              </option>
-            ))}
-          </select>
-
-          {/* Search input */}
-          <input
-            type="text"
-            placeholder="Search code, title, teacher..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              padding: "9px 14px",
-              borderRadius: "8px",
-              border: "1px solid var(--line, #e2e8f0)",
-              fontSize: "13px",
-              background: "var(--panel, #fff)",
-              color: "inherit",
-              width: "220px",
-            }}
-          />
-        </div>
-
-        <div className="admin-topbar-actions">
-          <button
-            className="btn-add"
-            type="button"
-            onClick={() => {
-              setShowSubjectModal(true);
-              setError("");
-            }}
-          >
-            + Add Subject
-          </button>
-          <button
-            className="btn-add"
-            type="button"
-            style={{ background: "#2563eb" }}
-            onClick={() => {
-              setShowClassModal(true);
-              setError("");
-            }}
-          >
-            + Add Class Slot
-          </button>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="admin-tabs">
-        <button
-          type="button"
-          className={`admin-tab ${activeTab === "subjects" ? "active" : ""}`}
-          onClick={() => setActiveTab("subjects")}
-        >
-          Subjects ({subjects.length})
-        </button>
-        <button
-          type="button"
-          className={`admin-tab ${activeTab === "classes" ? "active" : ""}`}
-          onClick={() => setActiveTab("classes")}
-        >
-          Class Schedules ({classes.length})
-        </button>
-      </div>
-
-      {/* Tab 1: Subjects Table */}
-      {activeTab === "subjects" && (
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Code</th>
-                <th>Subject Name</th>
-                <th>Program</th>
-                <th>Semester</th>
-                <th style={{ textAlign: "right" }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredSubjects.length === 0 && !loading ? (
-                <tr>
-                  <td colSpan={5} className="admin-table-empty">
-                    No subjects found. Click <strong>+ Add Subject</strong> to add curriculum courses.
-                  </td>
-                </tr>
-              ) : (
-                filteredSubjects.map((s) => (
-                  <tr key={s.id}>
-                    <td>
-                      <span className="badge badge-blue">{s.code}</span>
-                    </td>
-                    <td style={{ fontWeight: 600 }}>{s.name}</td>
-                    <td>
-                      <span style={{ color: "var(--ink-soft)" }}>{s.program.code} · </span>
-                      {s.program.name}
-                    </td>
-                    <td>
-                      <span className="badge badge-slate">Semester {s.semester}</span>
-                    </td>
-                    <td>
-                      <div className="table-actions">
-                        <button
-                          type="button"
-                          className="btn-action-edit"
-                          title="Edit Subject"
-                          aria-label="Edit Subject"
-                          onClick={() => {
-                            setError("");
-                            setEditingSubject({
-                              id: s.id,
-                              name: s.name,
-                              code: s.code,
-                              programId: s.programId,
-                              semester: String(s.semester),
-                            });
-                          }}
-                        >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                          </svg>
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-action-delete"
-                          title="Delete Subject"
-                          aria-label="Delete Subject"
-                          onClick={() => {
-                            setError("");
-                            setDeletingSubject(s);
-                          }}
-                        >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                            <line x1="10" y1="11" x2="10" y2="17"></line>
-                            <line x1="14" y1="11" x2="14" y2="17"></line>
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Tab 2: Classes Table */}
-      {activeTab === "classes" && (
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Subject</th>
-                <th>Program & Semester</th>
-                <th>Faculty / Teacher</th>
-                <th>Day of Week</th>
-                <th>Time Slot</th>
-                <th style={{ textAlign: "right" }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredClasses.length === 0 && !loading ? (
-                <tr>
-                  <td colSpan={6} className="admin-table-empty">
-                    No scheduled classes found. Click <strong>+ Add Class Slot</strong> to assign lecture times.
-                  </td>
-                </tr>
-              ) : (
-                filteredClasses.map((c) => (
-                  <tr key={c.id}>
-                    <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span className="badge badge-blue">{c.subject.code}</span>
-                        <span style={{ fontWeight: 600 }}>{c.subject.name}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <span>{c.program.code}</span> ·{" "}
-                      <span className="badge badge-slate">Semester {c.semester}</span>
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 500 }}>
-                        {c.teacher.user.firstName} {c.teacher.user.lastName}
-                      </div>
-                      <small style={{ color: "var(--ink-soft)" }}>{c.teacher.employeeNo}</small>
-                    </td>
-                    <td>
-                      <span className="badge badge-green">
-                        {c.dayOfWeek}
-                      </span>
-                    </td>
-                    <td style={{ fontWeight: 500 }}>
-                      {formatTime(c.startTime)} – {formatTime(c.endTime)}
-                    </td>
-                    <td>
-                      <div className="table-actions">
-                        <button
-                          type="button"
-                          className="btn-action-edit"
-                          title="Edit Class Schedule"
-                          aria-label="Edit Class Schedule"
-                          onClick={() => {
-                            setError("");
-                            setEditingClass({
-                              id: c.id,
-                              programId: c.programId,
-                              semester: String(c.semester),
-                              subjectId: c.subjectId,
-                              teacherId: c.teacherId,
-                              dayOfWeek: c.dayOfWeek,
-                              startTime: timeToHHMM(c.startTime),
-                              endTime: timeToHHMM(c.endTime),
-                            });
-                          }}
-                        >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                          </svg>
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-action-delete"
-                          title="Delete Class Schedule"
-                          aria-label="Delete Class Schedule"
-                          onClick={() => {
-                            setError("");
-                            setDeletingClass(c);
-                          }}
-                        >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                            <line x1="10" y1="11" x2="10" y2="17"></line>
-                            <line x1="14" y1="11" x2="14" y2="17"></line>
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {error && <p className="admin-message error">{error}</p>}
-      {message && <p className="admin-message success">{message}</p>}
-
-      {/* Modal 1: Add Subject */}
-      {showSubjectModal && (
-        <AdminModal
-          title="Add New Subject"
-          onClose={() => {
-            setShowSubjectModal(false);
-            setSubjectForm(emptySubjectForm);
+    <AdminShell title="Class Scheduling" subtitle="Timetable Management" active="/admin/teaching">
+      <div style={{ display: "grid", gap: "20px" }}>
+        {/* Toolbar */}
+        <section
+          style={{
+            padding: "18px 20px",
+            borderRadius: "12px",
+            background: "var(--panel)",
+            border: "1px solid var(--line)",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "14px",
+            alignItems: "flex-end",
           }}
         >
-          <form className="modal-form" onSubmit={handleCreateSubject}>
-            <label>
-              Program
-              <select
-                value={subjectForm.programId}
-                onChange={(e) => setSubjectForm({ ...subjectForm, programId: e.target.value, semester: "" })}
-                required
-              >
-                <option value="">Select Academic Program</option>
-                {programs.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.code} — {p.name} ({p.durationYears * 2} Semesters)
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Semester
-              <select
-                value={subjectForm.semester}
-                onChange={(e) => setSubjectForm({ ...subjectForm, semester: e.target.value })}
-                disabled={!subjectForm.programId}
-                required
-              >
-                <option value="">
-                  {subjectForm.programId ? "Select Semester Number" : "← Please choose a program first"}
+          <label style={{ display: "grid", gap: "6px", minWidth: "260px", flex: 1 }}>
+            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--ink-soft)" }}>Program</span>
+            <select
+              value={selectedProgramId}
+              onChange={(e) => {
+                setSelectedProgramId(e.target.value);
+                setSelectedSemester("");
+              }}
+              style={ttInput}
+              disabled={loading || programs.length === 0}
+            >
+              {programs.length === 0 && <option value="">No programs</option>}
+              {programs.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.code} — {p.name}
                 </option>
-                {Array.from({ length: subjectSemestersCount }, (_, i) => i + 1).map((n) => (
-                  <option key={n} value={String(n)}>
-                    Semester {n}
-                  </option>
-                ))}
-              </select>
-            </label>
+              ))}
+            </select>
+          </label>
 
-            <label>
-              Subject Name
-              <input
-                type="text"
-                placeholder="e.g. Database Management Systems"
-                value={subjectForm.name}
-                onChange={(e) => setSubjectForm({ ...subjectForm, name: e.target.value })}
-                required
-              />
-            </label>
+          <label style={{ display: "grid", gap: "6px", width: "180px" }}>
+            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--ink-soft)" }}>Semester</span>
+            <select
+              value={selectedSemester}
+              onChange={(e) => setSelectedSemester(e.target.value)}
+              style={ttInput}
+              disabled={!selectedProgramId}
+            >
+              <option value="">Select semester</option>
+              {Array.from({ length: semesterCount }, (_, i) => i + 1).map((n) => (
+                <option key={n} value={String(n)}>
+                  Semester {n}
+                </option>
+              ))}
+            </select>
+          </label>
 
-            <label>
-              Subject Code
-              <input
-                type="text"
-                placeholder="e.g. BCT601"
-                value={subjectForm.code}
-                onChange={(e) => setSubjectForm({ ...subjectForm, code: e.target.value.toUpperCase() })}
-                required
-              />
-            </label>
+          <button
+            type="button"
+            className="btn-add"
+            onClick={() => openCreate()}
+            disabled={!selectedProgramId || !selectedSemester}
+          >
+            + Add Slot
+          </button>
 
-            {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
-
-            <div className="modal-actions">
-              <button className="btn-primary" type="submit" disabled={saving}>
-                {saving ? "Creating…" : "+ Create Subject"}
-              </button>
-              <button
-                className="btn-ghost"
-                type="button"
-                onClick={() => {
-                  setShowSubjectModal(false);
-                  setSubjectForm(emptySubjectForm);
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </AdminModal>
-      )}
-
-      {/* Modal 2: Edit Subject */}
-      {editingSubject && (
-        <AdminModal
-          title={`Edit Subject: ${editingSubject.code}`}
-          onClose={() => setEditingSubject(null)}
-        >
-          <form className="modal-form" onSubmit={handleUpdateSubject}>
-            <label>
-              Program
-              <select
-                value={editingSubject.programId}
-                onChange={(e) => setEditingSubject({ ...editingSubject, programId: e.target.value, semester: "1" })}
-                required
-              >
-                {programs.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.code} — {p.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Semester
-              <select
-                value={editingSubject.semester}
-                onChange={(e) => setEditingSubject({ ...editingSubject, semester: e.target.value })}
-                required
-              >
-                {Array.from({ length: editSubjectSemestersCount }, (_, i) => i + 1).map((n) => (
-                  <option key={n} value={String(n)}>
-                    Semester {n}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Subject Name
-              <input
-                type="text"
-                value={editingSubject.name}
-                onChange={(e) => setEditingSubject({ ...editingSubject, name: e.target.value })}
-                required
-              />
-            </label>
-
-            <label>
-              Subject Code
-              <input
-                type="text"
-                value={editingSubject.code}
-                onChange={(e) => setEditingSubject({ ...editingSubject, code: e.target.value.toUpperCase() })}
-                required
-              />
-            </label>
-
-            {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
-
-            <div className="modal-actions">
-              <button className="btn-primary" type="submit" disabled={saving}>
-                {saving ? "Saving Changes…" : "Save Changes"}
-              </button>
-              <button className="btn-ghost" type="button" onClick={() => setEditingSubject(null)}>
-                Cancel
-              </button>
-            </div>
-          </form>
-        </AdminModal>
-      )}
-
-      {/* Modal 3: Delete Subject Confirmation */}
-      {deletingSubject && (
-        <AdminModal
-          title={`Delete Subject: ${deletingSubject.code}`}
-          onClose={() => setDeletingSubject(null)}
-        >
-          <div className="modal-confirm-box">
-            <p>
-              Are you sure you want to delete the course <strong>{deletingSubject.name} ({deletingSubject.code})</strong>?
-            </p>
-            <p style={{ fontSize: "13px", color: "#dc2626", background: "rgba(220, 38, 38, 0.08)", padding: "10px 14px", borderRadius: "8px" }}>
-              ⚠️ Deleting this subject will permanently remove all scheduled lecture slots, assessments, and attendance records associated with it.
-            </p>
-            {error && <p style={{ margin: "12px 0 0", fontSize: 13, color: "#b91c1c" }}>{error}</p>}
-            <div className="modal-actions" style={{ marginTop: "20px" }}>
-              <button className="btn-danger" type="button" onClick={handleDeleteSubject} disabled={saving}>
-                {saving ? "Deleting…" : "Yes, Delete Subject"}
-              </button>
-              <button className="btn-ghost" type="button" onClick={() => setDeletingSubject(null)} disabled={saving}>
-                Cancel
-              </button>
-            </div>
+          <div style={{ display: "flex", gap: "10px", marginLeft: "auto" }}>
+            <span className="badge badge-blue">Slots: {stats.slots}</span>
+            <span className="badge badge-green">Hours/wk: {stats.hours}</span>
+            <span className="badge badge-slate">Teachers: {stats.teachers}</span>
           </div>
-        </AdminModal>
-      )}
+        </section>
 
-      {/* Modal 4: Add Class Slot */}
-      {showClassModal && (
-        <AdminModal
-          title="Schedule New Class Slot"
-          onClose={() => {
-            setShowClassModal(false);
-            setClassForm(emptyClassForm);
-          }}
-        >
-          <form className="modal-form" onSubmit={handleCreateClass}>
-            <div className="inline-pair">
-              <label>
-                Program
-                <select
-                  value={classForm.programId}
-                  onChange={(e) =>
-                    setClassForm({
-                      ...classForm,
-                      programId: e.target.value,
-                      semester: "",
-                      subjectId: "",
-                    })
-                  }
-                  required
+        {error && <p className="admin-message error">{error}</p>}
+        {message && <p className="admin-message success">{message}</p>}
+
+        {!loading && !selectedProgram && (
+          <div className="cs-empty">Create a program first to build its timetable.</div>
+        )}
+
+        {selectedProgram && !selectedSemester && (
+          <div className="cs-empty">Pick a semester to view and edit its weekly timetable.</div>
+        )}
+
+        {/* Weekly grid */}
+        {selectedProgram && selectedSemester && (
+          <section
+            style={{
+              padding: "18px 20px",
+              borderRadius: "12px",
+              background: "var(--panel)",
+              border: "1px solid var(--line)",
+            }}
+          >
+            <div className="tt-grid">
+              <div className="tt-corner" />
+              {WORK_DAYS.map((day) => (
+                <div key={day} className="tt-day-head">
+                  {day.slice(0, 3)}
+                </div>
+              ))}
+
+              <div className="tt-axis" style={{ height: gridHeight }}>
+                {hourMarks.map((m) => (
+                  <span
+                    key={m}
+                    className="tt-hour"
+                    style={{ top: (m - dayStart) * PX_PER_MIN }}
+                  >
+                    {minutesToHHMM(m)}
+                  </span>
+                ))}
+              </div>
+
+              {WORK_DAYS.map((day) => (
+                <div
+                  key={day}
+                  className="tt-day-body"
+                  style={{
+                    height: gridHeight,
+                    backgroundImage: `repeating-linear-gradient(to bottom, var(--line) 0px, var(--line) 1px, transparent 1px, transparent ${Math.round(
+                      60 * PX_PER_MIN,
+                    )}px)`,
+                  }}
+                  title={`Click to schedule a ${day.toLowerCase()} class`}
+                  onClick={(e) => handleDayClick(day, e)}
                 >
-                  <option value="">Select Program</option>
-                  {programs.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.code} — {p.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  {scheduledBlocks
+                    .filter((b) => b.dayOfWeek === day)
+                    .map((b) => {
+                      const color = PALETTE[b.colorIndex];
+                      const conflicted = conflictedBlocks.has(b.id);
+                      return (
+                        <button
+                          key={b.id}
+                          type="button"
+                          className={`tt-block${conflicted ? " tt-block-conflict" : ""}`}
+                          style={{
+                            top: (b.startMin - dayStart) * PX_PER_MIN,
+                            height: Math.max(34, (b.endMin - b.startMin) * PX_PER_MIN - 4),
+                            borderLeftColor: color,
+                            background: `linear-gradient(to right, ${color}26, ${color}12)`,
+                          }}
+                          title={`${b.subject.code} · ${b.subject.name}\n${teacherName(b.teacherId)}\n${formatTime(
+                            b.startTime,
+                          )} – ${formatTime(b.endTime)}${conflicted ? "\n⚠ Overlapping slots" : ""}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEdit(b);
+                          }}
+                        >
+                          <strong>{b.subject.code}</strong>
+                          <span className="tt-block-name">
+                            {b.group ? `${b.subject.name} · ${b.group}` : b.subject.name}
+                          </span>
+                          {b.type === "Practical" && (
+                            <span className="tt-block-type">Practical</span>
+                          )}
+                          <span className="tt-block-meta">{teacherName(b.teacherId)}</span>
+                          <span className="tt-block-meta">
+                            {timeToHHMM(b.startTime)}–{timeToHHMM(b.endTime)}
+                            {conflicted ? " ⚠" : ""}
+                          </span>
+                        </button>
+                      );
+                    })}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Unscheduled curriculum subjects for this semester */}
+        {selectedProgram && selectedSemester && (
+          <section
+            style={{
+              padding: "18px 20px",
+              borderRadius: "12px",
+              background: "var(--panel)",
+              border: "1px solid var(--line)",
+            }}
+          >
+            <strong style={{ display: "block", marginBottom: "10px" }}>
+              Curriculum coverage — Semester {selectedSemester}
+            </strong>
+            {classSubjectOptions.length === 0 ? (
+              <p style={{ margin: 0, fontSize: "13px", color: "var(--ink-soft)" }}>
+                No coded subjects found in the published curriculum for this semester.
+              </p>
+            ) : unscheduledSubjects.length === 0 ? (
+              <p style={{ margin: 0, fontSize: "13px", color: "#059669", fontWeight: 600 }}>
+                ✓ Every curriculum subject has at least one scheduled slot.
+              </p>
+            ) : (
+              <div className="tt-unscheduled">
+                {unscheduledSubjects.map((course) => (
+                  <span key={course.key} className="tt-chip">
+                    <strong>{course.code}</strong>
+                    {course.name}
+                    <button
+                      type="button"
+                      title="Schedule this subject"
+                      onClick={() => {
+                        openCreate();
+                        setClassForm((cf) => ({
+                          ...cf,
+                          subjectId: resolveSubjectId(course),
+                        }));
+                      }}
+                    >
+                      + Schedule
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Modal: Add Class Slot */}
+        {showClassModal && selectedProgram && (
+          <AdminModal
+            title="Schedule New Class Slot"
+            onClose={() => setShowClassModal(false)}
+          >
+            <form className="modal-form" onSubmit={handleCreateClass}>
+              <p style={{ margin: "0 0 6px", fontSize: "13px", fontWeight: 700 }}>
+                {selectedProgram.code} ·{" "}
+                <span style={{ color: "var(--ink-soft)", fontWeight: 600 }}>
+                  Semester {selectedSemester}
+                </span>
+              </p>
 
               <label>
-                Semester
+                Subject
                 <select
-                  value={classForm.semester}
-                  onChange={(e) =>
-                    setClassForm({
-                      ...classForm,
-                      semester: e.target.value,
-                      subjectId: "",
-                    })
-                  }
-                  disabled={!classForm.programId}
+                  value={classForm.subjectId}
+                  onChange={(e) => setClassForm({ ...classForm, subjectId: e.target.value })}
                   required
                 >
                   <option value="">
-                    {classForm.programId ? "Select Semester" : "← Pick Program"}
+                    {classSubjectOptions.length === 0
+                      ? "No subjects in curriculum for this semester"
+                      : "Select Subject"}
                   </option>
-                  {Array.from({ length: classSemestersCount }, (_, i) => i + 1).map((n) => (
-                    <option key={n} value={String(n)}>
-                      Semester {n}
+                  {classSubjectOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
                     </option>
                   ))}
                 </select>
               </label>
-            </div>
 
-            <label>
-              Subject Course
-              <select
-                value={classForm.subjectId}
-                onChange={(e) => setClassForm({ ...classForm, subjectId: e.target.value })}
-                disabled={!classForm.programId || !classForm.semester}
-                required
-              >
-                <option value="">
-                  {!classForm.programId || !classForm.semester
-                    ? "← Choose Program & Semester above first"
-                    : availableClassSubjects.length === 0
-                    ? "No subjects registered for this semester"
-                    : "Select Subject"}
-                </option>
-                {availableClassSubjects.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.code} · {s.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Assigned Faculty / Teacher
-              <select
-                value={classForm.teacherId}
-                onChange={(e) => setClassForm({ ...classForm, teacherId: e.target.value })}
-                required
-              >
-                <option value="">Select Faculty Member</option>
-                {teachers.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} ({t.employeeNo})
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Weekday
-              <select
-                value={classForm.dayOfWeek}
-                onChange={(e) => setClassForm({ ...classForm, dayOfWeek: e.target.value })}
-                required
-              >
-                {DAYS.map((day) => (
-                  <option key={day} value={day}>
-                    {day}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <div className="inline-pair">
               <label>
-                Start Time
-                <input
-                  type="time"
-                  value={classForm.startTime}
-                  onChange={(e) => setClassForm({ ...classForm, startTime: e.target.value })}
+                Assigned Teacher
+                <select
+                  value={classForm.teacherId}
+                  onChange={(e) => setClassForm({ ...classForm, teacherId: e.target.value })}
                   required
-                />
+                >
+                  <option value="">Select Teacher</option>
+                  {teachers.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({t.employeeNo})
+                    </option>
+                  ))}
+                </select>
               </label>
+
+              <div className="inline-pair">
+                <label>
+                  Weekday
+                  <select
+                    value={classForm.dayOfWeek}
+                    onChange={(e) => setClassForm({ ...classForm, dayOfWeek: e.target.value })}
+                    required
+                  >
+                    {WORK_DAYS.map((day) => (
+                      <option key={day} value={day}>
+                        {day}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="inline-pair">
+                <label>
+                  Start Time
+                  <input
+                    type="time"
+                    value={classForm.startTime}
+                    onChange={(e) =>
+                      setClassForm({ ...classForm, startTime: e.target.value })
+                    }
+                    required
+                  />
+                </label>
+                <label>
+                  End Time
+                  <input
+                    type="time"
+                    value={classForm.endTime}
+                    onChange={(e) => setClassForm({ ...classForm, endTime: e.target.value })}
+                    required
+                  />
+                </label>
+              </div>
+
+              <div className="inline-pair">
+                <label>
+                  Slot Type
+                  <select
+                    value={classForm.type}
+                    onChange={(e) => setClassForm({ ...classForm, type: e.target.value })}
+                    required
+                  >
+                    <option value="Lecture">Lecture</option>
+                    <option value="Practical">Practical</option>
+                  </select>
+                </label>
+                <label>
+                  Group (optional)
+                  <input
+                    type="text"
+                    placeholder="e.g. Gr. A"
+                    value={classForm.group}
+                    onChange={(e) => setClassForm({ ...classForm, group: e.target.value })}
+                  />
+                </label>
+              </div>
+
+              {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
+
+              <div className="modal-actions">
+                <button className="btn-primary" type="submit" disabled={saving}>
+                  {saving ? "Scheduling…" : "+ Schedule Class"}
+                </button>
+                <button
+                  className="btn-ghost"
+                  type="button"
+                  onClick={() => setShowClassModal(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </AdminModal>
+        )}
+
+        {/* Modal: Edit Class Slot */}
+        {editingClass && selectedProgram && (
+          <AdminModal
+            title="Edit Class Slot"
+            onClose={() => setEditingClass(null)}
+          >
+            <form className="modal-form" onSubmit={handleUpdateClass}>
+              <p style={{ margin: "0 0 6px", fontSize: "13px", fontWeight: 700 }}>
+                {selectedProgram.code} ·{" "}
+                <span style={{ color: "var(--ink-soft)", fontWeight: 600 }}>
+                  Semester {selectedSemester}
+                </span>
+              </p>
+
               <label>
-                End Time
-                <input
-                  type="time"
-                  value={classForm.endTime}
-                  onChange={(e) => setClassForm({ ...classForm, endTime: e.target.value })}
+                Subject
+                <select
+                  value={editingClass.subjectId}
+                  onChange={(e) => setEditingClass({ ...editingClass, subjectId: e.target.value })}
                   required
-                />
+                >
+                  <option value="">
+                    {editClassSubjectOptions.length === 0
+                      ? "No subjects in curriculum for this semester"
+                      : "Select Subject"}
+                  </option>
+                  {editClassSubjectOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </label>
-            </div>
 
-            {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
+              <label>
+                Assigned Teacher
+                <select
+                  value={editingClass.teacherId}
+                  onChange={(e) => setEditingClass({ ...editingClass, teacherId: e.target.value })}
+                  required
+                >
+                  {teachers.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({t.employeeNo})
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-            <div className="modal-actions">
-              <button className="btn-primary" type="submit" disabled={saving}>
-                {saving ? "Scheduling…" : "+ Schedule Class"}
-              </button>
-              <button
-                className="btn-ghost"
-                type="button"
-                onClick={() => {
-                  setShowClassModal(false);
-                  setClassForm(emptyClassForm);
+              <div className="inline-pair">
+                <label>
+                  Weekday
+                  <select
+                    value={editingClass.dayOfWeek}
+                    onChange={(e) => setEditingClass({ ...editingClass, dayOfWeek: e.target.value })}
+                    required
+                  >
+                    {WORK_DAYS.map((day) => (
+                      <option key={day} value={day}>
+                        {day}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="inline-pair">
+                <label>
+                  Start Time
+                  <input
+                    type="time"
+                    value={editingClass.startTime}
+                    onChange={(e) => setEditingClass({ ...editingClass, startTime: e.target.value })}
+                    required
+                  />
+                </label>
+                <label>
+                  End Time
+                  <input
+                    type="time"
+                    value={editingClass.endTime}
+                    onChange={(e) => setEditingClass({ ...editingClass, endTime: e.target.value })}
+                    required
+                  />
+                </label>
+              </div>
+
+              <div className="inline-pair">
+                <label>
+                  Slot Type
+                  <select
+                    value={editingClass.type}
+                    onChange={(e) => setEditingClass({ ...editingClass, type: e.target.value })}
+                    required
+                  >
+                    <option value="Lecture">Lecture</option>
+                    <option value="Practical">Practical</option>
+                  </select>
+                </label>
+                <label>
+                  Group (optional)
+                  <input
+                    type="text"
+                    placeholder="e.g. Gr. A"
+                    value={editingClass.group}
+                    onChange={(e) => setEditingClass({ ...editingClass, group: e.target.value })}
+                  />
+                </label>
+              </div>
+
+              {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
+
+              <div className="modal-actions">
+                <button className="btn-primary" type="submit" disabled={saving}>
+                  {saving ? "Saving Changes…" : "Save Changes"}
+                </button>
+                <button className="btn-ghost" type="button" onClick={() => setEditingClass(null)}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </AdminModal>
+        )}
+
+        {/* Modal: Delete Class Slot */}
+        {deletingClass && (
+          <AdminModal title="Delete Class Slot" onClose={() => setDeletingClass(null)}>
+            <div className="modal-confirm-box">
+              <p>
+                Delete the slot for{" "}
+                <strong>
+                  {deletingClass.subject.name} ({deletingClass.subject.code})
+                </strong>{" "}
+                on {deletingClass.dayOfWeek} ({formatTime(deletingClass.startTime)} –{" "}
+                {formatTime(deletingClass.endTime)})?
+              </p>
+              <p
+                style={{
+                  fontSize: "13px",
+                  color: "#dc2626",
+                  background: "rgba(220, 38, 38, 0.08)",
+                  padding: "10px 14px",
+                  borderRadius: "8px",
                 }}
               >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </AdminModal>
-      )}
-
-      {/* Modal 5: Edit Class Slot */}
-      {editingClass && (
-        <AdminModal
-          title="Edit Class Schedule Slot"
-          onClose={() => setEditingClass(null)}
-        >
-          <form className="modal-form" onSubmit={handleUpdateClass}>
-            <div className="inline-pair">
-              <label>
-                Program
-                <select
-                  value={editingClass.programId}
-                  onChange={(e) =>
-                    setEditingClass({
-                      ...editingClass,
-                      programId: e.target.value,
-                      semester: "1",
-                      subjectId: "",
-                    })
-                  }
-                  required
+                ⚠️ Deleting this schedule removes its attendance sessions and student records.
+              </p>
+              {error && <p style={{ margin: "12px 0 0", fontSize: 13, color: "#b91c1c" }}>{error}</p>}
+              <div className="modal-actions" style={{ marginTop: "20px" }}>
+                <button className="btn-danger" type="button" onClick={handleDeleteClass} disabled={saving}>
+                  {saving ? "Deleting…" : "Yes, Delete Slot"}
+                </button>
+                <button
+                  className="btn-ghost"
+                  type="button"
+                  onClick={() => setDeletingClass(null)}
+                  disabled={saving}
                 >
-                  {programs.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.code} — {p.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                Semester
-                <select
-                  value={editingClass.semester}
-                  onChange={(e) =>
-                    setEditingClass({
-                      ...editingClass,
-                      semester: e.target.value,
-                      subjectId: "",
-                    })
-                  }
-                  required
-                >
-                  {Array.from({ length: editClassSemestersCount }, (_, i) => i + 1).map((n) => (
-                    <option key={n} value={String(n)}>
-                      Semester {n}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  Cancel
+                </button>
+              </div>
             </div>
-
-            <label>
-              Subject Course
-              <select
-                value={editingClass.subjectId}
-                onChange={(e) => setEditingClass({ ...editingClass, subjectId: e.target.value })}
-                required
-              >
-                <option value="">
-                  {editAvailableClassSubjects.length === 0
-                    ? "No subjects registered for this semester"
-                    : "Select Subject"}
-                </option>
-                {editAvailableClassSubjects.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.code} · {s.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Assigned Faculty / Teacher
-              <select
-                value={editingClass.teacherId}
-                onChange={(e) => setEditingClass({ ...editingClass, teacherId: e.target.value })}
-                required
-              >
-                {teachers.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} ({t.employeeNo})
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Weekday
-              <select
-                value={editingClass.dayOfWeek}
-                onChange={(e) => setEditingClass({ ...editingClass, dayOfWeek: e.target.value })}
-                required
-              >
-                {DAYS.map((day) => (
-                  <option key={day} value={day}>
-                    {day}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <div className="inline-pair">
-              <label>
-                Start Time
-                <input
-                  type="time"
-                  value={editingClass.startTime}
-                  onChange={(e) => setEditingClass({ ...editingClass, startTime: e.target.value })}
-                  required
-                />
-              </label>
-              <label>
-                End Time
-                <input
-                  type="time"
-                  value={editingClass.endTime}
-                  onChange={(e) => setEditingClass({ ...editingClass, endTime: e.target.value })}
-                  required
-                />
-              </label>
-            </div>
-
-            {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
-
-            <div className="modal-actions">
-              <button className="btn-primary" type="submit" disabled={saving}>
-                {saving ? "Saving Changes…" : "Save Changes"}
-              </button>
-              <button className="btn-ghost" type="button" onClick={() => setEditingClass(null)}>
-                Cancel
-              </button>
-            </div>
-          </form>
-        </AdminModal>
-      )}
-
-      {/* Modal 6: Delete Class Confirmation */}
-      {deletingClass && (
-        <AdminModal
-          title="Delete Class Schedule Slot"
-          onClose={() => setDeletingClass(null)}
-        >
-          <div className="modal-confirm-box">
-            <p>
-              Are you sure you want to delete this lecture slot for{" "}
-              <strong>{deletingClass.subject.name} ({deletingClass.subject.code})</strong> on {deletingClass.dayOfWeek} (
-              {formatTime(deletingClass.startTime)} - {formatTime(deletingClass.endTime)})?
-            </p>
-            <p style={{ fontSize: "13px", color: "#dc2626", background: "rgba(220, 38, 38, 0.08)", padding: "10px 14px", borderRadius: "8px" }}>
-              ⚠️ Deleting this schedule will remove its associated attendance sessions and student attendance records.
-            </p>
-            {error && <p style={{ margin: "12px 0 0", fontSize: 13, color: "#b91c1c" }}>{error}</p>}
-            <div className="modal-actions" style={{ marginTop: "20px" }}>
-              <button className="btn-danger" type="button" onClick={handleDeleteClass} disabled={saving}>
-                {saving ? "Deleting…" : "Yes, Delete Slot"}
-              </button>
-              <button className="btn-ghost" type="button" onClick={() => setDeletingClass(null)} disabled={saving}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </AdminModal>
-      )}
+          </AdminModal>
+        )}
+      </div>
     </AdminShell>
   );
 }

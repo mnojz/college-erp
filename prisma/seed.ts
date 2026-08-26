@@ -1,7 +1,9 @@
 import "dotenv/config";
 import { hash } from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "../app/generated/prisma/client";
+import { PrismaClient, type DayOfWeek } from "../app/generated/prisma/client";
+import bctCurriculum from "../app/data/curriculum/bct.json";
+import { syncSubjectsFromCurriculum } from "../app/lib/curriculum-sync";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -12,547 +14,308 @@ const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString }),
 });
 
-async function main() {
-  console.log("🌱 Starting rich database seeding...");
+const parseTime = (timeStr: string) => {
+  const [h, m] = timeStr.split(":").map(Number);
+  return new Date(Date.UTC(1970, 0, 1, h, m, 0, 0));
+};
 
-  // 1. Create Admin User
-  const adminPasswordHash = await hash("admin1234", 12);
+async function main() {
+  console.log("🌱 Starting database seeding...");
+
+  // ─── Programs ───────────────────────────────────────────────
+  const bct = await prisma.program.upsert({
+    where: { code: "BCT" },
+    update: {},
+    create: { name: "B.E. Degree in Computer Engineering", code: "BCT", durationYears: 4, departmentName: "Engineering" },
+  });
+  await prisma.program.upsert({
+    where: { code: "BCE" },
+    update: {},
+    create: { name: "Civil", code: "BCE", durationYears: 4, departmentName: "Engineering" },
+  });
+  await prisma.program.upsert({
+    where: { code: "BE. ARCH" },
+    update: {},
+    create: { name: "Architecture", code: "BE. ARCH", durationYears: 4, departmentName: "Engineering" },
+  });
+    console.log("✅ Programs: BCT, BCE, BE ARCH");
+
+  // ─── Users ──────────────────────────────────────────────────
+  const adminHash = await hash("admin1234", 12);
   const adminUser = await prisma.user.upsert({
     where: { email: "admin@fwu.edu.np" },
     update: {},
-    create: {
-      email: "admin@fwu.edu.np",
-      passwordHash: adminPasswordHash,
-      firstName: "Admin",
-      lastName: "User",
-      role: "ADMIN",
-    },
-  });
-  console.log("✅ Admin user:", adminUser.email);
-
-  // 2. Create Programs
-  const bctProgram = await prisma.program.upsert({
-    where: { code: "BCT" },
-    update: {},
-    create: {
-      name: "Bachelor in Computer Engineering",
-      code: "BCT",
-      durationYears: 4,
-      departmentName: "Department of Computer & Electronics Engineering",
-    },
+    create: { email: "admin@fwu.edu.np", passwordHash: adminHash, firstName: "Admin", lastName: "User", role: "ADMIN" },
   });
 
-  const bcaProgram = await prisma.program.upsert({
-    where: { code: "BCA" },
-    update: {},
-    create: {
-      name: "Bachelor in Computer Applications",
-      code: "BCA",
-      durationYears: 3,
-      departmentName: "Department of Computer Science & Information Technology",
-    },
-  });
-  console.log("✅ Programs created: BCT (4 yrs/8 sems), BCA (3 yrs/6 sems)");
-
-  // 3. Create Teachers
-  const teacherPasswordHash = await hash("teacher1234", 12);
-
-  const teacherUser1 = await prisma.user.upsert({
-    where: { email: "teacher@fwu.edu.np" },
-    update: {},
-    create: {
-      email: "teacher@fwu.edu.np",
-      passwordHash: teacherPasswordHash,
-      firstName: "Dr. Ramesh",
-      lastName: "Sharma",
-      role: "TEACHER",
-    },
-  });
-  const teacher1 = await prisma.teacher.upsert({
-    where: { userId: teacherUser1.id },
-    update: {},
-    create: { userId: teacherUser1.id, employeeNo: "FWU-EMP-101" },
-  });
-
-  const teacherUser2 = await prisma.user.upsert({
-    where: { email: "priya@fwu.edu.np" },
-    update: {},
-    create: {
-      email: "priya@fwu.edu.np",
-      passwordHash: teacherPasswordHash,
-      firstName: "Dr. Priya",
-      lastName: "Thapa",
-      role: "TEACHER",
-    },
-  });
-  const teacher2 = await prisma.teacher.upsert({
-    where: { userId: teacherUser2.id },
-    update: {},
-    create: { userId: teacherUser2.id, employeeNo: "FWU-EMP-102" },
-  });
-
-  const teacherUser3 = await prisma.user.upsert({
-    where: { email: "anil@fwu.edu.np" },
-    update: {},
-    create: {
-      email: "anil@fwu.edu.np",
-      passwordHash: teacherPasswordHash,
-      firstName: "Mr. Anil",
-      lastName: "Karki",
-      role: "TEACHER",
-    },
-  });
-  const teacher3 = await prisma.teacher.upsert({
-    where: { userId: teacherUser3.id },
-    update: {},
-    create: { userId: teacherUser3.id, employeeNo: "FWU-EMP-103" },
-  });
-  console.log("✅ 3 Teachers created: Dr. Ramesh Sharma, Dr. Priya Thapa, Mr. Anil Karki");
-
-  // 4. Create Students
-  const studentPasswordHash = await hash("student1234", 12);
-
-  const studentDefs = [
-    {
-      email: "student@fwu.edu.np",
-      firstName: "Aayush",
-      lastName: "Adhikari",
-      enrollment: "2024-BCT-01",
-      regId: "REG-2024-001",
-      roll: "01",
-      programId: bctProgram.id,
-      semester: 6,
-    },
-    {
-      email: "sneha@fwu.edu.np",
-      firstName: "Sneha",
-      lastName: "Bhandari",
-      enrollment: "2024-BCT-02",
-      regId: "REG-2024-002",
-      roll: "02",
-      programId: bctProgram.id,
-      semester: 6,
-    },
-    {
-      email: "ram@fwu.edu.np",
-      firstName: "Ram",
-      lastName: "Bahadur",
-      enrollment: "2024-BCT-03",
-      regId: "REG-2024-003",
-      roll: "03",
-      programId: bctProgram.id,
-      semester: 3,
-    },
-    {
-      email: "hari@fwu.edu.np",
-      firstName: "Hari",
-      lastName: "Prasad",
-      enrollment: "2024-BCT-04",
-      regId: "REG-2024-004",
-      roll: "04",
-      programId: bctProgram.id,
-      semester: 1,
-    },
-    {
-      email: "bibek@fwu.edu.np",
-      firstName: "Bibek",
-      lastName: "Thapa",
-      enrollment: "2024-BCT-05",
-      regId: "REG-2024-005",
-      roll: "05",
-      programId: bctProgram.id,
-      semester: 5,
-    },
-    {
-      email: "sita@fwu.edu.np",
-      firstName: "Sita",
-      lastName: "Rai",
-      enrollment: "2024-BCA-01",
-      regId: "REG-2024-101",
-      roll: "11",
-      programId: bcaProgram.id,
-      semester: 4,
-    },
-    {
-      email: "maya@fwu.edu.np",
-      firstName: "Maya",
-      lastName: "Gurung",
-      enrollment: "2024-BCA-02",
-      regId: "REG-2024-102",
-      roll: "12",
-      programId: bcaProgram.id,
-      semester: 2,
-    },
-    {
-      email: "anita@fwu.edu.np",
-      firstName: "Anita",
-      lastName: "Sharma",
-      enrollment: "2024-BCA-03",
-      regId: "REG-2024-103",
-      roll: "13",
-      programId: bcaProgram.id,
-      semester: 4,
-    },
+  const teacherHash = await hash("teacher1234", 12);
+  const teachersInfo = [
+    { email: "kl@fwu.edu.np", fn: "Kamal", ln: "Lekhak", empNo: "FWU-EMP-203" },
+    { email: "rkb@fwu.edu.np", fn: "Rohit", ln: "Bist", empNo: "FWU-EMP-206" },
+    { email: "bsd@fwu.edu.np", fn: "Birendra Singh", ln: "Dhami", empNo: "FWU-EMP-204" },
+    { email: "gpl@fwu.edu.np", fn: "Guru Prasad", ln: "Lekhak", empNo: "FWU-EMP-205" },
+    { email: "pdb@fwu.edu.np", fn: "P. D.", ln: "Bhatta", empNo: "FWU-EMP-202" },
+    { email: "bp@fwu.edu.np", fn: "B", ln: "P", empNo: "FWU-EMP-201" },
   ];
 
-  const students = [];
-  for (const s of studentDefs) {
-    const user = await prisma.user.upsert({
+  const teacherMap: Record<string, string> = {};
+  for (const t of teachersInfo) {
+    const u = await prisma.user.upsert({
+      where: { email: t.email },
+      update: {},
+      create: {
+        email: t.email,
+        passwordHash: teacherHash,
+        firstName: t.fn,
+        lastName: t.ln,
+        role: "TEACHER",
+        teacher: { create: { employeeNo: t.empNo } },
+      },
+    });
+    const teacher = await prisma.teacher.findUnique({ where: { userId: u.id } });
+    if (teacher) teacherMap[t.email] = teacher.id;
+  }
+
+  const studentHash = await hash("student1234", 12);
+  const studentsInfo = [
+    { email: "aryan@fwu.edu.np", fn: "Aryan", ln: "Bhatta", enroll: "80BCT01" },
+    { email: "sugam@fwu.edu.np", fn: "Sugam", ln: "Dhami", enroll: "80BCT38" },
+    { email: "umesh@fwu.edu.np", fn: "Umesh Raj", ln: "Upadhyay", enroll: "80BCT42" },
+  ];
+
+  const studentMap: Record<string, string> = {};
+  for (const s of studentsInfo) {
+    const u = await prisma.user.upsert({
       where: { email: s.email },
       update: {},
       create: {
         email: s.email,
-        passwordHash: studentPasswordHash,
-        firstName: s.firstName,
-        lastName: s.lastName,
+        passwordHash: studentHash,
+        firstName: s.fn,
+        lastName: s.ln,
         role: "STUDENT",
+        student: {
+          create: { enrollmentNumber: s.enroll, admissionDate: new Date("2023-09-15"), programId: bct.id, currentSemester: 6 },
+        },
       },
     });
-
-    const student = await prisma.student.upsert({
-      where: { userId: user.id },
-      update: {
-        programId: s.programId,
-        currentSemester: s.semester,
-      },
-      create: {
-        userId: user.id,
-        enrollmentNumber: s.enrollment,
-        registrationId: s.regId,
-        rollNumber: s.roll,
-        admissionDate: new Date("2024-08-15"),
-        programId: s.programId,
-        currentSemester: s.semester,
-        programEnrollmentStatus: "ENROLLED",
-      },
-    });
-    students.push(student);
+    const student = await prisma.student.findUnique({ where: { userId: u.id } });
+    if (student) studentMap[s.email] = student.id;
   }
-  console.log(`✅ ${students.length} Students created across BCT & BCA`);
+    console.log("✅ Users: admin, 6 teachers, 3 students");
 
-  // 5. Create Subjects
-  const subjectDefs = [
-    // BCT Subjects
-    { name: "Structured Programming in C", code: "BCT101", programId: bctProgram.id, semester: 1 },
-    { name: "Digital Logic & Circuit Design", code: "BCT102", programId: bctProgram.id, semester: 1 },
-    { name: "Data Structures & Algorithms", code: "BCT301", programId: bctProgram.id, semester: 3 },
-    { name: "Computer Architecture", code: "BCT302", programId: bctProgram.id, semester: 3 },
-    { name: "Operating Systems", code: "BCT501", programId: bctProgram.id, semester: 5 },
-    { name: "Computer Networks", code: "BCT502", programId: bctProgram.id, semester: 5 },
-    { name: "Database Management Systems", code: "BCT601", programId: bctProgram.id, semester: 6 },
-    { name: "Software Engineering & Project", code: "BCT602", programId: bctProgram.id, semester: 6 },
+    // ─── Curriculum ─────────────────────────────────────────────
+  await prisma.$transaction(async (tx) => {
+    await tx.curriculum.deleteMany({ where: { programId: bct.id } });
+    await tx.subject.deleteMany({ where: { programId: bct.id } });
+    await tx.class.deleteMany({ where: { programId: bct.id } });
+    await tx.assessment.deleteMany({ where: { programId: bct.id } });
+    await tx.result.deleteMany({});
+  });
 
-    // BCA Subjects
-    { name: "Fundamentals of IT", code: "BCA101", programId: bcaProgram.id, semester: 1 },
-    { name: "C Programming & Labs", code: "BCA102", programId: bcaProgram.id, semester: 1 },
-    { name: "Object Oriented Programming Java", code: "BCA201", programId: bcaProgram.id, semester: 2 },
-    { name: "Web Technologies & UI Design", code: "BCA202", programId: bcaProgram.id, semester: 2 },
-    { name: "Database Systems with SQL", code: "BCA401", programId: bcaProgram.id, semester: 4 },
-    { name: "Cloud Computing & DevOps", code: "BCA402", programId: bcaProgram.id, semester: 4 },
+  // Create BCT curriculum from JSON
+  const yearsRaw = (bctCurriculum as { years: Array<{ year: string; semesters: Array<{ semester: string; credits: number; courses: Array<{ code: string | null; name: string; credits: number }> }> }> }).years;
+  const electivesRaw = (bctCurriculum as { electives: Record<string, Array<{ code: string; name: string; credits: number }>> }).electives;
+
+  let globalSemNo = 0;
+  await prisma.$transaction(async (tx) => {
+    await tx.curriculum.create({
+      data: {
+        programId: bct.id,
+        years: {
+          create: yearsRaw.map((y, yi) => ({
+            yearNo: yi + 1,
+            label: y.year,
+            semesters: {
+              create: y.semesters.map((sem) => {
+                globalSemNo += 1;
+                return {
+                  semesterNo: globalSemNo,
+                  label: sem.semester,
+                  courses: {
+                    create: sem.courses
+                      .filter((c) => c.code != null)
+                      .map((c, ci) => ({ code: c.code!, name: c.name, credits: c.credits, sortOrder: ci })),
+                  },
+                };
+              }),
+            },
+          })),
+        },
+        electives: {
+          create: Object.entries(electivesRaw).flatMap(([group, courses]) =>
+            courses.map((c, ei) => ({
+              group: group === "electiveI" ? "ELECTIVE_I" : "ELECTIVE_II",
+              code: c.code,
+              name: c.name,
+              credits: c.credits,
+              sortOrder: ei,
+            })),
+          ),
+        },
+      },
+    });
+  });
+  await syncSubjectsFromCurriculum(prisma, bct.id);
+  console.log("✅ Curriculum & subjects synced");
+
+  // ─── Classes ────────────────────────────────────────────────
+  const subjects = await prisma.subject.findMany({ where: { programId: bct.id }, select: { id: true, code: true } });
+  const sub = (code: string) => subjects.find((s) => s.code === code)?.id ?? "";
+  const tch = (email: string) => teacherMap[email] ?? "";
+
+  const dow = { Mon: "MONDAY", Tue: "TUESDAY", Wed: "WEDNESDAY", Thu: "THURSDAY", Fri: "FRIDAY", Sat: "SATURDAY" } as const;
+
+  const classDefs: Array<{
+    d: string; t: string; subj?: string | null; tchEmail?: string | null; type?: string; group?: string;
+    parallel?: { subj: string; tch: string; group: string }[];
+  }> = [
+    // Monday
+    { d: dow.Mon, t: "09:00-10:00", subj: "CT 367", tchEmail: null, type: "Lecture" },
+    { d: dow.Mon, t: "10:00-11:00", subj: "SH 366", tchEmail: "bp@fwu.edu.np", type: "Lecture" },
+    { d: dow.Mon, t: "11:00-12:00", subj: "CT 362", tchEmail: "pdb@fwu.edu.np", type: "Lecture" },
+    { d: dow.Mon, t: "12:00-13:00", subj: "EX 365", tchEmail: "kl@fwu.edu.np", type: "Lecture" },
+    { d: dow.Mon, t: "13:30-14:30", subj: "CT 363", tchEmail: "gpl@fwu.edu.np", type: "Lecture" },
+    { d: dow.Mon, t: "14:30-15:30", subj: "CT 361", tchEmail: "bsd@fwu.edu.np", type: "Lecture" },
+    { d: dow.Mon, t: "14:30-16:00", subj: "CT 364-P", tchEmail: "rkb@fwu.edu.np", type: "Practical", group: "Gr. B" },
+    // Tuesday
+    { d: dow.Tue, t: "09:00-10:00", subj: "CT 367", tchEmail: null, type: "Lecture" },
+    { d: dow.Tue, t: "10:00-11:00", subj: "SH 366", tchEmail: "bp@fwu.edu.np", type: "Lecture" },
+    { d: dow.Tue, t: "11:00-12:00", subj: "CT 362", tchEmail: "pdb@fwu.edu.np", type: "Lecture" },
+    { d: dow.Tue, t: "12:00-13:00", subj: "EX 365", tchEmail: "kl@fwu.edu.np", type: "Lecture" },
+    { d: dow.Tue, t: "13:30-14:30", subj: "CT 363", tchEmail: "gpl@fwu.edu.np", type: "Lecture" },
+    { d: dow.Tue, t: "14:30-15:30", subj: "CT 364", tchEmail: "rkb@fwu.edu.np", type: "Lecture" },
+    // Wednesday
+    { d: dow.Wed, t: "09:00-10:00", subj: "CT 367", tchEmail: null, type: "Lecture" },
+    { d: dow.Wed, t: "10:00-11:00", subj: "CT 364", tchEmail: "rkb@fwu.edu.np", type: "Lecture" },
+    { d: dow.Wed, t: "11:00-12:00", subj: "CT 362", tchEmail: "pdb@fwu.edu.np", type: "Lecture" },
+    { d: dow.Wed, t: "12:00-13:00", subj: "CT 361", tchEmail: "bsd@fwu.edu.np", type: "Lecture" },
+    { d: dow.Wed, t: "13:30-14:30", subj: "CT 363", tchEmail: "gpl@fwu.edu.np", type: "Lecture" },
+    { d: dow.Wed, t: "14:30-16:00", parallel: [
+      { subj: "EX 365-P", tch: "kl@fwu.edu.np", group: "Gr. A" },
+      { subj: "CT 363-P", tch: "gpl@fwu.edu.np", group: "Gr. B" },
+    ] },
+    // Thursday
+    { d: dow.Thu, t: "09:00-10:00", subj: "CT 364", tchEmail: "rkb@fwu.edu.np", type: "Lecture" },
+    { d: dow.Thu, t: "10:00-11:00", subj: "SH 366", tchEmail: "bp@fwu.edu.np", type: "Lecture" },
+    { d: dow.Thu, t: "11:00-12:00", subj: "EX 365", tchEmail: "kl@fwu.edu.np", type: "Lecture" },
+    { d: dow.Thu, t: "12:00-13:00", subj: "CT 361", tchEmail: "bsd@fwu.edu.np", type: "Lecture" },
+    { d: dow.Thu, t: "13:30-14:30", subj: "CT 363", tchEmail: "gpl@fwu.edu.np", type: "Lecture" },
+    { d: dow.Thu, t: "14:30-16:00", parallel: [
+      { subj: "EX 365-P", tch: "kl@fwu.edu.np", group: "Gr. B" },
+      { subj: "CT 363-P", tch: "gpl@fwu.edu.np", group: "Gr. A" },
+    ] },
+    // Friday
+    { d: dow.Fri, t: "09:00-10:00", subj: "CT 364", tchEmail: "rkb@fwu.edu.np", type: "Lecture" },
+    { d: dow.Fri, t: "10:00-11:00", subj: "SH 366", tchEmail: "bp@fwu.edu.np", type: "Lecture" },
+    { d: dow.Fri, t: "11:00-12:00", subj: "EX 365", tchEmail: "kl@fwu.edu.np", type: "Lecture" },
+    { d: dow.Fri, t: "12:00-13:00", subj: "CT 361", tchEmail: "bsd@fwu.edu.np", type: "Lecture" },
+    { d: dow.Fri, t: "13:30-14:30", subj: "CT 363", tchEmail: "gpl@fwu.edu.np", type: "Lecture" },
+    { d: dow.Fri, t: "14:30-16:00", subj: "CT 364-P", tchEmail: "rkb@fwu.edu.np", type: "Practical", group: "Gr. A" },
   ];
 
-  const createdSubjects = new Map<string, { id: string; name: string; code: string; programId: string; semester: number }>();
-  for (const sub of subjectDefs) {
-    const s = await prisma.subject.upsert({
-      where: { code: sub.code },
-      update: { programId: sub.programId, semester: sub.semester, name: sub.name },
-      create: sub,
-    });
-    createdSubjects.set(sub.code, s);
-  }
-  console.log(`✅ ${createdSubjects.size} Subjects created`);
+  await prisma.$transaction(async (tx) => {
+    for (const c of classDefs) {
+      const [start, end] = c.t.split("-");
+      if (c.parallel) {
+        for (const p of c.parallel) {
+          await tx.class.create({
+            data: {
+              programId: bct.id,
+              semester: 6,
+              dayOfWeek: c.d,
+              startTime: parseTime(start),
+              endTime: parseTime(end),
+              subjectId: sub(p.subj),
+              teacherId: tch(p.tch),
+              type: "Practical",
+              group: p.group,
+            },
+          });
+        }
+      } else {
+        await tx.class.create({
+          data: {
+            programId: bct.id,
+            semester: 6,
+            dayOfWeek: c.d,
+            startTime: parseTime(start),
+            endTime: parseTime(end),
+            subjectId: c.subj ? sub(c.subj) : null,
+            teacherId: c.tchEmail ? tch(c.tchEmail) : null,
+            type: c.type ?? "Lecture",
+            group: c.group ?? null,
+          },
+        });
+      }
+    }
+  });
+    console.log("✅ Classes seeded (Sem 6 schedule)");
 
-  // 6. Create Classes
-  const classDefs = [
-    // Dr. Ramesh Sharma teaches DBMS (BCT601) and DB Systems (BCA401)
-    {
-      subjectCode: "BCT601",
-      teacherId: teacher1.id,
-      programId: bctProgram.id,
+    // ─── Assessments ────────────────────────────────────────────
+  const dbSub = await prisma.subject.findUnique({ where: { code: "CT 364" } });
+  const existingAssessment = await prisma.assessment.findUnique({
+    where: { subjectId_semester_name: { subjectId: dbSub!.id, semester: 6, name: "Mid-Term Examination" } },
+  });
+  const a1 = existingAssessment ?? await prisma.assessment.create({
+    data: {
+      programId: bct.id,
       semester: 6,
-      dayOfWeek: "MONDAY" as const,
-      startTime: new Date("1970-01-01T09:00:00.000Z"),
-      endTime: new Date("1970-01-01T10:30:00.000Z"),
+      subjectId: dbSub!.id,
+      name: "Mid-Term Examination",
+      maxMarks: 50,
+      assessmentDate: new Date("2026-08-18"),
     },
-    {
-      subjectCode: "BCT601",
-      teacherId: teacher1.id,
-      programId: bctProgram.id,
-      semester: 6,
-      dayOfWeek: "WEDNESDAY" as const,
-      startTime: new Date("1970-01-01T11:00:00.000Z"),
-      endTime: new Date("1970-01-01T12:30:00.000Z"),
-    },
-    {
-      subjectCode: "BCA401",
-      teacherId: teacher1.id,
-      programId: bcaProgram.id,
-      semester: 4,
-      dayOfWeek: "TUESDAY" as const,
-      startTime: new Date("1970-01-01T13:00:00.000Z"),
-      endTime: new Date("1970-01-01T14:30:00.000Z"),
-    },
+  });
+  console.log("✅ Assessments created");
 
-    // Dr. Priya Thapa teaches OS (BCT501) and Web Technologies (BCA202)
-    {
-      subjectCode: "BCT501",
-      teacherId: teacher2.id,
-      programId: bctProgram.id,
-      semester: 5,
-      dayOfWeek: "TUESDAY" as const,
-      startTime: new Date("1970-01-01T10:00:00.000Z"),
-      endTime: new Date("1970-01-01T11:30:00.000Z"),
-    },
-    {
-      subjectCode: "BCA202",
-      teacherId: teacher2.id,
-      programId: bcaProgram.id,
-      semester: 2,
-      dayOfWeek: "THURSDAY" as const,
-      startTime: new Date("1970-01-01T14:00:00.000Z"),
-      endTime: new Date("1970-01-01T15:30:00.000Z"),
-    },
-
-    // Mr. Anil Karki teaches DSA (BCT301) and C Prog (BCT101)
-    {
-      subjectCode: "BCT301",
-      teacherId: teacher3.id,
-      programId: bctProgram.id,
-      semester: 3,
-      dayOfWeek: "MONDAY" as const,
-      startTime: new Date("1970-01-01T11:00:00.000Z"),
-      endTime: new Date("1970-01-01T12:30:00.000Z"),
-    },
-    {
-      subjectCode: "BCT101",
-      teacherId: teacher3.id,
-      programId: bctProgram.id,
-      semester: 1,
-      dayOfWeek: "FRIDAY" as const,
-      startTime: new Date("1970-01-01T08:30:00.000Z"),
-      endTime: new Date("1970-01-01T10:00:00.000Z"),
-    },
-  ];
-
-  const createdClasses = [];
-  for (const c of classDefs) {
-    const sub = createdSubjects.get(c.subjectCode);
-    if (!sub) continue;
-    const cls = await prisma.class.upsert({
-      where: {
-        subjectId_teacherId_programId_semester_dayOfWeek_startTime_endTime: {
-          subjectId: sub.id,
-          teacherId: c.teacherId,
-          programId: c.programId,
-          semester: c.semester,
-          dayOfWeek: c.dayOfWeek,
-          startTime: c.startTime,
-          endTime: c.endTime,
-        },
-      },
-      update: {},
-      create: {
-        subjectId: sub.id,
-        teacherId: c.teacherId,
-        programId: c.programId,
-        semester: c.semester,
-        dayOfWeek: c.dayOfWeek,
-        startTime: c.startTime,
-        endTime: c.endTime,
-      },
+  // ─── Results ────────────────────────────────────────────────
+  const allStudents = await prisma.student.findMany({
+    where: { enrollmentNumber: { in: ["80BCT01", "80BCT38", "80BCT42"] } },
+    select: { id: true, enrollmentNumber: true },
+  });
+  for (const s of allStudents) {
+    const marks = s.enrollmentNumber === "80BCT42" ? 44.5 : s.enrollmentNumber === "80BCT38" ? 48.0 : 42.0;
+    const grade = s.enrollmentNumber === "80BCT42" ? "A" : s.enrollmentNumber === "80BCT38" ? "A+" : "B+";
+    const existingResult = await prisma.result.findUnique({
+      where: { assessmentId_studentId: { assessmentId: a1.id, studentId: s.id } },
     });
-    createdClasses.push(cls);
-  }
-  console.log(`✅ ${createdClasses.length} Classes scheduled`);
-
-  // 7. Attendance Sessions & Records
-  if (createdClasses.length > 0) {
-    const session1 = await prisma.attendanceSession.upsert({
-      where: {
-        classId_sessionDate: {
-          classId: createdClasses[0].id,
-          sessionDate: new Date("2026-08-20T00:00:00.000Z"),
-        },
-      },
-      update: {},
-      create: {
-        classId: createdClasses[0].id,
-        sessionDate: new Date("2026-08-20T00:00:00.000Z"),
-      },
-    });
-
-    await prisma.attendanceRecord.upsert({
-      where: {
-        sessionId_studentId: {
-          sessionId: session1.id,
-          studentId: students[0].id, // Aayush
-        },
-      },
-      update: {},
-      create: {
-        sessionId: session1.id,
-        studentId: students[0].id,
-        status: "PRESENT",
-      },
-    });
-
-    await prisma.attendanceRecord.upsert({
-      where: {
-        sessionId_studentId: {
-          sessionId: session1.id,
-          studentId: students[1].id, // Sneha
-        },
-      },
-      update: {},
-      create: {
-        sessionId: session1.id,
-        studentId: students[1].id,
-        status: "PRESENT",
-      },
-    });
-    console.log("✅ Attendance session & records created");
-  }
-
-  // 8. Assessments & Results
-  const subBct601 = createdSubjects.get("BCT601");
-  if (subBct601) {
-    const assessment1 = await prisma.assessment.upsert({
-      where: {
-        subjectId_semester_name: {
-          subjectId: subBct601.id,
-          semester: 6,
-          name: "Mid-Term Examination",
-        },
-      },
-      update: {},
-      create: {
-        subjectId: subBct601.id,
-        programId: bctProgram.id,
-        semester: 6,
-        name: "Mid-Term Examination",
-        maxMarks: 50,
-        assessmentDate: new Date("2026-08-18"),
-      },
-    });
-
-    await prisma.result.upsert({
-      where: {
-        assessmentId_studentId: {
-          assessmentId: assessment1.id,
-          studentId: students[0].id,
-        },
-      },
-      update: {},
-      create: {
-        assessmentId: assessment1.id,
-        studentId: students[0].id,
-        marks: 44.5,
-        grade: "A",
-      },
-    });
-
-    await prisma.result.upsert({
-      where: {
-        assessmentId_studentId: {
-          assessmentId: assessment1.id,
-          studentId: students[1].id,
-        },
-      },
-      update: {},
-      create: {
-        assessmentId: assessment1.id,
-        studentId: students[1].id,
-        marks: 48.0,
-        grade: "A+",
-      },
-    });
-  }
-
-  const subBca401 = createdSubjects.get("BCA401");
-  if (subBca401) {
-    const assessment2 = await prisma.assessment.upsert({
-      where: {
-        subjectId_semester_name: {
-          subjectId: subBca401.id,
-          semester: 4,
-          name: "Practical Assessment 1",
-        },
-      },
-      update: {},
-      create: {
-        subjectId: subBca401.id,
-        programId: bcaProgram.id,
-        semester: 4,
-        name: "Practical Assessment 1",
-        maxMarks: 25,
-        assessmentDate: new Date("2026-08-22"),
-      },
-    });
-
-    await prisma.result.upsert({
-      where: {
-        assessmentId_studentId: {
-          assessmentId: assessment2.id,
-          studentId: students[5].id, // Sita
-        },
-      },
-      update: {},
-      create: {
-        assessmentId: assessment2.id,
-        studentId: students[5].id,
-        marks: 23,
-        grade: "A",
-      },
-    });
-  }
-  console.log("✅ Assessments & Results recorded");
-
-  // 9. Announcements
-  const announcements = [
-    {
-      title: "Far Western University Academic Year 2026 Session Commences",
-      body: "All students and faculty members are informed that regular academic coursework and laboratory sessions for the Fall 2026 semester have officially commenced. Attendance will be recorded digitally on the College ERP portal.",
-    },
-    {
-      title: "Library and Digital Resource Access Pass Distribution",
-      body: "Students can collect their RFID library credentials and institutional access cards from the administrative front desk starting this Friday between 10:00 AM and 4:00 PM.",
-    },
-    {
-      title: "Call for Papers: National Engineering & IT Symposium 2026",
-      body: "The Department of Computer & Electronics Engineering invites research papers and capstone project submissions for the upcoming National Engineering Symposium. Cash prizes and publication certificates will be awarded.",
-    },
-    {
-      title: "Semester Examination Schedule & Form Submission Deadline",
-      body: "Examination registration forms for the upcoming semester finals must be submitted to the examination department by the end of next week along with cleared dues.",
-    },
-  ];
-
-  for (const a of announcements) {
-    const existing = await prisma.announcement.findFirst({ where: { title: a.title } });
-    if (!existing) {
-      await prisma.announcement.create({
-        data: {
-          title: a.title,
-          body: a.body,
-          authorId: adminUser.id,
-          publishedAt: new Date(),
-        },
+    if (!existingResult) {
+      await prisma.result.create({
+        data: { assessmentId: a1.id, studentId: s.id, marks, grade },
       });
     }
   }
-  console.log(`✅ Announcements created`);
+  console.log("✅ Results recorded");
 
-  console.log("\n🎉 Seeding finished successfully!\n");
-  console.log("-----------------------------------------");
-  console.log("Demo Credentials:");
+  // ─── Announcements ─────────────────────────────────────────
+  const announcements = [
+    { title: "Far Western University Academic Year 2026 Session Commences", body: "All students and faculty members are informed that regular academic coursework and laboratory sessions for the Fall 2026 semester have officially commenced. Attendance will be recorded digitally on the College ERP portal." },
+    { title: "Library and Digital Resource Access Pass Distribution", body: "Students can collect their RFID library credentials and institutional access cards from the administrative front desk starting this Friday between 10:00 AM and 4:00 PM." },
+    { title: "Call for Papers: National Engineering & IT Symposium 2026", body: "The Department of Computer & Electronics Engineering invites research papers and capstone project submissions for the upcoming National Engineering Symposium. Cash prizes and publication certificates will be awarded." },
+    { title: "Semester Examination Schedule & Form Submission Deadline", body: "Examination registration forms for the upcoming semester finals must be submitted to the examination department by the end of next week along with cleared dues." },
+  ];
+  for (const a of announcements) {
+    await prisma.announcement.create({
+      data: { title: a.title, body: a.body, authorId: adminUser.id, publishedAt: new Date() },
+    });
+  }
+  console.log("✅ Announcements created");
+
+  console.log("\n🎉 Seeding complete!\n");
+  console.log("─────────────────────────────────────────────");
+  console.log("Login Credentials:");
   console.log("• Admin:   admin@fwu.edu.np   / admin1234");
-  console.log("• Teacher: teacher@fwu.edu.np / teacher1234");
-  console.log("• Teacher: priya@fwu.edu.np   / teacher1234");
-  console.log("• Teacher: anil@fwu.edu.np    / teacher1234");
-  console.log("• Student: student@fwu.edu.np / student1234 (BCT Sem 6)");
-  console.log("• Student: sita@fwu.edu.np    / student1234 (BCA Sem 4)");
-  console.log("• Student: ram@fwu.edu.np     / student1234 (BCT Sem 3)");
-  console.log("-----------------------------------------");
+  console.log("• Teacher: kl@fwu.edu.np     / teacher1234  (Kamal Lekhak)");
+  console.log("• Teacher: rkb@fwu.edu.np    / teacher1234  (Rohit Bist)");
+  console.log("• Teacher: bsd@fwu.edu.np    / teacher1234  (Birendra Singh)");
+  console.log("• Teacher: gpl@fwu.edu.np    / teacher1234  (Guru Prasad)");
+  console.log("• Teacher: pdb@fwu.edu.np    / teacher1234  (P.D. Bhatta)");
+  console.log("• Teacher: bp@fwu.edu.np     / teacher1234  (B.P.)");
+  console.log("• Student: aryan@fwu.edu.np  / student1234  (80BCT01)");
+  console.log("• Student: sugam@fwu.edu.np  / student1234  (80BCT38)");
+  console.log("• Student: umesh@fwu.edu.np  / student1234  (80BCT42)");
+  console.log("─────────────────────────────────────────────");
 }
 
 main()

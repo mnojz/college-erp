@@ -58,6 +58,7 @@ model Program {
   subjects       Subject[]
   classes        Class[]
   assessments    Assessment[]
+  curriculum     Curriculum?
 }
 
 model Student {
@@ -116,6 +117,8 @@ model Class {
   dayOfWeek   DayOfWeek
   startTime   DateTime            @db.Time
   endTime     DateTime            @db.Time
+  type        String              @default("Lecture") // "Lecture" | "Practical"
+  group       String? // e.g. "Gr. A" — allows parallel practical groups
   subject     Subject             @relation(fields: [subjectId], references: [id], onDelete: Restrict)
   teacher     Teacher             @relation(fields: [teacherId], references: [id], onDelete: Restrict)
   program     Program             @relation(fields: [programId], references: [id], onDelete: Restrict)
@@ -188,4 +191,62 @@ model Announcement {
   updatedAt   DateTime  @updatedAt
 
   @@index([publishedAt])
+}
+
+// ─── Curriculum (admin-manageable course structure) ─────────────
+model Curriculum {
+  id        String            @id @default(cuid())
+  programId String            @unique
+  program   Program           @relation(fields: [programId], references: [id], onDelete: Cascade)
+  years     CurriculumYear[]
+  electives CurriculumElective[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+}
+
+model CurriculumYear {
+  id           String               @id @default(cuid())
+  curriculumId String
+  curriculum   Curriculum           @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
+  yearNo       Int
+  label        String
+  semesters    CurriculumSemester[]
+
+  @@unique([curriculumId, yearNo])
+}
+
+model CurriculumSemester {
+  id         String             @id @default(cuid())
+  yearId     String
+  year       CurriculumYear     @relation(fields: [yearId], references: [id], onDelete: Cascade)
+  semesterNo Int
+  label      String
+  courses    CurriculumCourse[]
+
+  @@unique([yearId, semesterNo])
+}
+
+model CurriculumCourse {
+  id         String              @id @default(cuid())
+  semesterId String
+  semester   CurriculumSemester  @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  code       String?
+  name       String
+  credits    Int                 @default(3)
+  sortOrder  Int                 @default(0)
+
+  @@index([semesterId])
+}
+
+model CurriculumElective {
+  id           String     @id @default(cuid())
+  curriculumId String
+  curriculum   Curriculum @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
+  group        String // "ELECTIVE_I" | "ELECTIVE_II"
+  code         String?
+  name         String
+  credits      Int        @default(3)
+  sortOrder    Int        @default(0)
+
+  @@index([curriculumId, group])
 }

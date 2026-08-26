@@ -1,9 +1,6 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ThemeToggle } from "@/app/components/common/ThemeToggle";
-import { useTheme } from "@/app/lib/useTheme";
 
 type CatalogKind = "courses" | "syllabus" | "fees" | "notices";
 type CatalogProps = { kind: CatalogKind; title: string; eyebrow: string; description: string };
@@ -11,7 +8,6 @@ type CatalogProps = { kind: CatalogKind; title: string; eyebrow: string; descrip
 type Item = Record<string, unknown>;
 
 export function PublicCatalog({ kind, title, eyebrow, description }: CatalogProps) {
-  useTheme(); // ensure theme initialized
   const [items, setItems] = useState<Item[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -42,29 +38,7 @@ export function PublicCatalog({ kind, title, eyebrow, description }: CatalogProp
   }, [endpoint, key]);
 
   return (
-    <main className="public-page">
-      <header className="public-page-header">
-        <Link href="/" className="public-brand">
-          <span className="home-brand-icon" style={{ width: 34, height: 34 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
-              <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
-            </svg>
-          </span>
-          <div style={{ display: "grid", gap: "1px" }}>
-            <strong style={{ fontSize: "16px" }}>College-ERP</strong>
-            <small style={{ fontSize: "10px", color: "var(--ink-soft)", textTransform: "uppercase" }}>Far Western University</small>
-          </div>
-        </Link>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <ThemeToggle />
-          <Link href="/" className="btn-ghost" style={{ fontSize: "13px", padding: "8px 14px", textDecoration: "none" }}>
-            ← Back to Home
-          </Link>
-        </div>
-      </header>
-
+    <div className="public-page-body">
       <section className="public-page-intro">
         <span className="badge badge-blue" style={{ marginBottom: "12px" }}>
           {eyebrow}
@@ -86,7 +60,9 @@ export function PublicCatalog({ kind, title, eyebrow, description }: CatalogProp
           ))}
         </div>
       )}
-    </main>
+
+      {loading && items.length === 0 && !error && <p className="public-empty">Loading…</p>}
+    </div>
   );
 }
 

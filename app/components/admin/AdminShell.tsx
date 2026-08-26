@@ -6,7 +6,8 @@ import { studentAssets } from "@/app/components/student/assets";
 const adminLinks = [
   ["Overview", "/admin", studentAssets.academic],
   ["Programs", "/admin/setup", studentAssets.subjects],
-  ["Subjects & classes", "/admin/teaching", studentAssets.schedules],
+  ["Curriculum", "/admin/curriculum", studentAssets.school],
+  ["Class Scheduling", "/admin/teaching", studentAssets.schedules],
   ["People", "/admin/people", studentAssets.user],
   ["Announcements", "/admin/announcements", studentAssets.bell],
 ] as const;
