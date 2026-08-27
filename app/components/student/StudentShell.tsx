@@ -8,6 +8,7 @@ const studentLinks = [
   ["Result", "/student/results", studentAssets.result],
   ["Attendance", "/student/attendance", studentAssets.attendance],
   ["Subjects", "/student/subjects", studentAssets.subjects],
+  ["Notes", "/student/notes", studentAssets.assignment],
   ["Schedules", "/student/schedules", studentAssets.schedules],
 ] as const;
 

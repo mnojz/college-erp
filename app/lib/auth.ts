@@ -4,7 +4,7 @@ import jwt, { type JwtPayload } from "jsonwebtoken";
 export const AUTH_COOKIE = "college_erp_session";
 const SESSION_DURATION_SECONDS = 60 * 60 * 24 * 7;
 
-type Session = JwtPayload & {
+export type Session = JwtPayload & {
   userId: string;
   role: string;
 };

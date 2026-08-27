@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "College ERP | Far western university",
-  description: "unified & centralized collage management app",
+  description: "unified & centralized collage management app",  
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

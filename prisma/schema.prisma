@@ -33,6 +33,23 @@ enum DayOfWeek {
   SUNDAY
 }
 
+enum MaterialType {
+  LECTURE_NOTES
+  SLIDES
+  QUESTION_BANK
+  LAB_MANUAL
+  ASSIGNMENT
+  REFERENCE_MATERIAL
+  PAST_PAPER
+  OTHER
+}
+
+enum MaterialVisibility {
+  EVERYONE
+  DEPARTMENT_PROGRAM
+  CLASSES
+}
+
 model User {
   id                   String         @id @default(cuid())
   email                String         @unique
@@ -46,6 +63,8 @@ model User {
   student              Student?
   teacher              Teacher?
   authoredAnnouncements Announcement[]
+  uploadedMaterials    StudyMaterial[]
+  bookmarks            Bookmark[]
 }
 
 model Program {
@@ -59,6 +78,7 @@ model Program {
   classes        Class[]
   assessments    Assessment[]
   curriculum     Curriculum?
+  studyMaterials StudyMaterial[]
 }
 
 model Student {
@@ -103,6 +123,7 @@ model Subject {
   program     Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
   classes     Class[]
   assessments Assessment[]
+  studyMaterials StudyMaterial[]
 
   @@unique([programId, semester, code])
   @@index([programId, semester])
@@ -123,6 +144,7 @@ model Class {
   teacher     Teacher             @relation(fields: [teacherId], references: [id], onDelete: Restrict)
   program     Program             @relation(fields: [programId], references: [id], onDelete: Restrict)
   sessions    AttendanceSession[]
+  materials   StudyMaterialClass[]
 
   @@unique([subjectId, teacherId, programId, semester, dayOfWeek, startTime, endTime])
   @@index([teacherId, semester, dayOfWeek])
@@ -249,4 +271,62 @@ model CurriculumElective {
   sortOrder    Int        @default(0)
 
   @@index([curriculumId, group])
+}
+
+// ─── Notes / Study Materials library ────────────────────────────
+model StudyMaterial {
+  id             String             @id @default(cuid())
+  title          String
+  description    String?
+  topic          String?
+  materialType   MaterialType       @default(LECTURE_NOTES)
+  visibility     MaterialVisibility @default(EVERYONE)
+  departmentName String?
+  programId      String?
+  semester       Int?
+  subjectId      String?
+  fileName       String
+  mimeType       String?
+  fileSize       Int // bytes
+  fileData       Bytes // stored in Postgres — keeps uploads self-contained with pg adapter
+  uploaderId     String
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  program     Program?              @relation(fields: [programId], references: [id], onDelete: SetNull)
+  subject     Subject?              @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  uploader    User                  @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  classLinks  StudyMaterialClass[]
+  bookmarks   Bookmark[]
+
+  @@index([materialType])
+  @@index([visibility])
+  @@index([programId, semester])
+  @@index([subjectId])
+  @@index([uploaderId])
+  @@index([createdAt])
+}
+
+// Targets a whole teaching group (all schedule slots of a subject for a program/semester)
+model StudyMaterialClass {
+  id          String        @id @default(cuid())
+  materialId  String
+  classId     String
+  material    StudyMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  class       Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([materialId, classId])
+  @@index([classId])
+}
+
+model Bookmark {
+  id              String        @id @default(cuid())
+  userId          String
+  studyMaterialId String
+  createdAt       DateTime      @default(now())
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studyMaterial   StudyMaterial @relation(fields: [studyMaterialId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, studyMaterialId])
+  @@index([studyMaterialId])
 }

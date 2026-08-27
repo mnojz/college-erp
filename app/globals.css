@@ -1687,63 +1687,86 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
 }
 
 /* ─── Course Structure Viewer ────────────────────────────────── */
-.tt-grid {
-  display: grid;
-  grid-template-columns: 64px repeat(7, minmax(0, 1fr));
+/* Timetable: weekdays as rows, time flowing horizontally */
+.tt-scroll {
+  overflow-x: auto;
 }
 
+.tt-inner {
+  min-width: 780px;
+}
+
+.tt-row {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+}
+
+.tt-head-row .tt-corner,
 .tt-corner {
   border-bottom: 1px solid var(--line);
 }
 
-.tt-day-head {
-  padding: 8px 4px;
-  text-align: center;
+.tt-axis-x {
+  position: relative;
+  height: 22px;
+}
+
+.tt-hour {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+/* Anchor edge ticks so they never stick out past the grid */
+.tt-hour-first {
+  transform: translateY(-50%);
+}
+
+.tt-hour-last {
+  transform: translate(-100%, -50%);
+}
+
+.tt-day-cell {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--ink-soft);
   border-bottom: 1px solid var(--line);
-  border-left: 1px solid var(--line);
 }
 
-.tt-axis {
-  position: relative;
-}
-
-.tt-hour {
-  position: absolute;
-  right: 8px;
-  transform: translateY(-50%);
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--ink-soft);
-}
-
-.tt-day-body {
+.tt-day-track {
   position: relative;
   border-left: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
   cursor: copy;
 }
 
-.tt-day-body:hover {
+.tt-day-track:hover {
   background: rgba(2, 132, 199, 0.04);
 }
 
 .tt-block {
   position: absolute;
-  left: 3px;
-  right: 3px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 1px;
+  justify-content: center;
+  gap: 0;
   overflow: hidden;
-  padding: 5px 7px;
+  white-space: nowrap;
+  padding: 2px 8px;
   border: 1px solid transparent;
   border-left-width: 4px;
-  border-radius: 8px;
+  border-radius: 7px;
   cursor: pointer;
   text-align: left;
   transition: box-shadow 120ms ease;
@@ -1754,49 +1777,29 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
 }
 
 .tt-block strong {
-  font-size: 11px;
-  line-height: 1.2;
+  font-size: 10px;
+  line-height: 1.35;
   color: var(--foreground);
 }
 
 .tt-block-name {
   width: 100%;
-  font-size: 11px;
-  line-height: 1.25;
-  color: var(--foreground);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tt-block-meta {
-  display: none;
-  font-size: 10px;
+  font-size: 9.5px;
+  line-height: 1.3;
   color: var(--ink-soft);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 100%;
 }
 
-@media (min-height: 900px) {
-  .tt-block-meta { display: block; }
+.tt-block-sm strong,
+.tt-block-sm .tt-block-name {
+  font-size: 9px;
 }
 
 .tt-block-conflict {
   outline: 2px solid #dc2626;
   outline-offset: -2px;
-}
-
-.tt-block-type {
-  font-size: 9px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #059669;
-  background: rgba(16, 185, 129, 0.14);
-  border-radius: 4px;
-  padding: 1px 5px;
 }
 
 .tt-unscheduled {
@@ -2136,6 +2139,239 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
   .profile-name-row { justify-content: center; }
   .profile-meta-row { justify-content: center; }
 }
+/* ─── Notes / Study Materials Module ───────────────────────────── */
+.notes-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.notes-search input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 16px;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--foreground);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.notes-search input:focus {
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+}
+
+.notes-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.notes-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--panel);
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 120ms ease;
+}
+
+.notes-tab:hover {
+  color: #0284c7;
+  border-color: #0ea5e9;
+}
+
+.notes-tab.active {
+  background: #0284c7;
+  border-color: #0284c7;
+  color: #ffffff;
+}
+
+:root[data-theme="dark"] .notes-tab.active {
+  background: #0ea5e9;
+  border-color: #0ea5e9;
+}
+
+.notes-tab-count {
+  padding: 1px 8px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.notes-tab:not(.active) .notes-tab-count {
+  background: var(--mint);
+  color: #0369a1;
+}
+
+.notes-tab-hint {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.notes-tab-hint strong {
+  color: var(--foreground);
+}
+
+.notes-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.notes-filter-row select,
+.notes-topic-input {
+  flex: 1 1 150px;
+  min-width: 130px;
+  max-width: 260px;
+  padding: 9px 12px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--input-color);
+  font-size: 13px;
+  outline: none;
+}
+
+.notes-filter-row select:focus,
+.notes-topic-input:focus {
+  border-color: #0ea5e9;
+}
+
+.notes-results-count {
+  margin: 14px 2px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.notes-results-count strong {
+  color: #0284c7;
+}
+
+:root[data-theme="dark"] .notes-results-count strong {
+  color: #38bdf8;
+}
+
+/* ─── Material cards ───────────────────────────────────────────── */
+.notes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 18px;
+}
+
+.note-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border-radius: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  transition: border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+}
+
+.note-card:hover {
+  border-color: var(--card-hover-border);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -8px rgba(2, 132, 199, 0.25);
+}
+
+.note-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.note-card-top-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.note-monogram {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.type-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.bookmark-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  transition: all 120ms ease;
+}
+
+.bookmark-btn:hover {
+  border-color: #f59e0b;
+  color: #f59e0b;
+}
+
+.bookmark-btn.is-bookmarked {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.note-card-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--foreground);
+  cursor: pointer;
+  line-height: 1.35;
+}
+
+.note-card-title:hover {
+  color: #0284c7;
+}
+
+:root[data-theme="dark"] .note-card-title:hover {
+  color: #38bdf8;
+}
+
 /* ─── Public Login Modal (extracted into PublicLayout) ─────────── */
 .login-modal-overlay {
   position: fixed;
@@ -2330,3 +2566,442 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
   background-clip: text;
   color: transparent;
 }
+
+/* ─── Notes module: chips, footer, details ─────────────────────── */
+.chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: var(--mint);
+  color: #065f46;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+:root[data-theme="dark"] .chip {
+  background: rgba(6, 78, 59, 0.4);
+  color: #6ee7b7;
+}
+
+.chip-sky {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+:root[data-theme="dark"] .chip-sky {
+  background: rgba(2, 132, 199, 0.25);
+  color: #7dd3fc;
+}
+
+.chip-visibility-everyone {
+  background: rgba(16, 185, 129, 0.14);
+  color: #059669;
+}
+
+:root[data-theme="dark"] .chip-visibility-everyone {
+  color: #34d399;
+}
+
+.chip-visibility-department_program,
+.chip-visibility-classes {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+:root[data-theme="dark"] .chip-visibility-department_program,
+:root[data-theme="dark"] .chip-visibility-classes {
+  background: rgba(180, 83, 9, 0.2);
+  color: #fbbf24;
+}
+
+.note-card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: auto;
+}
+
+.note-card-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.note-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.note-card-subject-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+.note-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.note-file-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.note-file-meta small {
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.btn-download {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: #0284c7;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background-color 120ms ease;
+}
+
+.btn-download:hover {
+  background: #0369a1;
+}
+
+.notes-empty {
+  text-align: center;
+  padding: 40px 32px;
+}
+
+.notes-empty h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.notes-empty p {
+  margin: 0 auto;
+  max-width: 520px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+/* ─── Notes module: detail modal ───────────────────────────────── */
+.note-details-desc {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+.note-details-grid {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 10px 14px;
+  margin: 0 0 18px;
+  font-size: 13px;
+}
+
+.note-details-grid dt {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.note-details-grid dd {
+  margin: 0;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+/* ─── Notes module: teacher upload list ────────────────────────── */
+.notes-success-banner {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #059669;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.notes-upload-list {
+  display: grid;
+  gap: 12px;
+}
+
+.upload-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  transition: border-color 120ms ease;
+}
+
+.upload-row:hover {
+  border-color: var(--card-hover-border);
+}
+
+.upload-row-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.upload-row-main h4 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.upload-row-meta {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.upload-row-actions {
+  display: flex;
+
+/* ─── Notes module: upload/edit form extras ────────────────────── */
+.notes-field-caption {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.notes-visibility-options {
+  display: grid;
+  gap: 8px;
+}
+
+.notes-visibility-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--background);
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.notes-visibility-option:hover {
+  border-color: #0ea5e9;
+}
+
+.notes-visibility-option.selected {
+  border-color: #0284c7;
+  background: rgba(2, 132, 199, 0.06);
+}
+
+:root[data-theme="dark"] .notes-visibility-option.selected {
+  border-color: #0ea5e9;
+  background: rgba(14, 165, 233, 0.08);
+}
+
+.notes-visibility-option input {
+  margin-top: 3px;
+}
+
+.notes-visibility-option span {
+  display: grid;
+  gap: 3px;
+}
+
+.notes-visibility-option strong {
+  font-size: 13px;
+  color: var(--foreground);
+}
+
+.notes-visibility-option small {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+
+.notes-class-picker {
+  display: grid;
+  gap: 6px;
+}
+
+.notes-class-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.notes-class-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--background);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--foreground);
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.notes-class-option:hover {
+  border-color: #0ea5e9;
+}
+
+.notes-class-option.selected {
+  border-color: #0284c7;
+  background: rgba(2, 132, 199, 0.08);
+}
+
+.notes-hint-text {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.notes-file-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px dashed var(--input-border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--input-color);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.notes-file-input:focus-visible {
+  outline: 2px solid #0ea5e9;
+}
+
+.notes-file-chosen {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0284c7;
+}
+
+:root[data-theme="dark"] .notes-file-chosen {
+  color: #38bdf8;
+}
+
+.notes-file-chosen.muted {
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.notes-form-error {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(220, 38, 38, 0.08);
+  color: #b91c1c !important;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ─── Notes module: responsive ─────────────────────────────────── */
+@media (max-width: 768px) {
+  .notes-filter-row select,
+  .notes-topic-input {
+    flex: 1 1 calc(50% - 5px);
+    max-width: none;
+  }
+
+  .upload-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .upload-row-actions {
+    width: 100%;
+  }
+
+  .upload-row-actions a,
+  .upload-row-actions button {
+    flex: 1;
+    text-align: center;
+  }
+
+  .note-details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .note-details-grid dt {
+    margin-top: 6px;
+  }
+
+  .note-card-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn-download {
+    width: 100%;
+  }
+}
+
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn-small {
+  padding: 7px 12px !important;
+  font-size: 12px !important;
+}
+
+.btn-danger-ghost {
+  padding: 10px 20px;
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  border-radius: 8px;
+  background: transparent;
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.btn-danger-ghost:hover {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+

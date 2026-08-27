@@ -36,7 +36,11 @@ type Block = ClassItem & { startMin: number; endMin: number; colorIndex: number;
 // Full week on the timetable (Sat & Sun typically stay empty but keep the
 // week visually complete).
 const WORK_DAYS = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"] as const;
-const PX_PER_MIN = 1.6;
+// Timetable geometry (days = rows, time = columns). Every block is rendered at
+// LANE_PITCH height so slots look uniform; rows only grow when several
+// parallel slots (e.g. Gr. A/B practicals) must stack inside one day.
+const ROW_H = 72;
+const LANE_PITCH = 36;
 const FALLBACK_START = 9 * 60;
 const FALLBACK_END = 15 * 60;
 const PALETTE = [
@@ -72,16 +76,6 @@ function formatTime(isoTime: string) {
   }
 }
 
-function timeToHHMM(isoTime: string) {
-  try {
-    const d = new Date(isoTime);
-    if (isNaN(d.getTime())) return isoTime.slice(11, 16);
-    return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
-  } catch {
-    return "09:00";
-  }
-}
-
 function toMinutes(isoTime: string) {
   try {
     const d = new Date(isoTime);
@@ -101,6 +95,27 @@ function colorIndexFor(code: string) {
   let hash = 0;
   for (let i = 0; i < code.length; i += 1) hash = (hash * 31 + code.charCodeAt(i)) >>> 0;
   return hash % PALETTE.length;
+}
+
+// Greedy lane packing: blocks sharing the same time window (parallel practical
+// groups, teacher-conflicts) stack vertically inside the day row instead of
+// rendering on top of each other.
+function packLanes<T extends { startMin: number; endMin: number }>(
+  blocks: T[],
+): Array<T & { lane: number }> {
+  const laneEnds: number[] = [];
+  return [...blocks]
+    .sort((a, b) => a.startMin - b.startMin)
+    .map((b) => {
+      let idx = laneEnds.findIndex((end) => end <= b.startMin);
+      if (idx === -1) {
+        laneEnds.push(b.endMin);
+        idx = laneEnds.length - 1;
+      } else {
+        laneEnds[idx] = b.endMin;
+      }
+      return { ...b, lane: idx };
+    });
 }
 
 export default function AdminTeachingPage() {
@@ -279,7 +294,6 @@ export default function AdminTeachingPage() {
     return Math.ceil(Math.max(...scheduledBlocks.map((b) => b.endMin)) / 60) * 60;
   }, [scheduledBlocks]);
   const gridMinutes = Math.max(60, dayEnd - dayStart);
-  const gridHeight = Math.round(gridMinutes * PX_PER_MIN);
 
   // Stats chips
   const stats = useMemo(() => {
@@ -356,8 +370,8 @@ export default function AdminTeachingPage() {
       subjectId: block.subjectId,
       teacherId: block.teacherId,
       dayOfWeek: block.dayOfWeek,
-      startTime: timeToHHMM(block.startTime),
-      endTime: timeToHHMM(block.endTime),
+      startTime: minutesToHHMM(toMinutes(block.startTime) ?? 0),
+      endTime: minutesToHHMM(toMinutes(block.endTime) ?? 0),
       type: block.type ?? "Lecture",
       group: block.group ?? "",
     });
@@ -463,11 +477,11 @@ export default function AdminTeachingPage() {
     }
   }
 
-  // Click an empty spot on a day column to schedule at that time.
+  // Click an empty spot on a day row to schedule at that time.
   function handleDayClick(day: string, e: React.MouseEvent<HTMLDivElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    let minutes = dayStart + Math.round(y / PX_PER_MIN / 30) * 30;
+    const ratio = (e.clientX - rect.left) / rect.width;
+    let minutes = dayStart + Math.round((ratio * gridMinutes) / 30) * 30;
     minutes = Math.max(dayStart, Math.min(dayEnd - 60, minutes));
     openCreate(day, minutes);
   }
@@ -581,80 +595,91 @@ export default function AdminTeachingPage() {
               border: "1px solid var(--line)",
             }}
           >
-            <div className="tt-grid">
-              <div className="tt-corner" />
-              {WORK_DAYS.map((day) => (
-                <div key={day} className="tt-day-head">
-                  {day.slice(0, 3)}
+            <div className="tt-scroll">
+              <div className="tt-inner">
+                {/* Time axis header */}
+                <div className="tt-row tt-head-row">
+                  <div className="tt-corner" />
+                  <div className="tt-axis-x">
+                    {hourMarks.map((m) => (
+                      <span
+                        key={m}
+                        className={`tt-hour${m === dayStart ? " tt-hour-first" : ""}${
+                          m === hourMarks[hourMarks.length - 1] ? " tt-hour-last" : ""
+                        }`}
+                        style={{ left: `${((m - dayStart) / gridMinutes) * 100}%` }}
+                      >
+                        {minutesToHHMM(m)}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              ))}
 
-              <div className="tt-axis" style={{ height: gridHeight }}>
-                {hourMarks.map((m) => (
-                  <span
-                    key={m}
-                    className="tt-hour"
-                    style={{ top: (m - dayStart) * PX_PER_MIN }}
-                  >
-                    {minutesToHHMM(m)}
-                  </span>
-                ))}
+                {/* One row per weekday, classes positioned horizontally by time */}
+                {WORK_DAYS.map((day) => {
+                  const packed = packLanes(
+                    scheduledBlocks.filter((b) => b.dayOfWeek === day),
+                  );
+                  const laneCount = packed.reduce((mx, p) => Math.max(mx, p.lane + 1), 1);
+                  const rowH = Math.max(ROW_H, laneCount * LANE_PITCH + 8);
+                  const laneOffset = Math.max(4, (rowH - laneCount * LANE_PITCH) / 2);
+                  const slotH = LANE_PITCH - 4; // uniform block height everywhere
+                  const hourPeriod = `${(60 / gridMinutes) * 100}%`;
+                  return (
+                    <div key={day} className="tt-row" style={{ height: rowH }}>
+                      <div className="tt-day-cell">{day.slice(0, 3)}</div>
+                      <div
+                        className="tt-day-track"
+                        style={{
+                          backgroundImage: `repeating-linear-gradient(to right, var(--line) 0px, var(--line) 1px, transparent 1px, transparent ${hourPeriod})`,
+                        }}
+                        title={`Click to schedule a ${day.toLowerCase()} class`}
+                        onClick={(e) => handleDayClick(day, e)}
+                      >
+                        {packed.map(({ lane, ...b }) => {
+                          const color = PALETTE[b.colorIndex];
+                          const conflicted = conflictedBlocks.has(b.id);
+                          return (
+                            <button
+                              key={b.id}
+                              type="button"
+                              className={`tt-block${laneCount > 1 ? " tt-block-sm" : ""}${
+                                conflicted ? " tt-block-conflict" : ""
+                              }`}
+                              style={{
+                                left: `${((b.startMin - dayStart) / gridMinutes) * 100}%`,
+                                width: `calc(${((b.endMin - b.startMin) / gridMinutes) * 100}% - 6px)`,
+                                top: Math.round(laneOffset + lane * LANE_PITCH),
+                                height: slotH,
+                                borderLeftColor: color,
+                                background: `linear-gradient(to right, ${color}26, ${color}12)`,
+                              }}
+                              title={`${b.subject.code} · ${b.subject.name}${b.group ? ` (${b.group})` : ""}\n${b.type}\n${teacherName(
+                                b.teacherId,
+                              )}\n${formatTime(b.startTime)} – ${formatTime(b.endTime)}${
+                                conflicted ? "\n⚠ Overlapping slots" : ""
+                              }`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEdit(b);
+                              }}
+                            >
+                              <strong>
+                                {b.subject.code}
+                                {b.type === "Practical" ? " · Lab" : ""}
+                                {conflicted ? " ⚠" : ""}
+                              </strong>
+                              <span className="tt-block-name">
+                                {b.group ? `${b.group} · ${b.subject.name}` : b.subject.name}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-
-              {WORK_DAYS.map((day) => (
-                <div
-                  key={day}
-                  className="tt-day-body"
-                  style={{
-                    height: gridHeight,
-                    backgroundImage: `repeating-linear-gradient(to bottom, var(--line) 0px, var(--line) 1px, transparent 1px, transparent ${Math.round(
-                      60 * PX_PER_MIN,
-                    )}px)`,
-                  }}
-                  title={`Click to schedule a ${day.toLowerCase()} class`}
-                  onClick={(e) => handleDayClick(day, e)}
-                >
-                  {scheduledBlocks
-                    .filter((b) => b.dayOfWeek === day)
-                    .map((b) => {
-                      const color = PALETTE[b.colorIndex];
-                      const conflicted = conflictedBlocks.has(b.id);
-                      return (
-                        <button
-                          key={b.id}
-                          type="button"
-                          className={`tt-block${conflicted ? " tt-block-conflict" : ""}`}
-                          style={{
-                            top: (b.startMin - dayStart) * PX_PER_MIN,
-                            height: Math.max(34, (b.endMin - b.startMin) * PX_PER_MIN - 4),
-                            borderLeftColor: color,
-                            background: `linear-gradient(to right, ${color}26, ${color}12)`,
-                          }}
-                          title={`${b.subject.code} · ${b.subject.name}\n${teacherName(b.teacherId)}\n${formatTime(
-                            b.startTime,
-                          )} – ${formatTime(b.endTime)}${conflicted ? "\n⚠ Overlapping slots" : ""}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEdit(b);
-                          }}
-                        >
-                          <strong>{b.subject.code}</strong>
-                          <span className="tt-block-name">
-                            {b.group ? `${b.subject.name} · ${b.group}` : b.subject.name}
-                          </span>
-                          {b.type === "Practical" && (
-                            <span className="tt-block-type">Practical</span>
-                          )}
-                          <span className="tt-block-meta">{teacherName(b.teacherId)}</span>
-                          <span className="tt-block-meta">
-                            {timeToHHMM(b.startTime)}–{timeToHHMM(b.endTime)}
-                            {conflicted ? " ⚠" : ""}
-                          </span>
-                        </button>
-                      );
-                    })}
-                </div>
-              ))}
             </div>
           </section>
         )}

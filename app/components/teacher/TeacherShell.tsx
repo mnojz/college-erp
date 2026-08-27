@@ -18,6 +18,7 @@ const teacherLinks = [
   ["Attendance", "/teacher/attendance", studentAssets.subjects],
   ["Class Schedule", "/teacher/schedule", studentAssets.schedules],
   ["Assessments & Marks", "/teacher/assessments", studentAssets.user],
+  ["My Uploads", "/teacher/materials", studentAssets.finance],
 ] as const;
 
 export function TeacherShell({

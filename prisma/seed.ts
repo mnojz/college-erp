@@ -94,23 +94,31 @@ async function main() {
         firstName: s.fn,
         lastName: s.ln,
         role: "STUDENT",
-        student: {
-          create: { enrollmentNumber: s.enroll, admissionDate: new Date("2023-09-15"), programId: bct.id, currentSemester: 6 },
-        },
       },
     });
-    const student = await prisma.student.findUnique({ where: { userId: u.id } });
-    if (student) studentMap[s.email] = student.id;
+    const student = await prisma.student.upsert({
+      where: { userId: u.id },
+      update: { currentSemester: 6, programId: bct.id },
+      create: {
+        userId: u.id,
+        enrollmentNumber: s.enroll,
+        registrationId: `REG-${s.enroll}`,
+        admissionDate: new Date("2023-09-15"),
+        programId: bct.id,
+        currentSemester: 6,
+      },
+    });
+    studentMap[s.email] = student.id;
   }
     console.log("✅ Users: admin, 6 teachers, 3 students");
 
     // ─── Curriculum ─────────────────────────────────────────────
   await prisma.$transaction(async (tx) => {
-    await tx.curriculum.deleteMany({ where: { programId: bct.id } });
-    await tx.subject.deleteMany({ where: { programId: bct.id } });
-    await tx.class.deleteMany({ where: { programId: bct.id } });
-    await tx.assessment.deleteMany({ where: { programId: bct.id } });
     await tx.result.deleteMany({});
+    await tx.assessment.deleteMany({ where: { programId: bct.id } });
+    await tx.class.deleteMany({ where: { programId: bct.id } }); // cascades attendance sessions & records
+    await tx.subject.deleteMany({ where: { programId: bct.id } });
+    await tx.curriculum.deleteMany({ where: { programId: bct.id } });
   });
 
   // Create BCT curriculum from JSON
@@ -159,15 +167,29 @@ async function main() {
   await syncSubjectsFromCurriculum(prisma, bct.id);
   console.log("✅ Curriculum & subjects synced");
 
+  // Add practical lab subjects (not part of the JSON theory curriculum)
+  const practicalDefs = [
+    { code: "CT 364-P", name: "Database Management System Practical" },
+    { code: "EX 365-P", name: "Communication System Practical" },
+    { code: "CT 363-P", name: "Artificial Intelligence Practical" },
+  ];
+  for (const p of practicalDefs) {
+    await prisma.subject.upsert({
+      where: { code: p.code },
+      update: { name: p.name, programId: bct.id, semester: 6 },
+      create: { code: p.code, name: p.name, programId: bct.id, semester: 6 },
+    });
+  }
+
   // ─── Classes ────────────────────────────────────────────────
   const subjects = await prisma.subject.findMany({ where: { programId: bct.id }, select: { id: true, code: true } });
   const sub = (code: string) => subjects.find((s) => s.code === code)?.id ?? "";
   const tch = (email: string) => teacherMap[email] ?? "";
 
-  const dow = { Mon: "MONDAY", Tue: "TUESDAY", Wed: "WEDNESDAY", Thu: "THURSDAY", Fri: "FRIDAY", Sat: "SATURDAY" } as const;
+  const dow: Record<string, DayOfWeek> = { Mon: "MONDAY", Tue: "TUESDAY", Wed: "WEDNESDAY", Thu: "THURSDAY", Fri: "FRIDAY", Sat: "SATURDAY" };
 
   const classDefs: Array<{
-    d: string; t: string; subj?: string | null; tchEmail?: string | null; type?: string; group?: string;
+    d: DayOfWeek; t: string; subj?: string | null; tchEmail?: string | null; type?: string; group?: string;
     parallel?: { subj: string; tch: string; group: string }[];
   }> = [
     // Monday
@@ -234,6 +256,9 @@ async function main() {
           });
         }
       } else {
+        // Real teaching slot. Break/Free placeholders are never stored as classes
+        // (Class.subjectId & Class.teacherId are required by the schema).
+        if (!c.subj) continue;
         await tx.class.create({
           data: {
             programId: bct.id,
@@ -241,8 +266,10 @@ async function main() {
             dayOfWeek: c.d,
             startTime: parseTime(start),
             endTime: parseTime(end),
-            subjectId: c.subj ? sub(c.subj) : null,
-            teacherId: c.tchEmail ? tch(c.tchEmail) : null,
+            subjectId: sub(c.subj),
+            // Slots without an assigned instructor (e.g. Minor Project) fall back
+            // to the semester coordinator as a placeholder supervisor.
+            teacherId: tch(c.tchEmail ?? "kl@fwu.edu.np"),
             type: c.type ?? "Lecture",
             group: c.group ?? null,
           },
@@ -287,6 +314,88 @@ async function main() {
     }
   }
   console.log("✅ Results recorded");
+
+  // ─── Notes / Study Materials samples ────────────────────────
+  const materialCount = await prisma.studyMaterial.count();
+  if (materialCount === 0) {
+    const uploader = await prisma.user.findUnique({
+      where: { email: "kl@fwu.edu.np" },
+      select: { id: true },
+    });
+    const bctSubjects = await prisma.subject.findMany({
+      where: { programId: bct.id },
+      orderBy: [{ semester: "asc" }, { code: "asc" }],
+      take: 4,
+    });
+
+    if (uploader && bctSubjects.length > 0) {
+      const sampleMaterials = [
+        {
+          title: `${bctSubjects[0].name} — Unit 1 Classroom Notes`,
+          description: "Handwritten-to-digital lecture notes covering foundational concepts, solved examples and revision pointers.",
+          topic: bctSubjects[0].name,
+          materialType: "LECTURE_NOTES" as const,
+          visibility: "EVERYONE" as const,
+          departmentName: null,
+          programId: null,
+          semester: null,
+          subjectId: bctSubjects[0].id,
+          fileName: `${bctSubjects[0].code.toLowerCase()}-unit1-notes.md`,
+          body: `# ${bctSubjects[0].name} — Unit 1 Notes\n\nThis unit introduces the core building blocks of ${bctSubjects[0].name}.\n\n- Key definitions and notation\n- Worked examples from class\n- Revision checklist\n\n_Auto-seeded demo study material._\n`,
+        },
+        {
+          title: `${bctSubjects[Math.min(3, bctSubjects.length - 1)].name} — Question Bank (Exam Prep)`,
+          description: "Collected past questions organised chapter-wise for semester exam preparation.",
+          topic: "Question Bank",
+          materialType: "QUESTION_BANK" as const,
+          visibility: "DEPARTMENT_PROGRAM" as const,
+          departmentName: "Engineering",
+          programId: bct.id,
+          semester: bctSubjects[Math.min(3, bctSubjects.length - 1)].semester,
+          subjectId: bctSubjects[Math.min(3, bctSubjects.length - 1)].id,
+          fileName: "question-bank.md",
+          body: "# Question Bank\n\nChapter-wise collection of long and short questions.\n\n1. Define and classify …\n2. Explain the working principle of …\n3. Derive the expression for …\n",
+        },
+        {
+          title: "Semester Startup Kit — Study Plan & References",
+          description: "General reference pack for new students: weekly study plan format, recommended references and library pointers.",
+          topic: "Study Skills",
+          materialType: "REFERENCE_MATERIAL" as const,
+          visibility: "EVERYONE" as const,
+          departmentName: null,
+          programId: bct.id,
+          semester: 3,
+          subjectId: null,
+          fileName: "semester-startup-kit.md",
+          body: "# Semester Startup Kit\n\nA college-wide reference everyone can access — surfaced automatically to Semester 3 students.\n\n## Weekly Study Planner\n\n| Day | Focus | Hours |\n| --- | ----- | ----- |\n| Mon | Theory revision | 2 |\n| Wed | Lab practice | 2 |\n| Fri | Assignment work | 2 |\n",
+        },
+      ];
+
+      for (const m of sampleMaterials) {
+        const bytes = Buffer.from(m.body, "utf8");
+        await prisma.studyMaterial.create({
+          data: {
+            title: m.title,
+            description: m.description,
+            topic: m.topic,
+            materialType: m.materialType,
+            visibility: m.visibility,
+            departmentName: m.departmentName,
+            programId: m.programId,
+            semester: m.semester,
+            subjectId: m.subjectId,
+            fileName: m.fileName,
+            mimeType: "text/markdown",
+            fileSize: bytes.byteLength,
+            fileData: bytes,
+            uploaderId: uploader.id,
+          },
+        });
+      }
+      console.log("✅ Sample study materials created");
+    }
+  }
+
 
   // ─── Announcements ─────────────────────────────────────────
   const announcements = [
