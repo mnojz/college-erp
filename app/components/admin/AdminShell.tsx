@@ -7,6 +7,7 @@ const adminLinks = [
   ["Overview", "/admin", studentAssets.academic],
   ["Programs", "/admin/setup", studentAssets.subjects],
   ["Curriculum", "/admin/curriculum", studentAssets.school],
+  ["Syllabi", "/admin/syllabi", studentAssets.syllabus],
   ["Class Scheduling", "/admin/teaching", studentAssets.schedules],
   ["People", "/admin/people", studentAssets.user],
   ["Announcements", "/admin/announcements", studentAssets.bell],

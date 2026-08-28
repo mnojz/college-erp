@@ -3005,3 +3005,138 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
   color: #fff;
 }
 
+/* ─── Syllabi library (admin + public) ────────────────────────────── */
+.syllabus-grouped {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.syllabus-dept {
+  background: var(--panel, #f8fafc);
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.syllabus-dept-name {
+  margin: 0;
+  padding: 12px 18px 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink, #0f172a);
+  background: rgba(15, 23, 42, 0.04);
+  border-bottom: 1px solid var(--line, #e2e8f0);
+}
+
+.syllabus-program {
+  padding: 14px 18px;
+}
+
+.syllabus-program-name {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft, #64748b);
+}
+
+.syllabus-program-semesters {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+@media (max-width: 768px) {
+  .syllabus-program-semesters {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.syllabus-semester-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.syllabus-sem-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft, #64748b);
+}
+
+.syllabus-empty-sem {
+  font-size: 13px;
+  color: var(--ink-soft, #94a3b8);
+  opacity: 0.6;
+}
+
+.syllabus-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.syllabus-admin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--line, #e2e8f0);
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.syllabus-admin-row:hover {
+  background: var(--card-hover-bg, #f8fafc);
+  border-color: var(--card-hover-border, #cbd5e1);
+}
+
+.syllabus-admin-link {
+  flex: 1;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+.syllabus-admin-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink, #0f172a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.syllabus-admin-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--ink-soft, #64748b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.syllabus-admin-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Shared: a touch more breathing room in the syllabus form */
+.modal-form .modal-actions {
+  flex-direction: row;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+
