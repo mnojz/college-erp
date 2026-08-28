@@ -1,16 +1,24 @@
 "use client";
 
 import { DashboardShell } from "@/app/components/layout/DashboardShell";
-import { studentAssets } from "@/app/components/student/assets";
+import {
+  IconDashboard,
+  IconSchool,
+  IconBooks,
+  IconFileDescription,
+  IconCalendarClock,
+  IconUsersGroup,
+  IconBell,
+} from "@tabler/icons-react";
 
 const adminLinks = [
-  ["Overview", "/admin", studentAssets.academic],
-  ["Programs", "/admin/setup", studentAssets.subjects],
-  ["Curriculum", "/admin/curriculum", studentAssets.school],
-  ["Syllabi", "/admin/syllabi", studentAssets.syllabus],
-  ["Class Scheduling", "/admin/teaching", studentAssets.schedules],
-  ["People", "/admin/people", studentAssets.user],
-  ["Announcements", "/admin/announcements", studentAssets.bell],
+  ["Overview", "/admin", IconDashboard],
+  ["Programs", "/admin/setup", IconSchool],
+  ["Curriculum", "/admin/curriculum", IconBooks],
+  ["Syllabi", "/admin/syllabi", IconFileDescription],
+  ["Class Scheduling", "/admin/teaching", IconCalendarClock],
+  ["People", "/admin/people", IconUsersGroup],
+  ["Announcements", "/admin/announcements", IconBell],
 ] as const;
 
 export function AdminShell({

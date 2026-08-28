@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useSyncExternalStore } from "react";
-import { AssetIcon, studentAssets } from "@/app/components/student/assets";
+import { ThemeToggle } from "@/app/components/common/ThemeToggle";
+import { IconBell } from "@tabler/icons-react";
 
 export type DashboardNavProps = {
   brandTitle?: string;
@@ -17,18 +17,6 @@ export type DashboardNavProps = {
   onLogout?: () => void;
 };
 
-function getTheme() {
-  if (typeof window === "undefined") return "light" as const;
-  const saved = window.localStorage.getItem("college-erp-theme");
-  if (saved === "dark" || saved === "light") return saved;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? ("dark" as const) : ("light" as const);
-}
-
-function subscribe(onChange: () => void) {
-  window.addEventListener("college-erp-theme-change", onChange);
-  return () => window.removeEventListener("college-erp-theme-change", onChange);
-}
-
 export function DashboardNav({
   brandTitle = "College-ERP",
   brandSubtitle = "Academic Terminal",
@@ -41,16 +29,6 @@ export function DashboardNav({
   onLogout,
 }: DashboardNavProps) {
   const router = useRouter();
-  const theme = useSyncExternalStore(subscribe, getTheme, () => "light");
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-  }, [theme]);
-
-  function changeTheme(nextTheme: "light" | "dark") {
-    window.localStorage.setItem("college-erp-theme", nextTheme);
-    window.dispatchEvent(new Event("college-erp-theme-change"));
-  }
 
   async function handleLogout() {
     if (onLogout) {
@@ -97,32 +75,13 @@ export function DashboardNav({
       </Link>
 
       <div className="student-nav-actions">
-        {/* Theme Switcher */}
-        <div className="theme-switch" aria-label="Theme options">
-          <button
-            className={theme === "light" ? "selected" : ""}
-            type="button"
-            onClick={() => changeTheme("light")}
-            aria-label="Use light theme"
-            title="Switch to Light Theme"
-          >
-            <AssetIcon src={studentAssets.sun} size={14} />
-          </button>
-          <button
-            className={theme === "dark" ? "selected" : ""}
-            type="button"
-            onClick={() => changeTheme("dark")}
-            aria-label="Use dark theme"
-            title="Switch to Dark Theme"
-          >
-            <AssetIcon src={studentAssets.moon} size={14} />
-          </button>
-        </div>
+        {/* Theme Switcher — single toggle */}
+        <ThemeToggle />
 
         {/* Notifications (if count > 0) */}
         {notificationCount > 0 && (
           <button className="notification-button" type="button" aria-label="Notifications" title={`${notificationCount} new alerts`}>
-            <AssetIcon src={studentAssets.bell} size={20} />
+            <IconBell size={20} aria-hidden="true" />
             <b>{notificationCount}</b>
           </button>
         )}

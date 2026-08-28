@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { AdminModal } from "@/app/components/admin/AdminModal";
+import { IconPlus, IconAlertTriangle } from "@tabler/icons-react";
 
 type ProgramOption = { id: string; name: string; code: string; durationYears: number };
 type SubjectItem = { id: string; name: string; code: string; programId: string; semester: number };
@@ -36,11 +37,15 @@ type Block = ClassItem & { startMin: number; endMin: number; colorIndex: number;
 // Full week on the timetable (Sat & Sun typically stay empty but keep the
 // week visually complete).
 const WORK_DAYS = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"] as const;
+// Lunch applies Monday–Friday only (Saturday/Sunday stay unaffected).
+const LUNCH_DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"] as const;
+const LUNCH_START_DEFAULT = "13:00";
+const LUNCH_END_DEFAULT = "14:00";
 // Timetable geometry (days = rows, time = columns). Every block is rendered at
 // LANE_PITCH height so slots look uniform; rows only grow when several
 // parallel slots (e.g. Gr. A/B practicals) must stack inside one day.
-const ROW_H = 72;
-const LANE_PITCH = 36;
+const ROW_H = 76;
+const LANE_PITCH = 38;
 const FALLBACK_START = 9 * 60;
 const FALLBACK_END = 15 * 60;
 const PALETTE = [
@@ -89,6 +94,13 @@ function toMinutes(isoTime: string) {
 function minutesToHHMM(totalMinutes: number) {
   const m = Math.max(0, Math.min(24 * 60 - 30, totalMinutes));
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+}
+
+function parseHHMM(value: string) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(value);
+  if (!m) return null;
+  const mins = Number(m[1]) * 60 + Number(m[2]);
+  return mins >= 0 && mins <= 24 * 60 - 1 ? mins : null;
 }
 
 function colorIndexFor(code: string) {
@@ -141,6 +153,10 @@ export default function AdminTeachingPage() {
   // Scheduling context
   const [selectedProgramId, setSelectedProgramId] = useState("");
   const [selectedSemester, setSelectedSemester] = useState("");
+
+  // Configurable lunch break (Mon–Fri only)
+  const [lunchStart, setLunchStart] = useState(LUNCH_START_DEFAULT);
+  const [lunchEnd, setLunchEnd] = useState(LUNCH_END_DEFAULT);
 
   // Modals
   const [showClassModal, setShowClassModal] = useState(false);
@@ -261,8 +277,11 @@ export default function AdminTeachingPage() {
       .sort((a, b) => a.startMin - b.startMin);
   }, [classes, selectedProgramId, selectedSemester]);
 
-  // Flag overlapping blocks that share a teacher or the same semester
-  // (different practical groups are allowed to overlap).
+  // Flag overlapping blocks. Rules:
+  //  - Same teacher at the same time always conflicts.
+  //  - Lecture + Lab (different slot types) may overlap.
+  //  - Lecture + Lecture always conflicts.
+  //  - Practical + Practical conflicts unless they are different parallel groups.
   const conflictedBlocks = useMemo(() => {
     const flagged = new Set<string>();
     for (let i = 0; i < scheduledBlocks.length; i += 1) {
@@ -271,44 +290,49 @@ export default function AdminTeachingPage() {
         const b = scheduledBlocks[j];
         if (a.dayOfWeek !== b.dayOfWeek) continue;
         const overlaps = a.startMin < b.endMin && a.endMin > b.startMin;
-        const differentGroups = !!a.group && !!b.group && a.group !== b.group;
-        const related =
-          a.teacherId === b.teacherId ||
-          (a.programId === b.programId && a.semester === b.semester && !differentGroups);
-        if (overlaps && related) {
+        if (!overlaps) continue;
+        if (a.teacherId === b.teacherId) {
           flagged.add(a.id);
           flagged.add(b.id);
+          continue;
         }
+        // Different slot types (Lecture vs Practical/Lab) may overlap.
+        const aType = a.type ?? "Lecture";
+        const bType = b.type ?? "Lecture";
+        if (aType !== bType) continue;
+        // Same type — reject, except parallel practical groups (Gr. A/Gr. B).
+        const differentGroups = !!a.group && !!b.group && a.group !== b.group;
+        if (aType === "Practical" && differentGroups) continue;
+        flagged.add(a.id);
+        flagged.add(b.id);
       }
     }
     return flagged;
   }, [scheduledBlocks]);
 
-  // Time window of the week grid (floored/ceiling hours).
-  const dayStart = useMemo(() => {
-    if (scheduledBlocks.length === 0) return FALLBACK_START;
-    return Math.floor(Math.min(...scheduledBlocks.map((b) => b.startMin)) / 60) * 60;
-  }, [scheduledBlocks]);
-  const dayEnd = useMemo(() => {
-    if (scheduledBlocks.length === 0) return FALLBACK_END;
-    return Math.ceil(Math.max(...scheduledBlocks.map((b) => b.endMin)) / 60) * 60;
-  }, [scheduledBlocks]);
-  const gridMinutes = Math.max(60, dayEnd - dayStart);
+  // Lunch window (null when disabled via equal or reversed times).
+  const lunchStartMin = parseHHMM(lunchStart);
+  const lunchEndMin = parseHHMM(lunchEnd);
+  const lunchActive =
+    lunchStartMin !== null && lunchEndMin !== null && lunchEndMin > lunchStartMin;
 
-  // Stats chips
-  const stats = useMemo(() => {
-    let minutes = 0;
-    const teacherIds = new Set<string>();
-    for (const b of scheduledBlocks) {
-      minutes += b.endMin - b.startMin;
-      teacherIds.add(b.teacherId);
-    }
-    return {
-      slots: scheduledBlocks.length,
-      hours: Math.round((minutes / 60) * 10) / 10,
-      teachers: teacherIds.size,
-    };
-  }, [scheduledBlocks]);
+  // Time window of the week grid (floored/ceiling hours). The lunch window is
+  // included so the break stays visible even when no classes touch it.
+  const dayStart = useMemo(() => {
+    const starts = scheduledBlocks.map((b) => b.startMin);
+    const ls = lunchStartMin;
+    if (ls !== null) starts.push(ls);
+    if (starts.length === 0) return FALLBACK_START;
+    return Math.floor(Math.min(...starts) / 60) * 60;
+  }, [scheduledBlocks, lunchStartMin]);
+  const dayEnd = useMemo(() => {
+    const ends = scheduledBlocks.map((b) => b.endMin);
+    const le = lunchEndMin;
+    if (le !== null) ends.push(le);
+    if (ends.length === 0) return FALLBACK_END;
+    return Math.ceil(Math.max(...ends) / 60) * 60;
+  }, [scheduledBlocks, lunchEndMin]);
+  const gridMinutes = Math.max(60, dayEnd - dayStart);
 
   // Curriculum subjects of this semester that have no scheduled slot yet.
   const unscheduledSubjects = useMemo(() => {
@@ -489,10 +513,14 @@ export default function AdminTeachingPage() {
   const teacherName = (id: string) =>
     teachers.find((t) => t.id === id)?.name ?? "Unknown";
 
-  const hourMarks: number[] = [];
-  for (let h = Math.floor(dayStart / 60); h <= Math.floor(dayEnd / 60); h += 1) {
-    hourMarks.push(h * 60);
+  // 30-minute grid: mark every half hour along the time axis.
+  const timeMarks: number[] = [];
+  for (let m = Math.floor(dayStart / 30) * 30; m <= dayEnd; m += 30) {
+    timeMarks.push(m);
   }
+
+  const hourPeriod = `${(60 / gridMinutes) * 100}%`;
+  const halfHourPeriod = `${(30 / gridMinutes) * 100}%`;
 
   const ttInput: React.CSSProperties = {
     padding: "9px 12px",
@@ -558,20 +586,42 @@ export default function AdminTeachingPage() {
             </select>
           </label>
 
+          <label
+            style={{ display: "grid", gap: "6px", width: "150px" }}
+            title="Lunch break applies Monday–Friday only"
+          >
+            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--ink-soft)" }}>Lunch Start</span>
+            <input
+              type="time"
+              value={lunchStart}
+              onChange={(e) => setLunchStart(e.target.value)}
+              style={ttInput}
+              disabled={!selectedProgramId}
+            />
+          </label>
+          <label
+            style={{ display: "grid", gap: "6px", width: "150px" }}
+            title="Lunch break applies Monday–Friday only"
+          >
+            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--ink-soft)" }}>Lunch End</span>
+            <input
+              type="time"
+              value={lunchEnd}
+              onChange={(e) => setLunchEnd(e.target.value)}
+              style={ttInput}
+              disabled={!selectedProgramId}
+            />
+          </label>
+
           <button
             type="button"
             className="btn-add"
             onClick={() => openCreate()}
             disabled={!selectedProgramId || !selectedSemester}
           >
-            + Add Slot
+            <IconPlus size={16} aria-hidden="true" />
+            Add Slot
           </button>
-
-          <div style={{ display: "flex", gap: "10px", marginLeft: "auto" }}>
-            <span className="badge badge-blue">Slots: {stats.slots}</span>
-            <span className="badge badge-green">Hours/wk: {stats.hours}</span>
-            <span className="badge badge-slate">Teachers: {stats.teachers}</span>
-          </div>
         </section>
 
         {error && <p className="admin-message error">{error}</p>}
@@ -597,21 +647,24 @@ export default function AdminTeachingPage() {
           >
             <div className="tt-scroll">
               <div className="tt-inner">
-                {/* Time axis header */}
+                {/* Time axis header — every half hour, hours labelled */}
                 <div className="tt-row tt-head-row">
                   <div className="tt-corner" />
                   <div className="tt-axis-x">
-                    {hourMarks.map((m) => (
-                      <span
-                        key={m}
-                        className={`tt-hour${m === dayStart ? " tt-hour-first" : ""}${
-                          m === hourMarks[hourMarks.length - 1] ? " tt-hour-last" : ""
-                        }`}
-                        style={{ left: `${((m - dayStart) / gridMinutes) * 100}%` }}
-                      >
-                        {minutesToHHMM(m)}
-                      </span>
-                    ))}
+                    {timeMarks.map((m) => {
+                      const isHour = m % 60 === 0;
+                      return (
+                        <span
+                          key={m}
+                          className={`tt-hour${isHour ? "" : " tt-hour-half"}${
+                            m === dayStart ? " tt-hour-first" : ""
+                          }${m === timeMarks[timeMarks.length - 1] ? " tt-hour-last" : ""}`}
+                          style={{ left: `${((m - dayStart) / gridMinutes) * 100}%` }}
+                        >
+                          {minutesToHHMM(m)}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -624,18 +677,29 @@ export default function AdminTeachingPage() {
                   const rowH = Math.max(ROW_H, laneCount * LANE_PITCH + 8);
                   const laneOffset = Math.max(4, (rowH - laneCount * LANE_PITCH) / 2);
                   const slotH = LANE_PITCH - 4; // uniform block height everywhere
-                  const hourPeriod = `${(60 / gridMinutes) * 100}%`;
+                  const isLunchDay = (LUNCH_DAYS as readonly string[]).includes(day);
                   return (
                     <div key={day} className="tt-row" style={{ height: rowH }}>
                       <div className="tt-day-cell">{day.slice(0, 3)}</div>
                       <div
                         className="tt-day-track"
                         style={{
-                          backgroundImage: `repeating-linear-gradient(to right, var(--line) 0px, var(--line) 1px, transparent 1px, transparent ${hourPeriod})`,
+                          backgroundImage: `repeating-linear-gradient(to right, var(--line-faint) 0px, var(--line-faint) 1px, transparent 1px, transparent ${halfHourPeriod}), repeating-linear-gradient(to right, var(--line) 0px, var(--line) 1px, transparent 1px, transparent ${hourPeriod})`,
                         }}
                         title={`Click to schedule a ${day.toLowerCase()} class`}
                         onClick={(e) => handleDayClick(day, e)}
                       >
+                        {lunchActive && isLunchDay && (
+                          <div
+                            className="tt-lunch"
+                            style={{
+                              left: `${((lunchStartMin! - dayStart) / gridMinutes) * 100}%`,
+                              width: `${((lunchEndMin! - lunchStartMin!) / gridMinutes) * 100}%`,
+                            }}
+                          >
+                            <span>Lunch</span>
+                          </div>
+                        )}
                         {packed.map(({ lane, ...b }) => {
                           const color = PALETTE[b.colorIndex];
                           const conflicted = conflictedBlocks.has(b.id);
@@ -664,10 +728,14 @@ export default function AdminTeachingPage() {
                                 openEdit(b);
                               }}
                             >
-                              <strong>
-                                {b.subject.code}
-                                {b.type === "Practical" ? " · Lab" : ""}
-                                {conflicted ? " ⚠" : ""}
+                              <strong className="tt-block-title">
+                                <span>
+                                  {b.subject.code}
+                                  {b.type === "Practical" ? " · Lab" : ""}
+                                </span>
+                                {conflicted && (
+                                  <IconAlertTriangle size={11} className="tt-block-warn" aria-hidden="true" />
+                                )}
                               </strong>
                               <span className="tt-block-name">
                                 {b.group ? `${b.group} · ${b.subject.name}` : b.subject.name}
@@ -722,7 +790,8 @@ export default function AdminTeachingPage() {
                         }));
                       }}
                     >
-                      + Schedule
+                      <IconPlus size={13} aria-hidden="true" />
+                      Schedule
                     </button>
                   </span>
                 ))}
@@ -848,7 +917,12 @@ export default function AdminTeachingPage() {
 
               <div className="modal-actions">
                 <button className="btn-primary" type="submit" disabled={saving}>
-                  {saving ? "Scheduling…" : "+ Schedule Class"}
+                  {saving ? "Scheduling…" : (
+                    <>
+                      <IconPlus size={15} aria-hidden="true" />
+                      Schedule Class
+                    </>
+                  )}
                 </button>
                 <button
                   className="btn-ghost"
@@ -1000,6 +1074,9 @@ export default function AdminTeachingPage() {
               </p>
               <p
                 style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
                   fontSize: "13px",
                   color: "#dc2626",
                   background: "rgba(220, 38, 38, 0.08)",
@@ -1007,7 +1084,8 @@ export default function AdminTeachingPage() {
                   borderRadius: "8px",
                 }}
               >
-                ⚠️ Deleting this schedule removes its attendance sessions and student records.
+                <IconAlertTriangle size={16} aria-hidden="true" />
+                Deleting this schedule removes its attendance sessions and student records.
               </p>
               {error && <p style={{ margin: "12px 0 0", fontSize: 13, color: "#b91c1c" }}>{error}</p>}
               <div className="modal-actions" style={{ marginTop: "20px" }}>

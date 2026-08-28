@@ -1,7 +1,13 @@
 "use client";
 
 import { DashboardShell } from "@/app/components/layout/DashboardShell";
-import { studentAssets } from "@/app/components/student/assets";
+import {
+  IconDashboard,
+  IconCalendarCheck,
+  IconCalendarClock,
+  IconClipboardCheck,
+  IconUpload,
+} from "@tabler/icons-react";
 
 type TeacherShellProps = {
   title: string;
@@ -14,11 +20,11 @@ type TeacherShellProps = {
 };
 
 const teacherLinks = [
-  ["Overview", "/teacher", studentAssets.academic],
-  ["Attendance", "/teacher/attendance", studentAssets.subjects],
-  ["Class Schedule", "/teacher/schedule", studentAssets.schedules],
-  ["Assessments & Marks", "/teacher/assessments", studentAssets.user],
-  ["My Uploads", "/teacher/materials", studentAssets.finance],
+  ["Overview", "/teacher", IconDashboard],
+  ["Attendance", "/teacher/attendance", IconCalendarCheck],
+  ["Class Schedule", "/teacher/schedule", IconCalendarClock],
+  ["Assessments & Marks", "/teacher/assessments", IconClipboardCheck],
+  ["My Uploads", "/teacher/materials", IconUpload],
 ] as const;
 
 export function TeacherShell({

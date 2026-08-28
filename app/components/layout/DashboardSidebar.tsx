@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AssetIcon } from "@/app/components/student/assets";
+import type { ComponentType } from "react";
+
+export type NavIcon = ComponentType<{ size?: string | number; className?: string }>;
 
 export type SidebarItem = {
   label: string;
   href: string;
-  icon: string;
+  icon: NavIcon;
 };
 
-export type SidebarTuple = readonly [string, string, string];
+export type SidebarTuple = readonly [string, string, NavIcon];
 
 export type DashboardSidebarProps = {
   items: readonly SidebarTuple[] | readonly SidebarItem[];
@@ -27,7 +29,7 @@ export function DashboardSidebar({ items, activeHref }: DashboardSidebarProps) {
           const isTuple = Array.isArray(item);
           const label = isTuple ? item[0] : (item as SidebarItem).label;
           const href = isTuple ? item[1] : (item as SidebarItem).href;
-          const icon = isTuple ? item[2] : (item as SidebarItem).icon;
+          const Icon = isTuple ? item[2] : (item as SidebarItem).icon;
 
           const isActive = activeHref ? activeHref === href : currentPath === href;
 
@@ -37,7 +39,9 @@ export function DashboardSidebar({ items, activeHref }: DashboardSidebarProps) {
               className={`student-sidebar-link ${isActive ? "active" : ""}`}
               href={href}
             >
-              <AssetIcon src={icon} size={19} />
+              <span className="student-sidebar-icon">
+                <Icon size={19} className="tabular-icon" aria-hidden="true" />
+              </span>
               <span>{label}</span>
               {isActive && <i />}
             </Link>

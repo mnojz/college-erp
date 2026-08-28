@@ -398,15 +398,48 @@ async function main() {
 
 
   // ─── Announcements ─────────────────────────────────────────
-  const announcements = [
+  // 1×1 transparent PNG used as a sample notice attachment (previewable image).
+  const noticeImage = new Uint8Array(
+    Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "base64",
+    ),
+  );
+
+  const announcements: Array<{
+    title: string;
+    body: string;
+    attachmentFileName?: string;
+    attachmentMimeType?: string;
+    attachmentData?: Uint8Array<ArrayBuffer>;
+  }> = [
     { title: "Far Western University Academic Year 2026 Session Commences", body: "All students and faculty members are informed that regular academic coursework and laboratory sessions for the Fall 2026 semester have officially commenced. Attendance will be recorded digitally on the College ERP portal." },
-    { title: "Library and Digital Resource Access Pass Distribution", body: "Students can collect their RFID library credentials and institutional access cards from the administrative front desk starting this Friday between 10:00 AM and 4:00 PM." },
+    {
+      title: "Library and Digital Resource Access Pass Distribution",
+      body: "Students can collect their RFID library credentials and institutional access cards from the administrative front desk starting this Friday between 10:00 AM and 4:00 PM.",
+      attachmentFileName: "library-access-pass.png",
+      attachmentMimeType: "image/png",
+      attachmentData: noticeImage,
+    },
     { title: "Call for Papers: National Engineering & IT Symposium 2026", body: "The Department of Computer & Electronics Engineering invites research papers and capstone project submissions for the upcoming National Engineering Symposium. Cash prizes and publication certificates will be awarded." },
     { title: "Semester Examination Schedule & Form Submission Deadline", body: "Examination registration forms for the upcoming semester finals must be submitted to the examination department by the end of next week along with cleared dues." },
   ];
   for (const a of announcements) {
     await prisma.announcement.create({
-      data: { title: a.title, body: a.body, authorId: adminUser.id, publishedAt: new Date() },
+      data: {
+        title: a.title,
+        body: a.body,
+        authorId: adminUser.id,
+        publishedAt: new Date(),
+        ...(a.attachmentData
+          ? {
+              attachmentFileName: a.attachmentFileName,
+              attachmentMimeType: a.attachmentMimeType,
+              attachmentSize: a.attachmentData.byteLength,
+              attachmentData: a.attachmentData,
+            }
+          : {}),
+      },
     });
   }
   console.log("✅ Announcements created");

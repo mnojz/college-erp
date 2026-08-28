@@ -1,6 +1,7 @@
 "use client";
 
 import { formatBytes, resolveTitle, type SyllabusDto } from "@/app/lib/syllabi-shared";
+import { IconDownload, IconPencil, IconTrash } from "@tabler/icons-react";
 
 type Syllabus = SyllabusDto;
 
@@ -32,14 +33,27 @@ export function SyllabusAdminRow({ syllabus, onEdit, onDelete }: Props) {
           download
           className="btn-ghost btn-small"
           title="Download PDF"
+          aria-label="Download PDF"
         >
-          ↓
+          <IconDownload size={16} aria-hidden="true" />
         </a>
-        <button type="button" className="btn-ghost btn-small" onClick={onEdit} title="Edit">
-          ✎
+        <button
+          type="button"
+          className="btn-ghost btn-small"
+          onClick={onEdit}
+          title="Edit"
+          aria-label="Edit syllabus"
+        >
+          <IconPencil size={16} aria-hidden="true" />
         </button>
-        <button type="button" className="btn-danger-ghost btn-small" onClick={onDelete} title="Delete">
-          ✕
+        <button
+          type="button"
+          className="btn-danger-ghost btn-small"
+          onClick={onDelete}
+          title="Delete"
+          aria-label="Delete syllabus"
+        >
+          <IconTrash size={16} aria-hidden="true" />
         </button>
       </div>
     </article>

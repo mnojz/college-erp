@@ -79,5 +79,12 @@ function indexBySemester(items: Syllabus[]): Map<number, Syllabus[]> {
     arr.push(s);
     bySemester.set(s.semester, arr);
   }
+  // Deterministic, readable order inside every semester slot.
+  for (const arr of bySemester.values()) {
+    arr.sort((a, b) =>
+      (a.title ?? a.fileName).localeCompare(b.title ?? b.fileName) ||
+      a.fileName.localeCompare(b.fileName),
+    );
+  }
   return bySemester;
 }

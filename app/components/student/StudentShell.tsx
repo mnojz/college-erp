@@ -1,16 +1,24 @@
 "use client";
 
 import { DashboardShell } from "@/app/components/layout/DashboardShell";
-import { studentAssets } from "./assets";
+import {
+  IconUser,
+  IconReport,
+  IconCalendarCheck,
+  IconBook2,
+  IconNotebook,
+  IconFileDescription,
+  IconCalendarClock,
+} from "@tabler/icons-react";
 
 const studentLinks = [
-  ["Profile", "/student", studentAssets.user],
-  ["Result", "/student/results", studentAssets.result],
-  ["Attendance", "/student/attendance", studentAssets.attendance],
-  ["Subjects", "/student/subjects", studentAssets.subjects],
-  ["Notes", "/student/notes", studentAssets.assignment],
-  ["Syllabi", "/student/syllabi", studentAssets.syllabus],
-  ["Schedules", "/student/schedules", studentAssets.schedules],
+  ["Profile", "/student", IconUser],
+  ["Result", "/student/results", IconReport],
+  ["Attendance", "/student/attendance", IconCalendarCheck],
+  ["Subjects", "/student/subjects", IconBook2],
+  ["Notes", "/student/notes", IconNotebook],
+  ["Syllabi", "/student/syllabi", IconFileDescription],
+  ["Schedules", "/student/schedules", IconCalendarClock],
 ] as const;
 
 export type StudentShellProps = {

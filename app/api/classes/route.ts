@@ -37,6 +37,29 @@ function parseTime(value: unknown) {
     : null;
 }
 
+/**
+ * Type-aware overlap rule:
+ *  - Same teacher at the same time always conflicts.
+ *  - Lecture + Lab (different slot types) may overlap.
+ *  - Lecture + Lecture always conflicts.
+ *  - Practical + Practical conflicts unless they are different parallel groups.
+ */
+function isConflict(
+  candidate: { teacherId: string; group: string | null; type: string | null },
+  teacherId: string,
+  type: string,
+  group: string | null,
+): boolean {
+  if (candidate.teacherId === teacherId) return true;
+  // Different slot types (Lecture vs Practical/Lab) may overlap.
+  const candidateType = candidate.type ?? "Lecture";
+  if (candidateType !== type) return false;
+  // Same type — reject unless they are different parallel practical groups.
+  const differentGroups = !!candidate.group && !!group && candidate.group !== group;
+  if (type === "Practical" && differentGroups) return false;
+  return true;
+}
+
 export async function GET() {
   try {
     const classes = await prisma.class.findMany({
@@ -111,8 +134,9 @@ export async function POST(request: Request) {
   }
 
   // Conflict detection: the assigned teacher cannot be in two places at
-  // once, and this program+semester cannot host overlapping slots — unless
-  // both slots belong to different practical groups.
+  // once, same-type slots (Lecture+Lecture / Practical+Practical) cannot
+  // overlap in this program+semester (except parallel practical groups),
+  // while a Lecture and a Lab may run concurrently.
   const candidates = await prisma.class.findMany({
     where: {
       dayOfWeek,
@@ -123,6 +147,7 @@ export async function POST(request: Request) {
     select: {
       startTime: true,
       endTime: true,
+      type: true,
       teacherId: true,
       group: true,
       subject: { select: { code: true, name: true } },
@@ -130,13 +155,7 @@ export async function POST(request: Request) {
     },
   });
 
-  const clash = candidates.find((c) => {
-    if (c.teacherId === teacherId) return true;
-    // Same semester overlap is only allowed when both slots sit in
-    // different practical groups.
-    const differentGroups = c.group !== null && group !== null && c.group !== group;
-    return !differentGroups;
-  });
+  const clash = candidates.find((c) => isConflict(c, teacherId, type, group));
 
   if (clash) {
     const fmt = (d: Date) =>
@@ -216,8 +235,8 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Subject does not match chosen program and semester" }, { status: 400 });
   }
 
-  // Conflict detection (ignores the slot being edited). Same-semester
-  // overlaps are allowed when both slots sit in different groups.
+  // Conflict detection (ignores the slot being edited). Same-type overlaps are
+  // rejected; Lecture + Lab may overlap; parallel practical groups may overlap.
   const candidates = await prisma.class.findMany({
     where: {
       id: { not: id },
@@ -229,6 +248,7 @@ export async function PUT(request: Request) {
     select: {
       startTime: true,
       endTime: true,
+      type: true,
       teacherId: true,
       group: true,
       subject: { select: { code: true, name: true } },
@@ -236,11 +256,7 @@ export async function PUT(request: Request) {
     },
   });
 
-  const clash = candidates.find((c) => {
-    if (c.teacherId === teacherId) return true;
-    const differentGroups = c.group !== null && group !== null && c.group !== group;
-    return !differentGroups;
-  });
+  const clash = candidates.find((c) => isConflict(c, teacherId, type, group));
 
   if (clash) {
     const fmt = (d: Date) =>

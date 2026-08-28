@@ -1,6 +1,7 @@
 "use client";
 
 import { resolveTitle, formatBytes, type SyllabusDto } from "@/app/lib/syllabi-shared";
+import { IconDownload, IconEye } from "@tabler/icons-react";
 
 type Syllabus = SyllabusDto;
 
@@ -27,12 +28,23 @@ export function SyllabusPublicRow({ syllabus }: Props) {
       </a>
       <div className="syllabus-admin-actions">
         <a
+          href={`/api/syllabi/${syllabus.id}/file?inline=1`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-ghost btn-small"
+          title="Preview PDF"
+          aria-label="Preview PDF"
+        >
+          <IconEye size={16} aria-hidden="true" />
+        </a>
+        <a
           href={`/api/syllabi/${syllabus.id}/file`}
           download
           className="btn-ghost btn-small"
           title="Download PDF"
+          aria-label="Download PDF"
         >
-          ↓
+          <IconDownload size={16} aria-hidden="true" />
         </a>
       </div>
     </article>

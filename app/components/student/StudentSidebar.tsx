@@ -1,15 +1,24 @@
 "use client";
 
 import { DashboardSidebar } from "@/app/components/layout/DashboardSidebar";
-import { studentAssets } from "./assets";
+import {
+  IconUser,
+  IconReport,
+  IconCalendarCheck,
+  IconBook2,
+  IconNotebook,
+  IconFileDescription,
+  IconCalendarClock,
+} from "@tabler/icons-react";
 
 const items = [
-  ["Profile", "/student", studentAssets.user],
-  ["Result", "/student/results", studentAssets.result],
-  ["Attendance", "/student/attendance", studentAssets.attendance],
-  ["Subjects", "/student/subjects", studentAssets.subjects],
-  ["Notes", "/student/notes", studentAssets.assignment],
-  ["Schedules", "/student/schedules", studentAssets.schedules],
+  ["Profile", "/student", IconUser],
+  ["Result", "/student/results", IconReport],
+  ["Attendance", "/student/attendance", IconCalendarCheck],
+  ["Subjects", "/student/subjects", IconBook2],
+  ["Notes", "/student/notes", IconNotebook],
+  ["Syllabi", "/student/syllabi", IconFileDescription],
+  ["Schedules", "/student/schedules", IconCalendarClock],
 ] as const;
 
 export function StudentSidebar({ active }: { active?: string }) {

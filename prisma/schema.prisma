@@ -213,6 +213,13 @@ model Announcement {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  // Optional attachment (e.g. a notice image/PDF), stored in Postgres like
+  // other uploads so the app stays self-contained with the pg adapter.
+  attachmentFileName String?
+  attachmentMimeType String?
+  attachmentSize     Int?
+  attachmentData     Bytes?
+
   @@index([publishedAt])
 }
 

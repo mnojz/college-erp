@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  NoticeDetailData,
+  NoticeDetailModal,
+} from "@/app/components/common/NoticeDetailModal";
+import { NoticePostCard } from "@/app/components/common/NoticePostCard";
 
 type CatalogKind = "courses" | "syllabus" | "fees" | "notices";
 type CatalogProps = { kind: CatalogKind; title: string; eyebrow: string; description: string };
@@ -11,6 +16,7 @@ export function PublicCatalog({ kind, title, eyebrow, description }: CatalogProp
   const [items, setItems] = useState<Item[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [selectedNotice, setSelectedNotice] = useState<NoticeDetailData | null>(null);
 
   const endpoint =
     kind === "courses" || kind === "syllabus"
@@ -37,6 +43,30 @@ export function PublicCatalog({ kind, title, eyebrow, description }: CatalogProp
       .finally(() => setLoading(false));
   }, [endpoint, key]);
 
+  // Map raw announcement rows into the client-safe notice shape used by the
+  // post-style cards and the detail modal.
+  const notices = useMemo<NoticeDetailData[]>(
+    () =>
+      kind === "notices"
+        ? items.map((item, index) => ({
+            id: String(item.id ?? index),
+            title: String(item.title ?? ""),
+            body: String(item.body ?? ""),
+            publishedAt: item.publishedAt ? String(item.publishedAt) : null,
+            createdAt: String(item.createdAt ?? item.publishedAt ?? new Date().toISOString()),
+            author: (item.author as NoticeDetailData["author"]) ?? null,
+            attachment: item.attachmentFileName
+              ? {
+                  fileName: String(item.attachmentFileName),
+                  mimeType: String(item.attachmentMimeType ?? "application/octet-stream"),
+                  size: Number(item.attachmentSize ?? 0),
+                }
+              : null,
+          }))
+        : [],
+    [items, kind],
+  );
+
   return (
     <div className="public-page-body">
       <section className="public-page-intro">
@@ -53,8 +83,18 @@ export function PublicCatalog({ kind, title, eyebrow, description }: CatalogProp
         <div className="public-empty">
           <p>No published records found in this category yet.</p>
         </div>
+      ) : kind === "notices" ? (
+        <div className="public-list notice-list">
+          {notices.map((notice) => (
+            <NoticePostCard
+              key={notice.id}
+              notice={notice}
+              onOpen={() => setSelectedNotice(notice)}
+            />
+          ))}
+        </div>
       ) : (
-        <div className={`public-list ${kind === "notices" ? "notice-list" : ""}`}>
+        <div className="public-list">
           {items.map((item, index) => (
             <PublicItem key={String(item.id ?? index)} item={item} kind={kind} />
           ))}
@@ -62,24 +102,15 @@ export function PublicCatalog({ kind, title, eyebrow, description }: CatalogProp
       )}
 
       {loading && items.length === 0 && !error && <p className="public-empty">Loading…</p>}
+
+      {selectedNotice && (
+        <NoticeDetailModal notice={selectedNotice} onClose={() => setSelectedNotice(null)} />
+      )}
     </div>
   );
 }
 
 function PublicItem({ item, kind }: { item: Item; kind: CatalogKind }) {
-  if (kind === "notices") {
-    const published = item.publishedAt || item.createdAt;
-    return (
-      <article className="public-item">
-        <span className="badge badge-green" style={{ marginBottom: "8px" }}>
-          {published ? new Date(String(published)).toLocaleDateString() : "Campus Notice"}
-        </span>
-        <h2>{String(item.title)}</h2>
-        <p>{String(item.body)}</p>
-      </article>
-    );
-  }
-
   if (kind === "fees") {
     return (
       <article className="public-item">

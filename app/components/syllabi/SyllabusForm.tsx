@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState, type FormEvent, type ChangeEvent } from "react";
-import { SEMESTERS, type SyllabusMeta } from "@/app/lib/syllabi-shared";
+import { useRef, useState, type FormEvent, type ChangeEvent, type DragEvent } from "react";
+import { SEMESTERS, formatBytes, type SyllabusMeta } from "@/app/lib/syllabi-shared";
+import { IconUpload, IconFileText, IconX } from "@tabler/icons-react";
 
 export type SyllabusSubmitValues = {
   title: string; // optional at submission (trimmed); empty => server derives from file
@@ -42,7 +43,7 @@ export function SyllabusForm({
     ...emptyValues,
     ...(initial ?? {}),
   });
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Programs belonging to the currently selected department. Changing the
@@ -51,10 +52,22 @@ export function SyllabusForm({
     (p) => p.departmentName === values.departmentName,
   );
 
-  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0] ?? null;
+  function applyFile(f: File | null) {
     setValues((v) => ({ ...v, file: f }));
-    setFileName(f?.name ?? null);
+  }
+
+  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
+    applyFile(e.target.files?.[0] ?? null);
+  }
+
+  function handleDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragOver(false);
+    applyFile(e.dataTransfer.files?.[0] ?? null);
+  }
+
+  function openPicker() {
+    if (!submitting) fileRef.current?.click();
   }
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -145,28 +158,83 @@ export function SyllabusForm({
         </select>
       </label>
 
-      <label htmlFor="syllabus-file">
-        PDF File {mode === "create" ? "*" : "(leave empty to keep current)"}
-        <input
-          id="syllabus-file"
-          ref={fileRef}
-          type="file"
-          accept="application/pdf"
-          onChange={handleFileChange}
-          disabled={submitting}
-          className="notes-file-input"
-        />
-        {fileName && (
-          <span className="notes-file-chosen" style={{ display: "block" }}>
-            {fileName}
-          </span>
-        )}
-        {mode === "edit" && !fileName && (
+      {/* PDF dropzone */}
+      <div className="notes-field-group">
+        <span className="notes-field-caption">
+          PDF File {mode === "create" ? "*" : "(leave empty to keep current)"}
+        </span>
+        <div
+          className={`syllabus-dropzone${dragOver ? " drag" : ""}${
+            values.file ? " has-file" : ""
+          }`}
+          role="button"
+          tabIndex={0}
+          onClick={openPicker}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openPicker();
+            }
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+        >
+          <input
+            id="syllabus-file"
+            ref={fileRef}
+            type="file"
+            accept="application/pdf"
+            onChange={handleFileChange}
+            disabled={submitting}
+            className="syllabus-dropzone-input"
+          />
+          {values.file ? (
+            <>
+              <span className="syllabus-dropzone-icon">
+                <IconFileText size={26} aria-hidden="true" />
+              </span>
+              <strong className="syllabus-dropzone-name">{values.file.name}</strong>
+              <small className="syllabus-dropzone-hint">
+                {formatBytes(values.file.size)} · click or drop to replace
+              </small>
+              <button
+                type="button"
+                className="syllabus-dropzone-remove"
+                aria-label="Remove selected file"
+                title="Remove file"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  applyFile(null);
+                }}
+                disabled={submitting}
+              >
+                <IconX size={16} aria-hidden="true" />
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="syllabus-dropzone-icon">
+                <IconUpload size={26} aria-hidden="true" />
+              </span>
+              <strong className="syllabus-dropzone-name">
+                {dragOver ? "Drop the PDF here" : "Drag & drop your PDF here"}
+              </strong>
+              <small className="syllabus-dropzone-hint">
+                or click to browse — PDF only, up to 50 MB
+              </small>
+            </>
+          )}
+        </div>
+        {mode === "edit" && !values.file && (
           <span className="notes-file-chosen muted" style={{ display: "block" }}>
             No new file selected — the existing PDF will be kept.
           </span>
         )}
-      </label>
+      </div>
 
       <div className="modal-actions">
         <button type="submit" className="btn-primary" disabled={!canSubmit}>

@@ -16,6 +16,7 @@ import {
   type ProgramsMeta,
   type SyllabusDto,
 } from "@/app/lib/syllabi-shared";
+import { IconPlus, IconAlertTriangle } from "@tabler/icons-react";
 
 type Syllabus = SyllabusDto;
 
@@ -247,7 +248,8 @@ export default function AdminSyllabiPage() {
               setShowCreateModal(true);
             }}
           >
-            + Upload Syllabus
+            <IconPlus size={16} aria-hidden="true" />
+            Upload Syllabus
           </button>
           <SyllabusToolbar
             meta={meta}
@@ -327,6 +329,9 @@ export default function AdminSyllabiPage() {
               </p>
               <p
                 style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
                   fontSize: "13px",
                   color: "#dc2626",
                   background: "rgba(220, 38, 38, 0.08)",
@@ -334,7 +339,8 @@ export default function AdminSyllabiPage() {
                   borderRadius: "8px",
                 }}
               >
-                ⚠️ This PDF will be immediately removed and no longer downloadable by students.
+                <IconAlertTriangle size={16} aria-hidden="true" />
+                This PDF will be immediately removed and no longer downloadable by students.
               </p>
               {formError && (
                 <p style={{ margin: "12px 0 0", fontSize: 13, color: "#b91c1c" }}>

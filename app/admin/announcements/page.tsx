@@ -4,6 +4,25 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { AdminModal } from "@/app/components/admin/AdminModal";
+import { FileDropzone } from "@/app/components/common/FileDropzone";
+import {
+  NoticeDetailData,
+  NoticeDetailModal,
+} from "@/app/components/common/NoticeDetailModal";
+import { NoticePostCard } from "@/app/components/common/NoticePostCard";
+import {
+  IconAlertTriangle,
+  IconPaperclip,
+  IconPencil,
+  IconPlus,
+  IconTrash,
+} from "@tabler/icons-react";
+
+type NoticeAttachmentMeta = {
+  fileName: string;
+  mimeType: string;
+  size: number;
+};
 
 type AnnouncementItem = {
   id: string;
@@ -12,12 +31,46 @@ type AnnouncementItem = {
   publishedAt: string | null;
   createdAt: string;
   author: { firstName: string; lastName: string } | null;
+  attachmentFileName: string | null;
+  attachmentMimeType: string | null;
+  attachmentSize: number | null;
+};
+
+type EditingNotice = {
+  id: string;
+  title: string;
+  body: string;
+  file: File | null;
+  removeAttachment: boolean;
+  existingAttachment: NoticeAttachmentMeta | null;
 };
 
 const emptyForm = {
   title: "",
   body: "",
+  file: null as File | null,
 };
+
+function attachmentMetaOf(a: AnnouncementItem): NoticeAttachmentMeta | null {
+  if (!a.attachmentFileName || a.attachmentSize === null) return null;
+  return {
+    fileName: a.attachmentFileName,
+    mimeType: a.attachmentMimeType ?? "application/octet-stream",
+    size: a.attachmentSize,
+  };
+}
+
+function toNoticeDetail(a: AnnouncementItem): NoticeDetailData {
+  return {
+    id: a.id,
+    title: a.title,
+    body: a.body,
+    publishedAt: a.publishedAt,
+    createdAt: a.createdAt,
+    author: a.author,
+    attachment: attachmentMetaOf(a),
+  };
+}
 
 export default function AdminAnnouncementsPage() {
   const router = useRouter();
@@ -26,8 +79,9 @@ export default function AdminAnnouncementsPage() {
 
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [editingAnnouncement, setEditingAnnouncement] = useState<{ id: string; title: string; body: string } | null>(null);
+  const [editingAnnouncement, setEditingAnnouncement] = useState<EditingNotice | null>(null);
   const [deletingAnnouncement, setDeletingAnnouncement] = useState<AnnouncementItem | null>(null);
+  const [selectedNotice, setSelectedNotice] = useState<NoticeDetailData | null>(null);
 
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -59,15 +113,12 @@ export default function AdminAnnouncementsPage() {
     setError("");
     setSaving(true);
     try {
-      const res = await fetch("/api/announcements", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: form.title,
-          body: form.body,
-          publishedAt: new Date().toISOString(),
-        }),
-      });
+      const fd = new FormData();
+      fd.set("title", form.title);
+      fd.set("body", form.body);
+      fd.set("publishedAt", new Date().toISOString());
+      if (form.file) fd.set("file", form.file);
+      const res = await fetch("/api/announcements", { method: "POST", body: fd });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Failed to publish announcement");
@@ -92,15 +143,16 @@ export default function AdminAnnouncementsPage() {
     setError("");
     setSaving(true);
     try {
-      const res = await fetch("/api/announcements", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: editingAnnouncement.id,
-          title: editingAnnouncement.title,
-          body: editingAnnouncement.body,
-        }),
-      });
+      const fd = new FormData();
+      fd.set("id", editingAnnouncement.id);
+      fd.set("title", editingAnnouncement.title);
+      fd.set("body", editingAnnouncement.body);
+      if (editingAnnouncement.file) {
+        fd.set("file", editingAnnouncement.file);
+      } else if (editingAnnouncement.removeAttachment) {
+        fd.set("removeAttachment", "1");
+      }
+      const res = await fetch("/api/announcements", { method: "PUT", body: fd });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Failed to update announcement");
@@ -155,7 +207,8 @@ export default function AdminAnnouncementsPage() {
               setError("");
             }}
           >
-            + New Announcement
+            <IconPlus size={16} aria-hidden="true" />
+            New Announcement
           </button>
         </div>
       </div>
@@ -169,42 +222,15 @@ export default function AdminAnnouncementsPage() {
             </div>
           </div>
         ) : (
-          announcements.map((a) => (
-            <article
-              key={a.id}
-              className="profile-info-card"
-              style={{
-                padding: "24px",
-                display: "grid",
-                gap: "12px",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px" }}>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-                    <span className="badge badge-green">PUBLISHED</span>
-                    <span style={{ fontSize: "12px", color: "var(--ink-soft)", fontFamily: "Arial, sans-serif" }}>
-                      {a.publishedAt
-                        ? new Date(a.publishedAt).toLocaleDateString(undefined, {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          })
-                        : new Date(a.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <h3 style={{ margin: 0, fontSize: "17px", color: "var(--foreground, #1e293b)", fontWeight: 600 }}>
-                    {a.title}
-                  </h3>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  {a.author && (
-                    <span style={{ fontSize: "12px", color: "var(--ink-soft)", whiteSpace: "nowrap" }}>
-                      By {a.author.firstName} {a.author.lastName}
-                    </span>
-                  )}
-                  <div className="table-actions" style={{ marginLeft: "8px" }}>
+          announcements.map((a) => {
+            const attachmentMeta = attachmentMetaOf(a);
+            return (
+              <NoticePostCard
+                key={a.id}
+                notice={toNoticeDetail(a)}
+                onOpen={() => setSelectedNotice(toNoticeDetail(a))}
+                actions={
+                  <>
                     <button
                       type="button"
                       className="btn-action-edit"
@@ -212,13 +238,17 @@ export default function AdminAnnouncementsPage() {
                       aria-label="Edit Announcement"
                       onClick={() => {
                         setError("");
-                        setEditingAnnouncement({ id: a.id, title: a.title, body: a.body });
+                        setEditingAnnouncement({
+                          id: a.id,
+                          title: a.title,
+                          body: a.body,
+                          file: null,
+                          removeAttachment: false,
+                          existingAttachment: attachmentMeta,
+                        });
                       }}
                     >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                      </svg>
+                      <IconPencil size={15} aria-hidden="true" />
                     </button>
                     <button
                       type="button"
@@ -230,29 +260,13 @@ export default function AdminAnnouncementsPage() {
                         setDeletingAnnouncement(a);
                       }}
                     >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="3 6 5 6 21 6"></polyline>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                        <line x1="10" y1="11" x2="10" y2="17"></line>
-                        <line x1="14" y1="11" x2="14" y2="17"></line>
-                      </svg>
+                      <IconTrash size={15} aria-hidden="true" />
                     </button>
-                  </div>
-                </div>
-              </div>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "14px",
-                  lineHeight: 1.6,
-                  color: "var(--ink-soft, #475569)",
-                  fontFamily: "Arial, sans-serif",
-                }}
-              >
-                {a.body}
-              </p>
-            </article>
-          ))
+                  </>
+                }
+              />
+            );
+          })
         )}
       </div>
 
@@ -291,7 +305,20 @@ export default function AdminAnnouncementsPage() {
               />
             </label>
 
-            {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
+            <label>
+              Attachment <span className="optional-tag">(optional image or PDF)</span>
+              <FileDropzone
+                id="notice-create-attachment"
+                accept="image/png,image/jpeg,image/webp,image/gif,application/pdf"
+                file={form.file}
+                onFileChange={(file) => setForm({ ...form, file })}
+                label="Drag & drop an image or PDF here"
+                dropLabel="Drop the attachment here"
+                hint="or click to browse — PNG, JPEG, WEBP, GIF or PDF, up to 10 MB"
+              />
+            </label>
+
+            {error && <p className="admin-form-error">{error}</p>}
 
             <div className="modal-actions">
               <button className="btn-primary" type="submit" disabled={saving}>
@@ -339,7 +366,45 @@ export default function AdminAnnouncementsPage() {
               />
             </label>
 
-            {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
+            <label>
+              Attachment <span className="optional-tag">(optional image or PDF)</span>
+              {editingAnnouncement.existingAttachment && !editingAnnouncement.file && (
+                <span className="notice-card-attachment-chip">
+                  <IconPaperclip size={13} aria-hidden="true" />
+                  Current: {editingAnnouncement.existingAttachment.fileName}
+                </span>
+              )}
+              <FileDropzone
+                id="notice-edit-attachment"
+                accept="image/png,image/jpeg,image/webp,image/gif,application/pdf"
+                file={editingAnnouncement.file}
+                onFileChange={(file) =>
+                  setEditingAnnouncement({ ...editingAnnouncement, file, removeAttachment: false })
+                }
+                label="Drag & drop a new image or PDF here"
+                dropLabel="Drop the attachment here"
+                hint="or click to browse — a new file replaces the current attachment"
+              />
+              {editingAnnouncement.existingAttachment && (
+                <span className="notice-attachment-remove">
+                  <input
+                    type="checkbox"
+                    id="notice-remove-attachment"
+                    checked={editingAnnouncement.removeAttachment}
+                    onChange={(e) =>
+                      setEditingAnnouncement({
+                        ...editingAnnouncement,
+                        removeAttachment: e.target.checked,
+                        file: null,
+                      })
+                    }
+                  />
+                  <label htmlFor="notice-remove-attachment">Remove attachment</label>
+                </span>
+              )}
+            </label>
+
+            {error && <p className="admin-form-error">{error}</p>}
 
             <div className="modal-actions">
               <button className="btn-primary" type="submit" disabled={saving}>
@@ -367,10 +432,11 @@ export default function AdminAnnouncementsPage() {
             <p>
               Are you sure you want to delete the notice <strong>&ldquo;{deletingAnnouncement.title}&rdquo;</strong>?
             </p>
-            <p style={{ fontSize: "13px", color: "#dc2626", background: "rgba(220, 38, 38, 0.08)", padding: "10px 14px", borderRadius: "8px" }}>
-              ⚠️ This bulletin will be removed from the public portal and all dashboards.
+            <p className="admin-form-error notice-confirm-warning">
+              <IconAlertTriangle size={14} aria-hidden="true" />
+              This bulletin will be removed from the public portal and all dashboards.
             </p>
-            {error && <p style={{ margin: "12px 0 0", fontSize: 13, color: "#b91c1c" }}>{error}</p>}
+            {error && <p className="admin-form-error" style={{ marginTop: 12 }}>{error}</p>}
             <div className="modal-actions" style={{ marginTop: "20px" }}>
               <button className="btn-danger" type="button" onClick={handleDelete} disabled={saving}>
                 {saving ? "Deleting…" : "Yes, Delete Notice"}
@@ -381,6 +447,10 @@ export default function AdminAnnouncementsPage() {
             </div>
           </div>
         </AdminModal>
+      )}
+      {/* Modal 4: Notice details with attachment preview */}
+      {selectedNotice && (
+        <NoticeDetailModal notice={selectedNotice} onClose={() => setSelectedNotice(null)} />
       )}
     </AdminShell>
   );
