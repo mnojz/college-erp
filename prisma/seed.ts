@@ -279,6 +279,34 @@ async function main() {
   });
     console.log("✅ Classes seeded (Sem 6 schedule)");
 
+    // ─── Subject ↔ Teacher assignments ────────────────────────────
+    // Teachers are the source of truth for class scheduling: each subject in
+    // the seeded timetable is linked to the teacher(s) who taught it so the
+    // schedule keeps resolving instructors automatically.
+    const assignments = new Map<string, string>();
+    const recordAssignment = (subjCode: string | undefined | null, tchEmail: string | undefined | null) => {
+      if (!subjCode) return;
+      const teacherId = tch(tchEmail ?? "kl@fwu.edu.np");
+      if (!teacherId) return;
+      assignments.set(`${sub(subjCode)}::${teacherId}`, sub(subjCode));
+    };
+    for (const c of classDefs) {
+      if (c.parallel) {
+        for (const p of c.parallel) recordAssignment(p.subj, p.tch);
+      } else {
+        recordAssignment(c.subj, c.tchEmail);
+      }
+    }
+    for (const [key, subjectId] of assignments) {
+      const teacherId = key.split("::")[1];
+      await prisma.subjectTeacher.upsert({
+        where: { subjectId_teacherId: { subjectId, teacherId } },
+        update: {},
+        create: { subjectId, teacherId },
+      });
+    }
+    console.log("✅ Subject ↔ teacher assignments seeded");
+
     // ─── Assessments ────────────────────────────────────────────
   const dbSub = await prisma.subject.findUnique({ where: { code: "CT 364" } });
   const existingAssessment = await prisma.assessment.findUnique({

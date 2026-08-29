@@ -4,10 +4,20 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { AdminModal } from "@/app/components/admin/AdminModal";
-import { IconPlus, IconAlertTriangle } from "@tabler/icons-react";
+import { IconPlus, IconAlertTriangle, IconCircleCheck } from "@tabler/icons-react";
 
 type ProgramOption = { id: string; name: string; code: string; durationYears: number };
-type SubjectItem = { id: string; name: string; code: string; programId: string; semester: number };
+type SubjectItem = {
+  id: string;
+  name: string;
+  code: string;
+  programId: string;
+  semester: number;
+  subjectTeachers: Array<{
+    teacherId: string;
+    teacher: { id: string; employeeNo: string; user: { firstName: string; lastName: string } };
+  }>;
+};
 type TeacherOption = { id: string; name: string; employeeNo: string };
 type ClassItem = {
   id: string;
@@ -371,6 +381,24 @@ export default function AdminTeachingPage() {
     return options;
   }, [classSubjectOptions, editingClass, classes]);
 
+  // Teachers assigned to each subject (SubjectTeacher). Scheduling only ever
+  // offers these teachers for a subject — the teacher is derived from the
+  // subject assignment, never picked from the full faculty list.
+  const teachersBySubject = useMemo(() => {
+    const map = new Map<string, TeacherOption[]>();
+    for (const subject of subjects) {
+      const options = (subject.subjectTeachers ?? []).map((st) => ({
+        id: st.teacher.id,
+        name: `${st.teacher.user.firstName} ${st.teacher.user.lastName}`,
+        employeeNo: st.teacher.employeeNo,
+      }));
+      map.set(subject.id, options);
+    }
+    return map;
+  }, [subjects]);
+
+  const assignedTeachersFor = (subjectId: string) => teachersBySubject.get(subjectId) ?? [];
+
   // ─── Handlers ────────────────────────────────────────────────────
   function openCreate(day?: string, startMin?: number) {
     const start = startMin ?? FALLBACK_START;
@@ -389,10 +417,16 @@ export default function AdminTeachingPage() {
 
   function openEdit(block: Block) {
     setError("");
+    const subjectAssignments = assignedTeachersFor(block.subjectId);
     setEditingClass({
       id: block.id,
       subjectId: block.subjectId,
-      teacherId: block.teacherId,
+      // Keep the stored teacher when they're still assigned to this subject;
+      // otherwise fall back to the subject's first assigned teacher.
+      teacherId:
+        subjectAssignments.some((t) => t.id === block.teacherId)
+          ? block.teacherId
+          : (subjectAssignments[0]?.id ?? block.teacherId),
       dayOfWeek: block.dayOfWeek,
       startTime: minutesToHHMM(toMinutes(block.startTime) ?? 0),
       endTime: minutesToHHMM(toMinutes(block.endTime) ?? 0),
@@ -721,7 +755,7 @@ export default function AdminTeachingPage() {
                               title={`${b.subject.code} · ${b.subject.name}${b.group ? ` (${b.group})` : ""}\n${b.type}\n${teacherName(
                                 b.teacherId,
                               )}\n${formatTime(b.startTime)} – ${formatTime(b.endTime)}${
-                                conflicted ? "\n⚠ Overlapping slots" : ""
+                                conflicted ? "\nOverlapping slots" : ""
                               }`}
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -770,8 +804,19 @@ export default function AdminTeachingPage() {
                 No coded subjects found in the published curriculum for this semester.
               </p>
             ) : unscheduledSubjects.length === 0 ? (
-              <p style={{ margin: 0, fontSize: "13px", color: "#059669", fontWeight: 600 }}>
-                ✓ Every curriculum subject has at least one scheduled slot.
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "13px",
+                  color: "#059669",
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <IconCircleCheck size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
+                Every curriculum subject has at least one scheduled slot.
               </p>
             ) : (
               <div className="tt-unscheduled">
@@ -784,9 +829,13 @@ export default function AdminTeachingPage() {
                       title="Schedule this subject"
                       onClick={() => {
                         openCreate();
+                        const subjectId = resolveSubjectId(course);
                         setClassForm((cf) => ({
                           ...cf,
-                          subjectId: resolveSubjectId(course),
+                          subjectId,
+                          teacherId: subjectId
+                            ? (assignedTeachersFor(subjectId)[0]?.id ?? "")
+                            : cf.teacherId,
                         }));
                       }}
                     >
@@ -818,7 +867,15 @@ export default function AdminTeachingPage() {
                 Subject
                 <select
                   value={classForm.subjectId}
-                  onChange={(e) => setClassForm({ ...classForm, subjectId: e.target.value })}
+                  onChange={(e) => {
+                    const subjectId = e.target.value;
+                    const options = assignedTeachersFor(subjectId);
+                    setClassForm({
+                      ...classForm,
+                      subjectId,
+                      teacherId: options[0]?.id ?? "",
+                    });
+                  }}
                   required
                 >
                   <option value="">
@@ -835,19 +892,30 @@ export default function AdminTeachingPage() {
               </label>
 
               <label>
-                Assigned Teacher
+                Teacher (from subject assignment)
                 <select
                   value={classForm.teacherId}
                   onChange={(e) => setClassForm({ ...classForm, teacherId: e.target.value })}
                   required
+                  disabled={assignedTeachersFor(classForm.subjectId).length === 0}
                 >
-                  <option value="">Select Teacher</option>
-                  {teachers.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} ({t.employeeNo})
-                    </option>
-                  ))}
+                  {assignedTeachersFor(classForm.subjectId).length === 0 ? (
+                    <option value="">No teacher assigned to this subject</option>
+                  ) : (
+                    <>
+                      <option value="">Select Teacher</option>
+                      {assignedTeachersFor(classForm.subjectId).map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name} ({t.employeeNo})
+                        </option>
+                      ))}
+                    </>
+                  )}
                 </select>
+                <span className="form-hint">
+                  Auto-filled from subject assignments. Assign teachers to subjects on the Faculty
+                  page.
+                </span>
               </label>
 
               <div className="inline-pair">
@@ -954,7 +1022,15 @@ export default function AdminTeachingPage() {
                 Subject
                 <select
                   value={editingClass.subjectId}
-                  onChange={(e) => setEditingClass({ ...editingClass, subjectId: e.target.value })}
+                  onChange={(e) => {
+                    const subjectId = e.target.value;
+                    const options = assignedTeachersFor(subjectId);
+                    setEditingClass({
+                      ...editingClass,
+                      subjectId,
+                      teacherId: options[0]?.id ?? "",
+                    });
+                  }}
                   required
                 >
                   <option value="">
@@ -971,18 +1047,30 @@ export default function AdminTeachingPage() {
               </label>
 
               <label>
-                Assigned Teacher
+                Teacher (from subject assignment)
                 <select
                   value={editingClass.teacherId}
                   onChange={(e) => setEditingClass({ ...editingClass, teacherId: e.target.value })}
                   required
+                  disabled={assignedTeachersFor(editingClass.subjectId).length === 0}
                 >
-                  {teachers.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} ({t.employeeNo})
-                    </option>
-                  ))}
+                  {assignedTeachersFor(editingClass.subjectId).length === 0 ? (
+                    <option value="">No teacher assigned to this subject</option>
+                  ) : (
+                    <>
+                      <option value="">Select Teacher</option>
+                      {assignedTeachersFor(editingClass.subjectId).map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name} ({t.employeeNo})
+                        </option>
+                      ))}
+                    </>
+                  )}
                 </select>
+                <span className="form-hint">
+                  Auto-filled from subject assignments. Assign teachers to subjects on the Faculty
+                  page.
+                </span>
               </label>
 
               <div className="inline-pair">

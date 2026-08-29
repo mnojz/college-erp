@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminShell } from "@/app/components/admin/AdminShell";
+import { IconX } from "@tabler/icons-react";
 
 type Program = {
   id: string;
@@ -548,7 +549,7 @@ export default function AdminCurriculumPage() {
                               title="Remove course"
                               style={{ ...inputStyle, width: "auto", color: "#dc2626" }}
                             >
-                              ✕
+                              <IconX size={14} strokeWidth={2.5} aria-hidden="true" />
                             </button>
                           </div>
                         ))}
@@ -640,7 +641,7 @@ export default function AdminCurriculumPage() {
                           title="Remove elective"
                           style={{ ...inputStyle, width: "auto", color: "#dc2626" }}
                         >
-                          ✕
+                          <IconX size={14} strokeWidth={2.5} aria-hidden="true" />
                         </button>
                       </div>
                     );

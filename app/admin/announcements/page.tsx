@@ -31,6 +31,10 @@ type AnnouncementItem = {
   publishedAt: string | null;
   createdAt: string;
   author: { firstName: string; lastName: string } | null;
+  teacherId: string | null;
+  semester: number | null;
+  subject: { id: string; name: string; code: string } | null;
+  program: { id: string; name: string; code: string } | null;
   attachmentFileName: string | null;
   attachmentMimeType: string | null;
   attachmentSize: number | null;
@@ -68,6 +72,16 @@ function toNoticeDetail(a: AnnouncementItem): NoticeDetailData {
     publishedAt: a.publishedAt,
     createdAt: a.createdAt,
     author: a.author,
+    scope:
+      a.teacherId && a.subject && a.program && a.semester != null
+        ? {
+            subjectName: a.subject.name,
+            subjectCode: a.subject.code,
+            programName: a.program.name,
+            programCode: a.program.code,
+            semester: a.semester,
+          }
+        : null,
     attachment: attachmentMetaOf(a),
   };
 }

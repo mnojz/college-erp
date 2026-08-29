@@ -14,6 +14,13 @@ import {
   type ProgramsMeta,
   type StudyMaterialDto,
 } from "@/app/lib/materials-shared";
+import {
+  IconAlertTriangle,
+  IconCircleCheck,
+  IconLock,
+  IconStarFilled,
+  IconUpload,
+} from "@tabler/icons-react";
 
 type TeacherInfo = {
   firstName: string;
@@ -235,13 +242,17 @@ export default function TeacherMaterialsPage() {
               setShowCreateModal(true);
             }}
           >
-            ⬆ Upload Material
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+              <IconUpload size={15} aria-hidden="true" /> Upload Material
+            </span>
           </button>
         </article>
       </section>
 
       {message && (
-        <p className="notes-success-banner">✓ {message}</p>
+        <p className="notes-success-banner" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <IconCircleCheck size={16} aria-hidden="true" style={{ flexShrink: 0 }} /> {message}
+        </p>
       )}
 
       {materials.length === 0 ? (
@@ -271,11 +282,13 @@ export default function TeacherMaterialsPage() {
                     {m.topic && <span className="chip">{m.topic}</span>}
                     {m.semester != null && <span className="chip">Sem {m.semester}</span>}
                     <span className={`chip chip-visibility-${m.visibility.toLowerCase()}`}>
-                      🔒 {VISIBILITY_LABELS[m.visibility] ?? m.visibility}
+                      <IconLock size={12} aria-hidden="true" style={{ verticalAlign: "-2px", marginRight: "4px" }} />
+                      {VISIBILITY_LABELS[m.visibility] ?? m.visibility}
                     </span>
                   </div>
                   <small className="upload-row-meta">
-                    {m.fileName} · {formatBytes(m.fileSize)} · Uploaded {formatDate(m.createdAt)} · ★{" "}
+                    {m.fileName} · {formatBytes(m.fileSize)} · Uploaded {formatDate(m.createdAt)} ·{" "}
+                    <IconStarFilled size={12} aria-hidden="true" style={{ verticalAlign: "-2px" }} />{" "}
                     {m.bookmarkCount} bookmark{m.bookmarkCount === 1 ? "" : "s"}
                   </small>
                 </div>
@@ -367,7 +380,10 @@ export default function TeacherMaterialsPage() {
                 borderRadius: "8px",
               }}
             >
-              ⚠️ Students will immediately lose access to this file, including existing bookmarks.
+              <span style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+                <IconAlertTriangle size={15} aria-hidden="true" style={{ flexShrink: 0, marginTop: "2px" }} />
+                Students will immediately lose access to this file, including existing bookmarks.
+              </span>
             </p>
             {formError && <p style={{ margin: "12px 0 0", fontSize: 13, color: "#b91c1c" }}>{formError}</p>}
             <div className="modal-actions" style={{ marginTop: "20px" }}>

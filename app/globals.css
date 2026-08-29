@@ -93,6 +93,17 @@ button, input, select, textarea {
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: 0.6; }
 
+/* ─── Hide Scrollbars (whole app) ─────────────────────────────── */
+/* Scrollbars are hidden for a cleaner look. Content is still fully
+   scrollable with the mouse wheel, touch, and keyboard. */
+* {
+  scrollbar-width: none;      /* Firefox */
+  -ms-overflow-style: none;   /* IE / legacy Edge */
+}
+*::-webkit-scrollbar {
+  display: none;              /* Chrome / Safari / Edge */
+}
+
 /* ─── App Shell & Layout ──────────────────────────────────────── */
 .student-app-shell {
   min-height: 100vh;
@@ -638,6 +649,15 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.modal-form .form-hint {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink-soft);
+  opacity: 0.8;
 }
 
 .modal-form input,
@@ -1236,6 +1256,12 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
   border: 1px solid rgba(239, 68, 68, 0.25);
 }
 
+.badge-violet {
+  background: rgba(113, 63, 194, 0.12);
+  color: #713fc2;
+  border: 1px solid rgba(113, 63, 194, 0.25);
+}
+
 :root[data-theme="dark"] .badge-green {
   background: rgba(16, 185, 129, 0.16);
   color: #34d399;
@@ -1264,6 +1290,12 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
   background: rgba(239, 68, 68, 0.16);
   color: #f87171;
   border-color: rgba(248, 113, 113, 0.3);
+}
+
+:root[data-theme="dark"] .badge-violet {
+  background: rgba(113, 63, 194, 0.16);
+  color: #c4b5fd;
+  border-color: rgba(196, 181, 253, 0.3);
 }
 
 /* ─── Modern Homepage Redesign ────────────────────────────────── */
@@ -3372,6 +3404,226 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
   border-color: #dc2626;
 }
 
+/* ─── Image Upload & Crop (profile photo) ─────────────────────── */
+.image-upload {
+  display: grid;
+  gap: 8px;
+}
+
+.image-upload-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.image-upload-zone {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px dashed var(--input-border);
+  border-radius: 12px;
+  background: var(--input-bg);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.image-upload-zone:hover,
+.image-upload-zone:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.image-upload-zone.has-image {
+  border-style: solid;
+  border-color: var(--line);
+  background: var(--panel);
+}
+
+.image-upload-zone:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.image-upload-avatar {
+  position: relative;
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #e0f2fe, #f0f9ff);
+  border: 2px solid var(--line);
+  color: var(--ink-soft);
+  transition: border-color 150ms ease;
+}
+
+.image-upload-zone:hover .image-upload-avatar {
+  border-color: var(--accent);
+}
+
+.image-upload-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.image-upload-avatar-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.55);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.image-upload-zone:hover .image-upload-avatar-overlay {
+  opacity: 1;
+}
+
+.image-upload-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.image-upload-text strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.image-upload-text small {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.image-upload-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.image-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 120ms ease, color 120ms ease, background-color 120ms ease;
+}
+
+.image-upload-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(14, 165, 233, 0.06);
+}
+
+.image-upload-btn.danger {
+  color: #dc2626;
+}
+
+.image-upload-btn.danger:hover {
+  border-color: #dc2626;
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.06);
+}
+
+/* Crop modal internals */
+.crop-modal-body {
+  display: grid;
+  gap: 16px;
+}
+
+.crop-modal-viewport {
+  display: grid;
+  place-items: center;
+  background: #0f172a;
+  border-radius: 12px;
+  padding: 8px;
+  overflow: hidden;
+}
+
+.crop-zoom {
+  display: grid;
+  gap: 8px;
+}
+
+.crop-zoom-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.crop-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.crop-zoom-controls input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.crop-zoom-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease;
+  flex-shrink: 0;
+}
+
+.crop-zoom-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.crop-zoom-badge {
+  display: inline-block;
+  min-width: 44px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.crop-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
 /* ─── Theme switch (single checkbox-style toggle) ────────────────── */
 .theme-switch {
   display: inline-flex;
@@ -3613,7 +3865,16 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
 .notice-post-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
+}
+
+.notice-post-byline-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .notice-post-avatar {
@@ -3649,18 +3910,29 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
   color: var(--ink-soft);
 }
 
-.notice-post-side {
+/* Edit/delete controls, pinned to the top-right of the header section,
+   laid out horizontally one after another for a compact header. */
+.notice-post-actions {
   display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   flex: 0 0 auto;
 }
 
-.notice-post-actions {
-  display: flex;
+.notice-post-scope {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
+  gap: 4px;
+  margin-top: 3px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--link, #713fc2);
+  letter-spacing: 0.02em;
 }
 
 .notice-post-title {
@@ -3682,10 +3954,16 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
   overflow: hidden;
 }
 
+/* Lower section: title/body + attachment preview. The border-top draws the
+   fine divider between the poster header and the notice content, and
+   `align-items: center` keeps the preview vertically centered against the
+   text block. */
 .notice-post-main {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
 }
 
 .notice-post-text {
@@ -3693,13 +3971,13 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
   min-width: 0;
 }
 
-/* Small squared attachment preview at the right end of the card. The full
-   image with zoom/pan lives in the detail modal. */
+/* Small squared attachment preview at the right end of the content section.
+   The full image with zoom/pan lives in the detail modal. */
 .notice-post-thumb {
   position: relative;
   flex: 0 0 auto;
-  width: 88px;
-  height: 88px;
+  width: 104px;
+  height: 104px;
   border-radius: 10px;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -3755,8 +4033,8 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
 }
 
 .notice-post-compact .notice-post-thumb {
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  height: 72px;
   border-radius: 8px;
 }
 
@@ -3771,15 +4049,12 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
 
   .notice-post-main {
     gap: 10px;
-  }
-
-  .notice-post-side {
-    gap: 8px;
+    padding-top: 12px;
   }
 
   .notice-post-thumb {
-    width: 64px;
-    height: 64px;
+    width: 72px;
+    height: 72px;
     border-radius: 8px;
   }
 

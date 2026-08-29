@@ -7,6 +7,7 @@ import {
   MATERIAL_TYPE_STYLE,
   materialTypeLabel,
 } from "@/app/lib/materials-shared";
+import { IconFileText, IconStar, IconStarFilled } from "@tabler/icons-react";
 
 type MaterialCardProps = {
   material: StudyMaterialDto;
@@ -45,7 +46,11 @@ export function MaterialCard({ material, onToggleBookmark, onOpenDetails }: Mate
             aria-label={material.bookmarked ? "Remove bookmark" : "Bookmark this material"}
             title={material.bookmarked ? "Remove bookmark" : "Bookmark"}
           >
-            {material.bookmarked ? "★" : "☆"}
+            {material.bookmarked ? (
+              <IconStarFilled size={15} aria-hidden="true" />
+            ) : (
+              <IconStar size={15} aria-hidden="true" />
+            )}
           </button>
         </div>
       </div>
@@ -82,7 +87,8 @@ export function MaterialCard({ material, onToggleBookmark, onOpenDetails }: Mate
 
       <div className="note-card-footer">
         <div className="note-file-meta" title={material.fileName}>
-          📄 {material.fileName}
+          <IconFileText size={13} aria-hidden="true" style={{ flexShrink: 0, verticalAlign: "-2px" }} />{" "}
+          {material.fileName}
           <small>
             {formatBytes(material.fileSize)} · {formatDate(material.createdAt)}
           </small>

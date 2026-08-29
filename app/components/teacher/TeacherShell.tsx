@@ -2,10 +2,11 @@
 
 import { DashboardShell } from "@/app/components/layout/DashboardShell";
 import {
-  IconDashboard,
+  IconBell,
   IconCalendarCheck,
   IconCalendarClock,
   IconClipboardCheck,
+  IconDashboard,
   IconUpload,
 } from "@tabler/icons-react";
 
@@ -24,6 +25,7 @@ const teacherLinks = [
   ["Attendance", "/teacher/attendance", IconCalendarCheck],
   ["Class Schedule", "/teacher/schedule", IconCalendarClock],
   ["Assessments & Marks", "/teacher/assessments", IconClipboardCheck],
+  ["Announcements", "/teacher/announcements", IconBell],
   ["My Uploads", "/teacher/materials", IconUpload],
 ] as const;
 

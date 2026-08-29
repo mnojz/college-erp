@@ -51,35 +51,36 @@ enum MaterialVisibility {
 }
 
 model User {
-  id                   String         @id @default(cuid())
-  email                String         @unique
-  passwordHash         String
-  firstName            String
-  lastName             String
-  role                 Role
-  status               UserStatus     @default(ACTIVE)
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
-  student              Student?
-  teacher              Teacher?
+  id                    String          @id @default(cuid())
+  email                 String          @unique
+  passwordHash          String
+  firstName             String
+  lastName              String
+  role                  Role
+  status                UserStatus      @default(ACTIVE)
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  student               Student?
+  teacher               Teacher?
   authoredAnnouncements Announcement[]
-  uploadedMaterials    StudyMaterial[]
-  bookmarks            Bookmark[]
+  uploadedMaterials     StudyMaterial[]
+  bookmarks             Bookmark[]
 }
 
 model Program {
-  id             String       @id @default(cuid())
+  id             String          @id @default(cuid())
   name           String
-  code           String       @unique
-  durationYears  Int          @default(4)
+  code           String          @unique
+  durationYears  Int             @default(4)
   departmentName String
   students       Student[]
   subjects       Subject[]
   classes        Class[]
   assessments    Assessment[]
-    curriculum     Curriculum?
+  curriculum     Curriculum?
   studyMaterials StudyMaterial[]
   syllabi        Syllabus[]
+  announcements  Announcement[]
 }
 
 model Student {
@@ -105,47 +106,69 @@ model Student {
 }
 
 model Teacher {
-  id              String       @id @default(cuid())
-  userId          String       @unique
-  employeeNo      String       @unique
+  id              String           @id @default(cuid())
+  userId          String           @unique
+  employeeNo      String           @unique
   profileImageUrl String?
-  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   classes         Class[]
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  announcements   Announcement[]
+  subjectTeachers SubjectTeacher[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 }
 
 model Subject {
-  id          String       @id @default(cuid())
-  name        String
-  code        String       @unique
-  programId   String
-  semester    Int          @default(1)
-  program     Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
-  classes     Class[]
-  assessments Assessment[]
-  studyMaterials StudyMaterial[]
+  id              String           @id @default(cuid())
+  name            String
+  code            String           @unique
+  programId       String
+  semester        Int              @default(1)
+  program         Program          @relation(fields: [programId], references: [id], onDelete: Cascade)
+  classes         Class[]
+  assessments     Assessment[]
+  studyMaterials  StudyMaterial[]
+  announcements   Announcement[]
+  subjectTeachers SubjectTeacher[]
 
   @@unique([programId, semester, code])
   @@index([programId, semester])
 }
 
+/**
+ * Many-to-many assignment of teachers to subjects. This is the source of
+ * truth for "who teaches what": class schedule slots derive their teacher
+ * from these rows automatically instead of picking one from the full faculty
+ * list. A subject may list several teachers (e.g. parallel practical groups).
+ */
+model SubjectTeacher {
+  id        String   @id @default(cuid())
+  subjectId String
+  teacherId String
+  createdAt DateTime @default(now())
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher   Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@unique([subjectId, teacherId])
+  @@index([teacherId])
+}
+
 model Class {
-  id          String              @id @default(cuid())
-  subjectId   String
-  teacherId   String
-  programId   String
-  semester    Int                 @default(1)
-  dayOfWeek   DayOfWeek
-  startTime   DateTime            @db.Time
-  endTime     DateTime            @db.Time
-  type        String              @default("Lecture") // "Lecture" | "Practical"
-  group       String? // e.g. "Gr. A" — allows parallel practical groups
-  subject     Subject             @relation(fields: [subjectId], references: [id], onDelete: Restrict)
-  teacher     Teacher             @relation(fields: [teacherId], references: [id], onDelete: Restrict)
-  program     Program             @relation(fields: [programId], references: [id], onDelete: Restrict)
-  sessions    AttendanceSession[]
-  materials   StudyMaterialClass[]
+  id        String               @id @default(cuid())
+  subjectId String
+  teacherId String
+  programId String
+  semester  Int                  @default(1)
+  dayOfWeek DayOfWeek
+  startTime DateTime             @db.Time
+  endTime   DateTime             @db.Time
+  type      String               @default("Lecture") // "Lecture" | "Practical"
+  group     String? // e.g. "Gr. A" — allows parallel practical groups
+  subject   Subject              @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  teacher   Teacher              @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  program   Program              @relation(fields: [programId], references: [id], onDelete: Restrict)
+  sessions  AttendanceSession[]
+  materials StudyMaterialClass[]
 
   @@unique([subjectId, teacherId, programId, semester, dayOfWeek, startTime, endTime])
   @@index([teacherId, semester, dayOfWeek])
@@ -175,15 +198,15 @@ model AttendanceRecord {
 }
 
 model Assessment {
-  id             String       @id @default(cuid())
+  id             String    @id @default(cuid())
   subjectId      String
   programId      String
-  semester       Int          @default(1)
+  semester       Int       @default(1)
   name           String
-  maxMarks       Decimal      @db.Decimal(6, 2)
+  maxMarks       Decimal   @db.Decimal(6, 2)
   assessmentDate DateTime?
-  subject        Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  program        Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
+  subject        Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  program        Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
   results        Result[]
 
   @@unique([subjectId, semester, name])
@@ -213,6 +236,18 @@ model Announcement {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  // Teacher-scoped notices: when `teacherId` is set the notice targets a
+  // specific teaching group (subject × program × semester) instead of the
+  // whole campus. `authorId` always points at the publishing User so cards
+  // can render the author byline for both admins and teachers.
+  teacherId String?
+  teacher   Teacher? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  subjectId String?
+  subject   Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  programId String?
+  program   Program? @relation(fields: [programId], references: [id], onDelete: SetNull)
+  semester  Int?
+
   // Optional attachment (e.g. a notice image/PDF), stored in Postgres like
   // other uploads so the app stays self-contained with the pg adapter.
   attachmentFileName String?
@@ -221,17 +256,19 @@ model Announcement {
   attachmentData     Bytes?
 
   @@index([publishedAt])
+  @@index([teacherId])
+  @@index([programId, semester])
 }
 
 // ─── Curriculum (admin-manageable course structure) ─────────────
 model Curriculum {
-  id        String            @id @default(cuid())
-  programId String            @unique
-  program   Program           @relation(fields: [programId], references: [id], onDelete: Cascade)
+  id        String               @id @default(cuid())
+  programId String               @unique
+  program   Program              @relation(fields: [programId], references: [id], onDelete: Cascade)
   years     CurriculumYear[]
   electives CurriculumElective[]
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
 }
 
 model CurriculumYear {
@@ -257,13 +294,13 @@ model CurriculumSemester {
 }
 
 model CurriculumCourse {
-  id         String              @id @default(cuid())
+  id         String             @id @default(cuid())
   semesterId String
-  semester   CurriculumSemester  @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  semester   CurriculumSemester @relation(fields: [semesterId], references: [id], onDelete: Cascade)
   code       String?
   name       String
-  credits    Int                 @default(3)
-  sortOrder  Int                 @default(0)
+  credits    Int                @default(3)
+  sortOrder  Int                @default(0)
 
   @@index([semesterId])
 }
@@ -301,11 +338,11 @@ model StudyMaterial {
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
-  program     Program?              @relation(fields: [programId], references: [id], onDelete: SetNull)
-  subject     Subject?              @relation(fields: [subjectId], references: [id], onDelete: SetNull)
-  uploader    User                  @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
-  classLinks  StudyMaterialClass[]
-  bookmarks   Bookmark[]
+  program    Program?             @relation(fields: [programId], references: [id], onDelete: SetNull)
+  subject    Subject?             @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  uploader   User                 @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  classLinks StudyMaterialClass[]
+  bookmarks  Bookmark[]
 
   @@index([materialType])
   @@index([visibility])
@@ -317,11 +354,11 @@ model StudyMaterial {
 
 // Targets a whole teaching group (all schedule slots of a subject for a program/semester)
 model StudyMaterialClass {
-  id          String        @id @default(cuid())
-  materialId  String
-  classId     String
-  material    StudyMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
-  class       Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
+  id         String        @id @default(cuid())
+  materialId String
+  classId    String
+  material   StudyMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  class      Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
 
   @@unique([materialId, classId])
   @@index([classId])
@@ -342,7 +379,7 @@ model Bookmark {
 // ─── Syllabus library (admin-uploaded PDF syllabi, publicly readable) ─────
 model Syllabus {
   id             String   @id @default(cuid())
-  title          String?  // null => derived from file name
+  title          String? // null => derived from file name
   departmentName String
   programId      String?
   semester       Int // 1..8

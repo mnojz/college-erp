@@ -6,8 +6,10 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 /**
  * GET /api/announcements/[id]/attachment — stream a notice attachment.
- * Published notices are public (the notices page is anonymous); drafts are
- * admin-only. `?inline=1` renders in-browser for previewable types.
+ * Published campus-wide notices are public (the notices page is anonymous);
+ * drafts are admin-only; teacher-scoped attachments require a matching
+ * audience (the publishing teacher, an admin, or a student in the target
+ * program + semester).
  */
 export async function GET(request: Request, ctx: RouteContext) {
   const { id } = await ctx.params;
@@ -17,6 +19,10 @@ export async function GET(request: Request, ctx: RouteContext) {
       where: { id },
       select: {
         publishedAt: true,
+        teacherId: true,
+        authorId: true,
+        programId: true,
+        semester: true,
         attachmentFileName: true,
         attachmentMimeType: true,
         attachmentData: true,
@@ -29,9 +35,37 @@ export async function GET(request: Request, ctx: RouteContext) {
 
     const publishedAt = announcement.publishedAt;
     const isPublished = publishedAt !== null && publishedAt.getTime() <= Date.now();
-    if (!isPublished) {
-      const session = await getSession();
-      if (session?.role !== "ADMIN") {
+    const session = await getSession();
+
+    const isScoped = announcement.teacherId !== null;
+    const isAdmin = session?.role === "ADMIN";
+    const isOwner = session != null && announcement.authorId === session.userId;
+
+    // Unpublished drafts → admins only. Teacher-scoped rows are always
+    // published at creation, so this branch effectively covers admin drafts.
+    if (!isPublished && !isAdmin) {
+      return NextResponse.json({ error: "Attachment not found" }, { status: 404 });
+    }
+
+    // Scoped (teacher) attachments: allow the owner/admin or a student in the
+    // target program + semester.
+    if (isScoped) {
+      if (isAdmin || isOwner) {
+        // allowed below
+      } else if (session?.role === "STUDENT") {
+        const student = await prisma.student.findUnique({
+          where: { userId: session.userId },
+          select: { programId: true, currentSemester: true },
+        });
+        const matchesScope =
+          student?.programId != null &&
+          student.currentSemester != null &&
+          student.programId === announcement.programId &&
+          student.currentSemester === announcement.semester;
+        if (!matchesScope) {
+          return NextResponse.json({ error: "Attachment not found" }, { status: 404 });
+        }
+      } else {
         return NextResponse.json({ error: "Attachment not found" }, { status: 404 });
       }
     }

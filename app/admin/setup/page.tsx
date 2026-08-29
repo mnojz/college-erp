@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { AdminModal } from "@/app/components/admin/AdminModal";
+import { IconAlertTriangle } from "@tabler/icons-react";
 
 type Program = {
   id: string;
@@ -330,8 +331,21 @@ export default function AdminSetupPage() {
             <p>
               Are you sure you want to delete the program <strong>{deletingProgram.name} ({deletingProgram.code})</strong>?
             </p>
-            <p style={{ fontSize: "13px", color: "#dc2626", background: "rgba(220, 38, 38, 0.08)", padding: "10px 14px", borderRadius: "8px" }}>
-              ⚠️ Deleting this program will remove all affiliated subjects, scheduled classes, assessments, and unassign enrolled students.
+            <p
+              style={{
+                fontSize: "13px",
+                color: "#dc2626",
+                background: "rgba(220, 38, 38, 0.08)",
+                padding: "10px 14px",
+                borderRadius: "8px",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "8px",
+                margin: 0,
+              }}
+            >
+              <IconAlertTriangle size={15} aria-hidden="true" style={{ flexShrink: 0, marginTop: "2px" }} />
+              <span>Deleting this program will remove all affiliated subjects, scheduled classes, assessments, and unassign enrolled students.</span>
             </p>
             {error && <p style={{ margin: "12px 0 0", fontSize: 13, color: "#b91c1c" }}>{error}</p>}
             <div className="modal-actions" style={{ marginTop: "20px" }}>

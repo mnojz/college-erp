@@ -11,6 +11,7 @@ type CreateTeacherBody = {
   lastName?: unknown;
   employeeNo?: unknown;
   profileImageUrl?: unknown;
+  subjectIds?: unknown;
 };
 
 type UpdateTeacherBody = {
@@ -21,7 +22,25 @@ type UpdateTeacherBody = {
   lastName?: unknown;
   employeeNo?: unknown;
   profileImageUrl?: unknown;
+  subjectIds?: unknown;
 };
+
+/** Normalise an optional `subjectIds` payload into a de-duplicated list. */
+function parseSubjectIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const item of value) {
+    if (typeof item === "string" && item.trim()) {
+      const id = item.trim();
+      if (!seen.has(id)) {
+        seen.add(id);
+        ids.push(id);
+      }
+    }
+  }
+  return ids;
+}
 
 export async function POST(request: Request) {
   if (!(await requireAdmin())) {
@@ -42,6 +61,7 @@ export async function POST(request: Request) {
   const lastName = typeof body.lastName === "string" ? body.lastName.trim() : "";
   const employeeNo = typeof body.employeeNo === "string" ? body.employeeNo.trim() : "";
   const profileImageUrl = typeof body.profileImageUrl === "string" ? body.profileImageUrl.trim() : undefined;
+  const subjectIds = parseSubjectIds(body.subjectIds);
 
   if (!email || !password || !firstName || !lastName || !employeeNo) {
     return NextResponse.json(
@@ -69,7 +89,7 @@ export async function POST(request: Request) {
         },
       });
 
-      return transaction.teacher.create({
+      const created = await transaction.teacher.create({
         data: {
           userId: user.id,
           employeeNo,
@@ -90,9 +110,21 @@ export async function POST(request: Request) {
           },
         },
       });
+
+      if (subjectIds.length > 0) {
+        await transaction.subjectTeacher.createMany({
+          data: subjectIds.map((subjectId) => ({
+            subjectId,
+            teacherId: created.id,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
+      return { teacher: created, subjectIds };
     });
 
-    return NextResponse.json({ teacher }, { status: 201 });
+    return NextResponse.json({ teacher: teacher.teacher, subjectIds: teacher.subjectIds }, { status: 201 });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return NextResponse.json(
@@ -124,6 +156,7 @@ export async function PUT(request: Request) {
   const lastName = typeof body.lastName === "string" ? body.lastName.trim() : "";
   const employeeNo = typeof body.employeeNo === "string" ? body.employeeNo.trim() : "";
   const profileImageUrl = typeof body.profileImageUrl === "string" ? body.profileImageUrl.trim() : null;
+  const subjectIds = parseSubjectIds(body.subjectIds);
 
   if (!id || !email || !firstName || !lastName || !employeeNo) {
     return NextResponse.json(
@@ -165,7 +198,7 @@ export async function PUT(request: Request) {
         data: userData,
       });
 
-      return tx.teacher.update({
+      const updated = await tx.teacher.update({
         where: { id },
         data: {
           employeeNo,
@@ -186,9 +219,23 @@ export async function PUT(request: Request) {
           },
         },
       });
+
+      // Replace the full set of subject assignments (delete + recreate).
+      await tx.subjectTeacher.deleteMany({ where: { teacherId: id } });
+      if (subjectIds.length > 0) {
+        await tx.subjectTeacher.createMany({
+          data: subjectIds.map((subjectId) => ({ subjectId, teacherId: id })),
+          skipDuplicates: true,
+        });
+      }
+
+      return updated;
     });
 
-    return NextResponse.json({ teacher: updatedTeacher }, { status: 200 });
+    return NextResponse.json(
+      { teacher: updatedTeacher, subjectIds },
+      { status: 200 },
+    );
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return NextResponse.json(
@@ -253,6 +300,7 @@ export async function DELETE(request: Request) {
         });
       }
 
+      await tx.subjectTeacher.deleteMany({ where: { teacherId: id } });
       await tx.teacher.delete({ where: { id } });
       await tx.user.delete({ where: { id: teacher.userId } });
     });
@@ -283,6 +331,20 @@ export async function GET() {
             firstName: true,
             lastName: true,
             status: true,
+          },
+        },
+        subjectTeachers: {
+          select: {
+            id: true,
+            subject: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                semester: true,
+                program: { select: { code: true, name: true } },
+              },
+            },
           },
         },
       },

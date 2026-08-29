@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminShell } from "@/app/components/admin/AdminShell";
+import { IconArrowRight } from "@tabler/icons-react";
 
 type Counts = Record<
   "students" | "teachers" | "programs" | "subjects" | "classes" | "assessments",
@@ -115,7 +116,7 @@ const ACTIONS: ActionConfig[] = [
     iconColor: "#059669",
     title: "Programs",
     description: "Set up degree programs, departments, and academic structure.",
-    cta: "Manage programs →",
+    cta: "Manage programs",
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
@@ -128,7 +129,7 @@ const ACTIONS: ActionConfig[] = [
     iconColor: "#d97706",
     title: "Subjects & Classes",
     description: "Define subjects, assign faculty, and configure weekly timetables.",
-    cta: "Set up teaching →",
+    cta: "Set up teaching",
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
@@ -141,7 +142,7 @@ const ACTIONS: ActionConfig[] = [
     iconColor: "#0284c7",
     title: "People",
     description: "Create and manage teacher and student accounts and identifiers.",
-    cta: "Manage people →",
+    cta: "Manage people",
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
@@ -155,7 +156,7 @@ const ACTIONS: ActionConfig[] = [
     iconColor: "#7c3aed",
     title: "Announcements",
     description: "Post notices, updates, and circulars for students and faculty.",
-    cta: "Post notices →",
+    cta: "Post notices",
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -254,7 +255,10 @@ export default function AdminPage() {
             </div>
             <h3>{action.title}</h3>
             <p>{action.description}</p>
-            <strong>{action.cta}</strong>
+            <strong style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
+              {action.cta}
+              <IconArrowRight size={14} strokeWidth={2.25} aria-hidden="true" />
+            </strong>
           </a>
         ))}
       </section>

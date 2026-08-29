@@ -60,6 +60,57 @@ function isConflict(
   return true;
 }
 
+type ResolvedTeacher = { teacherId: string | null; error?: string };
+
+/**
+ * The teacher for a class slot is derived from the subject's teacher
+ * assignments (SubjectTeacher) — the scheduler never picks one from the whole
+ * faculty list. An explicitly supplied teacherId must belong to the subject;
+ * when omitted we auto-resolve (single assignment, otherwise the assigned
+ * teacher currently carrying the fewest scheduled slots for this subject).
+ */
+async function resolveTeacherForSubject(
+  subjectId: string,
+  requestedTeacherId: string,
+): Promise<ResolvedTeacher> {
+  const assignments = await prisma.subjectTeacher.findMany({
+    where: { subjectId },
+    select: { teacherId: true, createdAt: true },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (assignments.length === 0) {
+    return {
+      teacherId: null,
+      error: "No teacher is assigned to this subject yet. Assign one on the Faculty page first.",
+    };
+  }
+
+  if (requestedTeacherId) {
+    return assignments.some((a) => a.teacherId === requestedTeacherId)
+      ? { teacherId: requestedTeacherId }
+      : { teacherId: null, error: "The selected teacher is not assigned to this subject." };
+  }
+
+  if (assignments.length === 1) {
+    return { teacherId: assignments[0].teacherId };
+  }
+
+  // Multiple assigned teachers → fair share: pick the one with the fewest
+  // already-scheduled slots for this subject (ties broken by earliest
+  // assignment).
+  const counts = await prisma.class.groupBy({
+    by: ["teacherId"],
+    where: { subjectId, teacherId: { in: assignments.map((a) => a.teacherId) } },
+    _count: { _all: true },
+  });
+  const countByTeacher = new Map(counts.map((c) => [c.teacherId, c._count._all]));
+  const best = assignments.reduce((acc, a) =>
+    (countByTeacher.get(a.teacherId) ?? 0) < (countByTeacher.get(acc.teacherId) ?? 0) ? a : acc,
+  );
+  return { teacherId: best.teacherId };
+}
+
 export async function GET() {
   try {
     const classes = await prisma.class.findMany({
@@ -109,7 +160,7 @@ export async function POST(request: Request) {
   }
 
   const subjectId = typeof body.subjectId === "string" ? body.subjectId : "";
-  const teacherId = typeof body.teacherId === "string" ? body.teacherId : "";
+  let teacherId = typeof body.teacherId === "string" ? body.teacherId : "";
   const programId = typeof body.programId === "string" ? body.programId : "";
   const semester = typeof body.semester === "number" ? body.semester : Number(body.semester);
   const dayOfWeek = typeof body.dayOfWeek === "string" ? (body.dayOfWeek as DayOfWeek) : null;
@@ -118,9 +169,9 @@ export async function POST(request: Request) {
   const type = parseType(body.type);
   const group = parseGroup(body.group);
 
-  if (!subjectId || !teacherId || !programId || !Number.isInteger(semester) || !dayOfWeek || !startTime || !endTime) {
+  if (!subjectId || !programId || !Number.isInteger(semester) || !dayOfWeek || !startTime || !endTime) {
     return NextResponse.json(
-      { error: "Subject, teacher, program, semester, day, start time, and end time are required" },
+      { error: "Subject, program, semester, day, start time, and end time are required" },
       { status: 400 },
     );
   }
@@ -132,6 +183,17 @@ export async function POST(request: Request) {
   if (!subject) {
     return NextResponse.json({ error: "Subject does not match program and semester" }, { status: 400 });
   }
+
+  // The teacher comes from the subject's assignments — validate an explicit
+  // choice or auto-resolve the assigned teacher for this slot.
+  const resolved = await resolveTeacherForSubject(subjectId, teacherId);
+  if (resolved.error || !resolved.teacherId) {
+    return NextResponse.json(
+      { error: resolved.error ?? "No teacher is assigned to this subject." },
+      { status: 400 },
+    );
+  }
+  teacherId = resolved.teacherId;
 
   // Conflict detection: the assigned teacher cannot be in two places at
   // once, same-type slots (Lecture+Lecture / Practical+Practical) cannot
@@ -210,7 +272,7 @@ export async function PUT(request: Request) {
 
   const id = typeof body.id === "string" ? body.id.trim() : "";
   const subjectId = typeof body.subjectId === "string" ? body.subjectId : "";
-  const teacherId = typeof body.teacherId === "string" ? body.teacherId : "";
+  let teacherId = typeof body.teacherId === "string" ? body.teacherId : "";
   const programId = typeof body.programId === "string" ? body.programId : "";
   const semester = typeof body.semester === "number" ? body.semester : Number(body.semester);
   const dayOfWeek = typeof body.dayOfWeek === "string" ? (body.dayOfWeek as DayOfWeek) : null;
@@ -219,9 +281,9 @@ export async function PUT(request: Request) {
   const type = parseType(body.type);
   const group = parseGroup(body.group);
 
-  if (!id || !subjectId || !teacherId || !programId || !Number.isInteger(semester) || !dayOfWeek || !startTime || !endTime) {
+  if (!id || !subjectId || !programId || !Number.isInteger(semester) || !dayOfWeek || !startTime || !endTime) {
     return NextResponse.json(
-      { error: "Class ID, subject, teacher, program, semester, day, and times are required" },
+      { error: "Class ID, subject, program, semester, day, and times are required" },
       { status: 400 },
     );
   }
@@ -234,6 +296,16 @@ export async function PUT(request: Request) {
   if (!subject) {
     return NextResponse.json({ error: "Subject does not match chosen program and semester" }, { status: 400 });
   }
+
+  // Keep the teacher derived from the subject's assignments (see POST).
+  const resolved = await resolveTeacherForSubject(subjectId, teacherId);
+  if (resolved.error || !resolved.teacherId) {
+    return NextResponse.json(
+      { error: resolved.error ?? "No teacher is assigned to this subject." },
+      { status: 400 },
+    );
+  }
+  teacherId = resolved.teacherId;
 
   // Conflict detection (ignores the slot being edited). Same-type overlaps are
   // rejected; Lecture + Lab may overlap; parallel practical groups may overlap.

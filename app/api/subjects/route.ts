@@ -15,6 +15,19 @@ export async function GET() {
       programId: true,
       semester: true,
       program: { select: { name: true, code: true } },
+      // Teachers assigned to this subject (drives automatic class scheduling).
+      subjectTeachers: {
+        select: {
+          teacherId: true,
+          teacher: {
+            select: {
+              id: true,
+              employeeNo: true,
+              user: { select: { firstName: true, lastName: true } },
+            },
+          },
+        },
+      },
     },
   });
   return NextResponse.json({ subjects });

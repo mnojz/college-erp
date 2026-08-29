@@ -4,6 +4,7 @@ import { AdminModal } from "@/app/components/admin/AdminModal";
 import { formatBytes } from "@/app/lib/syllabi-shared";
 import { ZoomableImageViewer } from "@/app/components/common/ZoomableImageViewer";
 import {
+  IconBook2,
   IconDownload,
   IconExternalLink,
   IconFileText,
@@ -16,6 +17,15 @@ export type NoticeAttachment = {
   size: number;
 };
 
+/** Target teaching group for a teacher-scoped notice (subject × program × semester). */
+export type NoticeScope = {
+  subjectName: string;
+  subjectCode: string;
+  programName: string;
+  programCode: string;
+  semester: number;
+};
+
 export type NoticeDetailData = {
   id: string;
   title: string;
@@ -24,6 +34,8 @@ export type NoticeDetailData = {
   createdAt: string;
   author?: { firstName: string; lastName: string } | null;
   attachment?: NoticeAttachment | null;
+  /** Present only for notices a teacher published to a specific class. */
+  scope?: NoticeScope | null;
 };
 
 /** Endpoint that streams a notice attachment (images/PDF). */
@@ -61,6 +73,12 @@ export function NoticeDetailModal({
           {notice.author && (
             <span className="notice-detail-author">
               Posted by {notice.author.firstName} {notice.author.lastName}
+            </span>
+          )}
+          {notice.scope && (
+            <span className="badge badge-violet" title={notice.scope.subjectName}>
+              <IconBook2 size={12} aria-hidden="true" />
+              {notice.scope.subjectCode} · {notice.scope.programCode} · Sem {notice.scope.semester}
             </span>
           )}
           {attachment && (

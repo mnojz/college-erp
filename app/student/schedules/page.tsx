@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { StudentShell } from "@/app/components/student/StudentShell";
+import { IconClock, IconUser } from "@tabler/icons-react";
 
 type Profile = {
   enrollmentNumber: string;
@@ -188,11 +189,13 @@ export default function StudentSchedulesPage() {
                           {item.subject.name}
                         </h4>
                         <div style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
-                          <p style={{ margin: "2px 0" }}>
-                            🕒 {formatTime(item.startTime)} — {formatTime(item.endTime)}
+                          <p style={{ margin: "2px 0", display: "flex", alignItems: "center", gap: "6px" }}>
+                            <IconClock size={13} aria-hidden="true" style={{ flexShrink: 0 }} />
+                            {formatTime(item.startTime)} — {formatTime(item.endTime)}
                           </p>
-                          <p style={{ margin: "2px 0" }}>
-                            👤 Prof. {item.teacher.user.firstName} {item.teacher.user.lastName}
+                          <p style={{ margin: "2px 0", display: "flex", alignItems: "center", gap: "6px" }}>
+                            <IconUser size={13} aria-hidden="true" style={{ flexShrink: 0 }} />
+                            Prof. {item.teacher.user.firstName} {item.teacher.user.lastName}
                           </p>
                         </div>
                       </div>

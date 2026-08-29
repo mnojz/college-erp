@@ -392,7 +392,7 @@ export default function StudentNotesPage() {
               : activeTab === "RECENT"
                 ? "Materials you open or download will appear here."
                 : activeTab === "BOOKMARKED"
-                  ? "Bookmark materials with the ☆ button to keep them one click away."
+                  ? "Bookmark materials with the star button to keep them one click away."
                   : "Try adjusting your search or filters."}
           </p>
         </div>

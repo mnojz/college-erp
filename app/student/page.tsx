@@ -6,6 +6,11 @@ import { InfoCard } from "@/app/components/student/InfoCard";
 import { ProfileHero } from "@/app/components/student/ProfileHero";
 import { StudentShell } from "@/app/components/student/StudentShell";
 import { studentAssets } from "@/app/components/student/assets";
+import {
+  NoticeDetailData,
+  NoticeDetailModal,
+} from "@/app/components/common/NoticeDetailModal";
+import { NoticePostCard } from "@/app/components/common/NoticePostCard";
 
 type Profile = {
   enrollmentNumber: string;
@@ -18,9 +23,57 @@ type Profile = {
   currentSemester: number | null;
 };
 
+type Announcement = {
+  id: string;
+  title: string;
+  body: string;
+  publishedAt: string | null;
+  createdAt: string;
+  teacherId: string | null;
+  semester: number | null;
+  author: { firstName: string; lastName: string } | null;
+  subject: { id: string; name: string; code: string } | null;
+  program: { id: string; name: string; code: string } | null;
+  attachmentFileName: string | null;
+  attachmentMimeType: string | null;
+  attachmentSize: number | null;
+};
+
+/** Raw announcement row → client-safe notice shape for cards/modal. */
+function toNotice(a: Announcement): NoticeDetailData {
+  return {
+    id: a.id,
+    title: a.title,
+    body: a.body,
+    publishedAt: a.publishedAt,
+    createdAt: a.createdAt,
+    author: a.author,
+    scope:
+      a.teacherId && a.subject && a.program && a.semester != null
+        ? {
+            subjectName: a.subject.name,
+            subjectCode: a.subject.code,
+            programName: a.program.name,
+            programCode: a.program.code,
+            semester: a.semester,
+          }
+        : null,
+    attachment:
+      a.attachmentFileName && a.attachmentSize !== null
+        ? {
+            fileName: a.attachmentFileName,
+            mimeType: a.attachmentMimeType ?? "application/octet-stream",
+            size: a.attachmentSize,
+          }
+        : null,
+  };
+}
+
 export default function StudentPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [selectedNotice, setSelectedNotice] = useState<NoticeDetailData | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -34,6 +87,17 @@ export default function StudentPage() {
         setProfile(result.student);
       })
       .catch(() => setError("Unable to reach the server"));
+
+    // Campus bulletins + teacher notices scoped to this student's program/semester.
+    fetch("/api/announcements")
+      .then(async (response) => {
+        if (!response.ok) return;
+        const result = await response.json();
+        setAnnouncements(result.announcements ?? []);
+      })
+      .catch(() => {
+        // announcements are non-critical; profile already loaded
+      });
   }, [router]);
 
   if (error) return <main className="profile-error">{error}</main>;
@@ -117,6 +181,40 @@ export default function StudentPage() {
           ]}
         />
       </div>
+
+      {announcements.length > 0 && (
+        <section style={{ marginTop: "28px" }}>
+          <header
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              marginBottom: 14,
+            }}
+          >
+            <div>
+              <h2 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>Announcements</h2>
+              <p style={{ margin: "2px 0 0", fontSize: 13, color: "var(--ink-soft)" }}>
+                Campus updates and notices from your teachers
+              </p>
+            </div>
+          </header>
+          <div className="public-list notice-list">
+            {announcements.map((a) => (
+              <NoticePostCard
+                key={a.id}
+                notice={toNotice(a)}
+                onOpen={() => setSelectedNotice(toNotice(a))}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {selectedNotice && (
+        <NoticeDetailModal notice={selectedNotice} onClose={() => setSelectedNotice(null)} />
+      )}
     </StudentShell>
   );
 }

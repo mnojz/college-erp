@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
 import { AssetIcon, studentAssets } from "@/app/components/student/assets";
+import { IconClipboardCheck, IconTarget, IconArrowRight } from "@tabler/icons-react";
 
 type TeacherData = {
   id: string;
@@ -367,7 +368,9 @@ export default function TeacherOverviewPage() {
               href="/teacher/schedule"
               style={{ fontSize: "0.8rem", color: "#0ea5e9", fontWeight: "600", textDecoration: "none" }}
             >
-              Full Timetable →
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                Full Timetable <IconArrowRight size={14} strokeWidth={2.25} aria-hidden="true" />
+              </span>
             </Link>
           </div>
 
@@ -438,7 +441,8 @@ export default function TeacherOverviewPage() {
                   textAlign: "center",
                 }}
               >
-                📝 Take Attendance
+                <IconClipboardCheck size={14} aria-hidden="true" style={{ marginRight: 4, verticalAlign: "-2px" }} />
+                Take Attendance
               </Link>
               <Link
                 href="/teacher/assessments"
@@ -454,7 +458,8 @@ export default function TeacherOverviewPage() {
                   textAlign: "center",
                 }}
               >
-                🎯 Enter Marks
+                <IconTarget size={14} aria-hidden="true" style={{ marginRight: 4, verticalAlign: "-2px" }} />
+                Enter Marks
               </Link>
             </div>
           </div>

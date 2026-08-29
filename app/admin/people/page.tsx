@@ -2,6 +2,13 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  IconAlertTriangle,
+  IconCircleCheck,
+  IconPlus,
+  IconSearch,
+  IconX,
+} from "@tabler/icons-react";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { AdminModal } from "@/app/components/admin/AdminModal";
 import { ImageUploadCrop } from "@/app/components/common/ImageUploadCrop";
@@ -17,6 +24,10 @@ type TeacherItem = {
     lastName: string;
     status: string;
   };
+  subjectTeachers: Array<{
+    id: string;
+    subject: { id: string; code: string; name: string; semester: number };
+  }>;
 };
 
 type StudentItem = {
@@ -39,6 +50,13 @@ type StudentItem = {
 };
 
 type ProgramOption = { id: string; name: string; code: string; durationYears: number };
+type SubjectOption = {
+  id: string;
+  code: string;
+  name: string;
+  semester: number;
+  program: { name: string; code: string } | null;
+};
 
 type DeleteTarget = {
   type: "teacher" | "student";
@@ -47,13 +65,22 @@ type DeleteTarget = {
   identifier: string;
 };
 
-const teacherEmpty = {
+const teacherEmpty: {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  employeeNo: string;
+  profileImageUrl: string;
+  subjectIds: string[];
+} = {
   email: "",
   password: "",
   firstName: "",
   lastName: "",
   employeeNo: "",
   profileImageUrl: "",
+  subjectIds: [],
 };
 
 const studentEmpty = {
@@ -70,12 +97,374 @@ const studentEmpty = {
   profileImageUrl: "",
 };
 
+/**
+ * Subject-assignment picker for the faculty create/edit modals.
+ *
+ * Shows only the subjects already assigned to the teacher as removable chips,
+ * plus a dedicated "Assign Subject" button. Clicking it expands a searchable
+ * catalog of ALL subjects — assigned ones appear disabled ("✓ Assigned"),
+ * unassigned ones are added on click. The parent's assignedIds drives both
+ * lists, so assigning/removing instantly updates the chips.
+ */
+function SubjectAssigner({
+  subjects,
+  assignedIds,
+  onChange,
+}: {
+  subjects: SubjectOption[];
+  assignedIds: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [semesterFilter, setSemesterFilter] = useState("ALL");
+  const [programFilter, setProgramFilter] = useState("ALL");
+
+  const assigned = subjects.filter((s) => assignedIds.includes(s.id));
+  const q = query.trim().toLowerCase();
+  const visible = subjects.filter((s) => {
+    if (programFilter !== "ALL" && (s.program?.code ?? "") !== programFilter) return false;
+    if (semesterFilter !== "ALL" && String(s.semester) !== semesterFilter) return false;
+    if (!q) return true;
+    return (
+      s.code.toLowerCase().includes(q) ||
+      s.name.toLowerCase().includes(q) ||
+      (s.program?.code ?? "").toLowerCase().includes(q) ||
+      (s.program?.name ?? "").toLowerCase().includes(q)
+    );
+  });
+
+  // Distinct semesters present across the catalog (for the filter dropdown).
+  const semesters = useMemo(
+    () => Array.from(new Set(subjects.map((s) => s.semester))).sort((a, b) => a - b),
+    [subjects],
+  );
+
+  // Distinct programs present across the catalog (for the filter dropdown).
+  const programs = useMemo(() => {
+    const byCode = new Map<string, { code: string; name: string }>();
+    for (const s of subjects) {
+      if (s.program && !byCode.has(s.program.code)) {
+        byCode.set(s.program.code, s.program);
+      }
+    }
+    return Array.from(byCode.values()).sort((a, b) => a.code.localeCompare(b.code));
+  }, [subjects]);
+
+  const filtersActive = programFilter !== "ALL" || semesterFilter !== "ALL";
+  const activeFilterLabel = [
+    programFilter !== "ALL" ? `program ${programFilter}` : "",
+    semesterFilter !== "ALL" ? `semester ${semesterFilter}` : "",
+    q ? `“${query.trim()}”` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const chipStyle = {
+    padding: "5px 10px",
+    fontWeight: 600,
+  };
+
+  return (
+    <div style={{ display: "grid", gap: "8px", marginTop: "4px" }}>
+      <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--ink-soft)" }}>
+        Assigned Subjects
+        <span style={{ fontWeight: 400 }}> — drives automatic class scheduling</span>
+      </span>
+
+      {assigned.length === 0 ? (
+        <p className="form-hint" style={{ margin: 0 }}>
+          No subjects assigned yet. Click “Assign Subject” below to add one.
+        </p>
+      ) : (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {assigned.map((s) => (
+            <span key={s.id} className="badge badge-violet" style={chipStyle}>
+              <strong style={{ fontWeight: 800 }}>{s.code}</strong>
+              <span style={{ fontWeight: 500 }}>{s.name}</span>
+              <span style={{ opacity: 0.8, fontWeight: 500 }}>Sem {s.semester}</span>
+              {s.program && <span style={{ opacity: 0.8, fontWeight: 500 }}>{s.program.code}</span>}
+              <button
+                type="button"
+                title={`Remove ${s.code} from this teacher`}
+                aria-label={`Remove ${s.code}`}
+                onClick={() => onChange(assignedIds.filter((id) => id !== s.id))}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "inherit",
+                  opacity: 0.7,
+                  fontSize: 14,
+                  lineHeight: 1,
+                  padding: 0,
+                  display: "inline-flex",
+                }}
+              >
+                <IconX size={13} aria-hidden="true" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <button
+          type="button"
+          className={pickerOpen ? "btn-ghost" : "btn-add"}
+          onClick={() => setPickerOpen((v) => !v)}
+        >
+          {pickerOpen ? (
+            "Done"
+          ) : (
+            <>
+              <IconPlus size={15} aria-hidden="true" />
+              Assign Subject
+            </>
+          )}
+        </button>
+        {assigned.length > 0 && (
+          <span className="form-hint" style={{ margin: 0 }}>
+            {assigned.length} of {subjects.length} subjects
+          </span>
+        )}
+      </div>
+
+      {pickerOpen && (
+        <div
+          style={{
+            border: "1px solid var(--line)",
+            borderRadius: 10,
+            padding: "10px",
+            background: "var(--panel)",
+            display: "grid",
+            gap: "8px",
+          }}
+        >
+          <div style={{ display: "grid", gap: 10 }}>
+            {/* Row 1 — full-width search */}
+            <div style={{ position: "relative" }}>
+              <IconSearch
+                size={15}
+                aria-hidden="true"
+                style={{
+                  position: "absolute",
+                  left: 12,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "var(--ink-soft)",
+                  pointerEvents: "none",
+                  zIndex: 1,
+                }}
+              />
+              <input
+                type="search"
+                placeholder="Search subjects by code, name, or program…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                autoFocus
+                style={{ paddingLeft: 36 }}
+              />
+            </div>
+
+            {/* Row 2 — filters */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr auto",
+                gap: 10,
+                alignItems: "end",
+              }}
+            >
+              <label style={{ display: "grid", gap: 5 }}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: "var(--ink-soft)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  Program
+                </span>
+                <select
+                  value={programFilter}
+                  onChange={(e) => setProgramFilter(e.target.value)}
+                >
+                  <option value="ALL">All programs</option>
+                  {programs.map((p) => (
+                    <option key={p.code} value={p.code}>
+                      {p.code} — {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label style={{ display: "grid", gap: 5 }}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: "var(--ink-soft)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  Semester
+                </span>
+                <select
+                  value={semesterFilter}
+                  onChange={(e) => setSemesterFilter(e.target.value)}
+                >
+                  <option value="ALL">All semesters</option>
+                  {semesters.map((n) => (
+                    <option key={n} value={String(n)}>
+                      Semester {n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {filtersActive && (
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => {
+                    setProgramFilter("ALL");
+                    setSemesterFilter("ALL");
+                  }}
+                  title="Clear filters"
+                  style={{
+                    whiteSpace: "nowrap",
+                    padding: "10px 14px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    justifyContent: "center",
+                  }}
+                >
+                  <IconX size={13} aria-hidden="true" />
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div>
+            {/* List header */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "0 2px 4px",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "var(--ink-soft)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                Subjects
+              </span>
+              <span style={{ fontSize: 11, color: "var(--ink-soft)" }}>
+                {visible.length} of {subjects.length}
+              </span>
+            </div>
+
+            <div style={{ maxHeight: 220, overflowY: "auto", display: "grid", gap: "2px" }}>
+            {visible.length === 0 ? (
+              <span style={{ color: "var(--ink-soft)", fontSize: 13, padding: "2px 4px" }}>
+                {subjects.length === 0
+                  ? "No subjects yet — publish a curriculum first."
+                  : `No subjects match: ${activeFilterLabel || "current filters"}.`}
+              </span>
+            ) : (
+              visible.map((s) => {
+                const isAssigned = assignedIds.includes(s.id);
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    disabled={isAssigned}
+                    onClick={() => onChange([...assignedIds, s.id])}
+                    title={isAssigned ? "Already assigned" : `Assign ${s.code} · ${s.name}`}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      width: "100%",
+                      padding: "7px 9px",
+                      border: "none",
+                      borderRadius: 7,
+                      background: "transparent",
+                      color: "inherit",
+                      cursor: isAssigned ? "default" : "pointer",
+                      fontSize: 13,
+                      textAlign: "left",
+                      opacity: isAssigned ? 0.55 : 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isAssigned) e.currentTarget.style.background = "var(--line)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    <span>
+                      <strong>{s.code}</strong> · {s.name}
+                      <span style={{ color: "var(--ink-soft)" }}>
+                        {" "}
+                        — {s.program?.code ?? ""} · Sem {s.semester}
+                      </span>
+                    </span>
+                    {isAssigned ? (
+                      <span
+                        style={{
+                          color: "#059669",
+                          flexShrink: 0,
+                          fontWeight: 600,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 5,
+                        }}
+                      >
+                        <IconCircleCheck size={15} aria-hidden="true" />
+                        Assigned
+                      </span>
+                    ) : (
+                      <IconPlus
+                        size={15}
+                        style={{ color: "#059669", flexShrink: 0 }}
+                        aria-hidden="true"
+                      />
+                    )}
+                  </button>
+                );
+              })
+            )}
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
 export default function AdminPeoplePage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"teachers" | "students">("teachers");
   const [teachers, setTeachers] = useState<TeacherItem[]>([]);
   const [students, setStudents] = useState<StudentItem[]>([]);
   const [programs, setPrograms] = useState<ProgramOption[]>([]);
+  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Filters
@@ -107,15 +496,17 @@ export default function AdminPeoplePage() {
           router.replace("/");
           return;
         }
-        const [tRes, sRes, pRes] = await Promise.all([
+        const [tRes, sRes, pRes, subRes] = await Promise.all([
           fetch("/api/teachers"),
           fetch("/api/students"),
           fetch("/api/programs"),
+          fetch("/api/subjects"),
         ]);
-        const [td, sd, pd] = await Promise.all([tRes.json(), sRes.json(), pRes.json()]);
+        const [td, sd, pd, subd] = await Promise.all([tRes.json(), sRes.json(), pRes.json(), subRes.json()]);
         setTeachers(td.teachers ?? []);
         setStudents(sd.students ?? []);
         setPrograms(pd.programs ?? []);
+        setSubjects(subd.subjects ?? []);
       } catch {
         setError("Unable to load directories");
       } finally {
@@ -183,6 +574,7 @@ export default function AdminPeoplePage() {
       password: "",
       employeeNo: teacher.employeeNo,
       profileImageUrl: teacher.profileImageUrl || "",
+      subjectIds: (teacher.subjectTeachers ?? []).map((st) => st.subject.id),
     });
   }
 
@@ -215,7 +607,10 @@ export default function AdminPeoplePage() {
       const res = await fetch("/api/teachers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(teacherForm),
+        body: JSON.stringify({
+          ...teacherForm,
+          subjectIds: teacherForm.subjectIds,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -242,13 +637,14 @@ export default function AdminPeoplePage() {
     setError("");
     setSaving(true);
     try {
-      const payload: Record<string, string | undefined> = {
+      const payload: Record<string, string | string[] | undefined> = {
         id: editingTeacher.id,
         firstName: editingTeacher.firstName,
         lastName: editingTeacher.lastName,
         email: editingTeacher.email,
         employeeNo: editingTeacher.employeeNo,
         profileImageUrl: editingTeacher.profileImageUrl || undefined,
+        subjectIds: editingTeacher.subjectIds,
       };
       if (editingTeacher.password) {
         payload.password = editingTeacher.password;
@@ -484,13 +880,14 @@ export default function AdminPeoplePage() {
                 <th>Employee Number</th>
                 <th>Email Address</th>
                 <th>Status</th>
+                <th>Assigned Subjects</th>
                 <th style={{ textAlign: "right" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredTeachers.length === 0 && !loading ? (
                 <tr>
-                  <td colSpan={5} className="admin-table-empty">
+                  <td colSpan={6} className="admin-table-empty">
                     No faculty records found. Click <strong>+ Add Faculty</strong> to create an account.
                   </td>
                 </tr>
@@ -539,6 +936,19 @@ export default function AdminPeoplePage() {
                       <span className={`badge ${t.user.status === "ACTIVE" ? "badge-green" : "badge-slate"}`}>
                         {t.user.status}
                       </span>
+                    </td>
+                    <td>
+                      {(t.subjectTeachers ?? []).length > 0 ? (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, maxWidth: 220 }}>
+                          {(t.subjectTeachers ?? []).map((st) => (
+                            <span key={st.id} className="badge badge-violet">
+                              {st.subject.code}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span style={{ color: "#94a3b8" }}>None</span>
+                      )}
                     </td>
                     <td>
                       <div className="table-actions">
@@ -798,6 +1208,12 @@ export default function AdminPeoplePage() {
               onChange={(val) => setTeacherForm({ ...teacherForm, profileImageUrl: val })}
             />
 
+            <SubjectAssigner
+              subjects={subjects}
+              assignedIds={teacherForm.subjectIds}
+              onChange={(next) => setTeacherForm((f) => ({ ...f, subjectIds: next }))}
+            />
+
             {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
 
             <div className="modal-actions">
@@ -882,6 +1298,14 @@ export default function AdminPeoplePage() {
               label="Profile Photo (Crop to Square)"
               value={editingTeacher.profileImageUrl || ""}
               onChange={(val) => setEditingTeacher({ ...editingTeacher, profileImageUrl: val })}
+            />
+
+            <SubjectAssigner
+              subjects={subjects}
+              assignedIds={editingTeacher.subjectIds}
+              onChange={(next) =>
+                setEditingTeacher((t) => (t ? { ...t, subjectIds: next } : t))
+              }
             />
 
             {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
@@ -1028,7 +1452,7 @@ export default function AdminPeoplePage() {
                   disabled={!studentForm.programId}
                 >
                   <option value="">
-                    {studentForm.programId ? "Select Semester" : "← Pick Program first"}
+                    {studentForm.programId ? "Select Semester" : "Pick Program first"}
                   </option>
                   {Array.from({ length: createStudentSemestersCount }, (_, i) => i + 1).map((n) => (
                     <option key={n} value={String(n)}>
@@ -1182,7 +1606,7 @@ export default function AdminPeoplePage() {
                   disabled={!editingStudent.programId}
                 >
                   <option value="">
-                    {editingStudent.programId ? "Select Semester" : "← Pick Program first"}
+                    {editingStudent.programId ? "Select Semester" : "Pick Program first"}
                   </option>
                   {Array.from({ length: editStudentSemestersCount }, (_, i) => i + 1).map((n) => (
                     <option key={n} value={String(n)}>
@@ -1229,8 +1653,9 @@ export default function AdminPeoplePage() {
               <strong style={{ color: "var(--foreground, #1e293b)" }}>{deletingTarget.name}</strong>{" "}
               ({deletingTarget.identifier})?
             </p>
-            <p style={{ fontSize: "13px", color: "#dc2626", background: "rgba(220, 38, 38, 0.08)", padding: "10px 14px", borderRadius: "8px" }}>
-              ⚠️ This action cannot be undone. All associated records, enrollments, attendance, and credentials will be removed.
+            <p style={{ fontSize: "13px", color: "#dc2626", background: "rgba(220, 38, 38, 0.08)", padding: "10px 14px", borderRadius: "8px", display: "flex", alignItems: "center", gap: 8 }}>
+              <IconAlertTriangle size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
+              This action cannot be undone. All associated records, enrollments, attendance, and credentials will be removed.
             </p>
 
             {error && <p style={{ margin: "12px 0 0", fontSize: 13, color: "#b91c1c" }}>{error}</p>}
