@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
+import { notifyEachUser } from "@/app/lib/notify";
 type ResultInput = { studentId?: unknown; marks?: unknown; grade?: unknown };
 type ResultsBody = { assessmentId?: unknown; results?: unknown };
 export async function POST(request: Request) {
@@ -10,11 +11,49 @@ export async function POST(request: Request) {
   const assessmentId = typeof body.assessmentId === "string" ? body.assessmentId : "";
   const inputs = Array.isArray(body.results) ? body.results as ResultInput[] : null;
   if (!assessmentId || !inputs) return NextResponse.json({ error: "Assessment and results are required" }, { status: 400 });
-  const assessment = await prisma.assessment.findFirst({ where: { id: assessmentId, ...(session.role === "TEACHER" ? { subject: { classes: { some: { teacher: { userId: session.userId } } } } } : {}) }, select: { id: true, maxMarks: true, programId: true } });
+  const assessment = await prisma.assessment.findFirst({ where: { id: assessmentId, ...(session.role === "TEACHER" ? { subject: { classes: { some: { teacher: { userId: session.userId } } } } } : {}) }, select: { id: true, name: true, maxMarks: true, programId: true, subjectId: true } });
   if (!assessment) return NextResponse.json({ error: "Assessment not found" }, { status: 404 });
   const records = inputs.map((item) => ({ studentId: typeof item.studentId === "string" ? item.studentId : "", marks: typeof item.marks === "number" ? item.marks : -1, grade: typeof item.grade === "string" ? item.grade.trim() || null : null }));
   const validIds = new Set((await prisma.student.findMany({ where: { programId: assessment.programId, programEnrollmentStatus: "ENROLLED" }, select: { id: true } })).map((student) => student.id));
   if (records.some((record) => !validIds.has(record.studentId) || record.marks < 0 || record.marks > Number(assessment.maxMarks))) return NextResponse.json({ error: "Results contain an invalid student or mark" }, { status: 400 });
   const results = await prisma.$transaction(records.map((record) => prisma.result.upsert({ where: { assessmentId_studentId: { assessmentId, studentId: record.studentId } }, create: { assessmentId, ...record }, update: { marks: record.marks, grade: record.grade } })));
+
+  // Notify each affected student that their marks are published.
+  try {
+    const [assessmentInfo, studentRows] = await Promise.all([
+      prisma.assessment.findUnique({
+        where: { id: assessmentId },
+        select: { name: true, maxMarks: true, subject: { select: { code: true, name: true } } },
+      }),
+      prisma.student.findMany({
+        where: { id: { in: results.map((r) => r.studentId) } },
+        select: { id: true, userId: true },
+      }),
+    ]);
+    if (assessmentInfo) {
+      const userIdByStudent = new Map(studentRows.map((s) => [s.id, s.userId]));
+      const subjectLabel = assessmentInfo.subject
+        ? `${assessmentInfo.subject.code} — ${assessmentInfo.subject.name}`
+        : "your subject";
+      await notifyEachUser(
+        results
+          .map((r) => {
+            const userId = userIdByStudent.get(r.studentId);
+            if (!userId) return null;
+            return {
+              userId,
+              type: "result",
+              title: `Result published: ${assessmentInfo.name}`,
+              body: `${subjectLabel}: ${r.marks}/${Number(assessmentInfo.maxMarks)}${r.grade ? ` (${r.grade})` : ""}`,
+              link: "/student/results",
+            };
+          })
+          .filter((row): row is NonNullable<typeof row> => row !== null),
+      );
+    }
+  } catch (notifyError) {
+    console.error("result notification error:", notifyError);
+  }
+
   return NextResponse.json({ results }, { status: 201 });
 }

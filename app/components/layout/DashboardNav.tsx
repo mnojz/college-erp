@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ThemeToggle } from "@/app/components/common/ThemeToggle";
-import { IconBell } from "@tabler/icons-react";
+import { NotificationDropdown } from "@/app/components/common/NotificationDropdown";
 
 export type DashboardNavProps = {
   brandTitle?: string;
@@ -11,9 +11,8 @@ export type DashboardNavProps = {
   brandHomeHref?: string;
   brandIconBg?: string;
   userName?: string;
-  userSubtitle?: string;
+    userSubtitle?: string;
   avatarUrl?: string | null;
-  notificationCount?: number;
   onLogout?: () => void;
 };
 
@@ -25,7 +24,6 @@ export function DashboardNav({
   userName = "User",
   userSubtitle = "Sign out",
   avatarUrl,
-  notificationCount = 0,
   onLogout,
 }: DashboardNavProps) {
   const router = useRouter();
@@ -64,7 +62,7 @@ export function DashboardNav({
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+            <path d="M22 10v6M 2 10l10-5 10 5-10 5z"></path>
             <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
           </svg>
         </span>
@@ -78,13 +76,8 @@ export function DashboardNav({
         {/* Theme Switcher — single toggle */}
         <ThemeToggle />
 
-        {/* Notifications (if count > 0) */}
-        {notificationCount > 0 && (
-          <button className="notification-button" type="button" aria-label="Notifications" title={`${notificationCount} new alerts`}>
-            <IconBell size={20} aria-hidden="true" />
-            <b>{notificationCount}</b>
-          </button>
-        )}
+        {/* Notifications (bell icon + dropdown) */}
+        <NotificationDropdown />
 
         {/* User Account & Signout */}
         <button
@@ -112,7 +105,10 @@ export function DashboardNav({
               }}
             />
           ) : (
-            <span className="nav-avatar-fallback" style={{ background: brandIconBg }}>
+            <span
+              className="nav-avatar-fallback"
+              style={{ background: brandIconBg }}
+            >
               {initials}
             </span>
           )}
@@ -121,4 +117,3 @@ export function DashboardNav({
     </header>
   );
 }
-

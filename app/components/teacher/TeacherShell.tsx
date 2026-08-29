@@ -48,7 +48,6 @@ export function TeacherShell({
         userName: teacherName,
         userSubtitle: `Emp ID: ${employeeNo}`,
         avatarUrl,
-        notificationCount: 2,
       }}
       sidebarItems={teacherLinks}
       activeHref={active}

@@ -100,6 +100,17 @@ export default function StudentNotesPage() {
         });
         setSubjects(subjectsData.subjects ?? []);
         setRecentIds(readRecentMaterialIds());
+
+        // Deep-link support: /student/notes?subjectId=... (from the Subjects hub).
+        const subjectParam = new URLSearchParams(window.location.search).get("subjectId");
+        if (
+          subjectParam &&
+          (subjectsData.subjects ?? []).some((s: { id: string }) => s.id === subjectParam)
+        ) {
+          setFilters({ ...EMPTY_FILTERS, subjectId: subjectParam });
+          setActiveTab("ALL");
+        }
+      
       } catch {
         setError("Unable to reach the server");
       } finally {

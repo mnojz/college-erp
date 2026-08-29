@@ -18,7 +18,6 @@ export function StudentNav({ name, studentId, avatarUrl }: StudentNavProps) {
       userName={name}
       userSubtitle={`ID: ${studentId}`}
       avatarUrl={avatarUrl}
-      notificationCount={3}
     />
   );
 }

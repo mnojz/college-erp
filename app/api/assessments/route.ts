@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@/app/generated/prisma/client";
 import { getSession } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
+import { notifyUsers, studentUserIdsForSemester } from "@/app/lib/notify";
 
 type AssessmentBody = { subjectId?: unknown; programId?: unknown; semester?: unknown; name?: unknown; maxMarks?: unknown; assessmentDate?: unknown };
 
@@ -63,6 +64,27 @@ export async function POST(request: Request) {
       data: { subjectId, programId, semester, name, maxMarks, assessmentDate },
       select: { id: true, name: true, maxMarks: true, assessmentDate: true, subjectId: true, programId: true, semester: true },
     });
+
+    // Notify the students of this program + semester.
+    try {
+      const [subjectInfo, studentIds] = await Promise.all([
+        prisma.subject.findUnique({ where: { id: subjectId }, select: { code: true, name: true } }),
+        studentUserIdsForSemester(programId, semester),
+      ]);
+      await notifyUsers(
+        studentIds,
+        {
+          type: "assessment",
+          title: `Upcoming assessment in ${subjectInfo?.code ?? "your subject"} — ${subjectInfo?.name ?? ""}`.replace(/ — $/, ""),
+          body: `${name} · ${maxMarks} marks`,
+          link: "/student/results",
+        },
+        { excludeUserId: session.userId },
+      );
+    } catch (notifyError) {
+      console.error("assessment notification error:", notifyError);
+    }
+
     return NextResponse.json({ assessment }, { status: 201 });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {

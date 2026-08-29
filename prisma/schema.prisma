@@ -65,6 +65,7 @@ model User {
   authoredAnnouncements Announcement[]
   uploadedMaterials     StudyMaterial[]
   bookmarks             Bookmark[]
+  notifications         Notification[]
 }
 
 model Program {
@@ -151,6 +152,27 @@ model SubjectTeacher {
 
   @@unique([subjectId, teacherId])
   @@index([teacherId])
+}
+
+/**
+ * In-app notification for a single recipient (user). Created by system
+ * events: campus announcements, teacher class notices, material uploads,
+ * assessments, published results, timetable changes, subject assignments.
+ * `link` is the dashboard path the recipient is taken to on click.
+ */
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  body      String
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
 }
 
 model Class {

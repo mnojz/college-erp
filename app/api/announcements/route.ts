@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@/app/generated/prisma/client";
 import { getSession } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
+import {
+  allAdminUserIds,
+  allStudentUserIds,
+  allTeacherUserIds,
+  notifyUsers,
+  studentUserIdsForSemester,
+} from "@/app/lib/notify";
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10 MB
 const ALLOWED_ATTACHMENT_TYPES = new Set([
@@ -265,6 +272,23 @@ export async function POST(request: Request) {
         },
         select: ANNOUNCEMENT_SELECT,
       });
+
+      // Notify every student of the targeted class group.
+      const [subjectInfo, studentIds] = await Promise.all([
+        prisma.subject.findUnique({ where: { id: subjectId }, select: { code: true, name: true } }),
+        studentUserIdsForSemester(programId, semester),
+      ]);
+      await notifyUsers(
+        studentIds,
+        {
+          type: "notice",
+          title: `New notice in ${subjectInfo?.code ?? "your subject"} — ${subjectInfo?.name ?? ""}`.replace(/ — $/, ""),
+          body: title,
+          link: "/student",
+        },
+        { excludeUserId: session.userId },
+      );
+
       return NextResponse.json({ announcement }, { status: 201 });
     }
 
@@ -272,6 +296,23 @@ export async function POST(request: Request) {
       data: { title, body: announcementBody, publishedAt, authorId: session.userId, ...attachmentWrite },
       select: ANNOUNCEMENT_SELECT,
     });
+
+    // Campus-wide bulletin → every student, teacher, and (other) admin,
+    // each pointed at the page in their own portal.
+    const [studentIds, teacherIds, adminIds] = await Promise.all([
+      allStudentUserIds(),
+      allTeacherUserIds(),
+      allAdminUserIds(),
+    ]);
+    const payload = {
+      type: "announcement",
+      title: "New campus announcement",
+      body: title,
+    } as const;
+    await notifyUsers(studentIds, { ...payload, link: "/student" }, { excludeUserId: session.userId });
+    await notifyUsers(teacherIds, { ...payload, link: "/teacher/announcements" }, { excludeUserId: session.userId });
+    await notifyUsers(adminIds, { ...payload, link: "/admin/announcements" }, { excludeUserId: session.userId });
+
     return NextResponse.json({ announcement }, { status: 201 });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {

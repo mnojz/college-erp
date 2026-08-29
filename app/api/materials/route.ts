@@ -8,6 +8,7 @@ import {
   serializeStudyMaterial,
   viewerAccessScopes,
 } from "@/app/lib/materials-server";
+import { notifyUsers, studentUserIdsForMaterial } from "@/app/lib/notify";
 
 /**
  * GET /api/materials
@@ -131,31 +132,68 @@ export async function POST(request: Request) {
     }
 
     const bytes = Buffer.from(await data.file.arrayBuffer());
-    const material = await prisma.studyMaterial.create({
-      data: {
-        title: data.title,
-        description: data.description,
-        topic: data.topic,
-        materialType: data.materialType as never,
-        visibility: data.visibility as never,
-        departmentName: data.departmentName,
-        programId: data.programId,
-        semester: data.semester,
-        subjectId: data.subjectId,
-        fileName: data.file.name,
-        mimeType: data.file.type || null,
-        fileSize: bytes.byteLength,
-        fileData: bytes,
-        uploaderId: session.userId,
-        classLinks:
-          data.visibility === "CLASSES"
-            ? { create: [...new Set(data.classIds)].map((classId) => ({ classId })) }
-            : undefined,
-      },
-      select: { id: true },
-    });
+    const createdId = (
+      await prisma.studyMaterial.create({
+        data: {
+          title: data.title,
+          description: data.description,
+          topic: data.topic,
+          materialType: data.materialType as never,
+          visibility: data.visibility as never,
+          departmentName: data.departmentName,
+          programId: data.programId,
+          semester: data.semester,
+          subjectId: data.subjectId,
+          fileName: data.file.name,
+          mimeType: data.file.type || null,
+          fileSize: bytes.byteLength,
+          fileData: bytes,
+          uploaderId: session.userId,
+          classLinks:
+            data.visibility === "CLASSES"
+              ? { create: [...new Set(data.classIds)].map((classId) => ({ classId })) }
+              : undefined,
+        },
+        select: { id: true },
+      })
+    ).id;
 
-    return NextResponse.json({ message: "Study material uploaded", material }, { status: 201 });
+    // Notify the students who can see this material, per its visibility.
+    try {
+      const created = await prisma.studyMaterial.findUnique({
+        where: { id: createdId },
+        select: {
+          title: true,
+          visibility: true,
+          programId: true,
+          semester: true,
+          subjectId: true,
+          subject: { select: { code: true, name: true } },
+          classLinks: { select: { class: { select: { programId: true, semester: true } } } },
+        },
+      });
+      if (created) {
+        const studentIds = await studentUserIdsForMaterial(created);
+        const subjectLabel = created.subject
+          ? `${created.subject.code} — ${created.subject.name}`
+          : data.title;
+        await notifyUsers(
+          studentIds,
+          {
+            type: "material",
+            title: `New material in ${subjectLabel}`,
+            body: data.title,
+            link: "/student/notes",
+          },
+          { excludeUserId: session.userId },
+        );
+      }
+    } catch (notifyError) {
+      // Notifications are best-effort; never fail the upload for them.
+      console.error("material notification error:", notifyError);
+    }
+
+    return NextResponse.json({ message: "Study material uploaded", material: { id: createdId } }, { status: 201 });
   } catch (error) {
     console.error("POST /api/materials error:", error);
     return NextResponse.json({ error: "Unable to upload study material" }, { status: 500 });

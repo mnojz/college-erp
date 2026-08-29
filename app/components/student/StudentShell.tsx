@@ -1,6 +1,7 @@
 "use client";
 
 import { DashboardShell } from "@/app/components/layout/DashboardShell";
+
 import {
   IconUser,
   IconReport,
@@ -50,7 +51,6 @@ export function StudentShell({
         userName: name,
         userSubtitle: `ID: ${studentId}`,
         avatarUrl,
-        notificationCount: 3,
       }}
       sidebarItems={studentLinks}
       activeHref={active}
