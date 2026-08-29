@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { IconLogin, IconSchool } from "@tabler/icons-react";
 import { ThemeToggle } from "@/app/components/common/ThemeToggle";
 
 export function PublicNavbar({
@@ -9,19 +10,7 @@ export function PublicNavbar({
       <div className="home-nav-container">
         <Link href="/" className="home-nav-brand">
           <span className="home-brand-icon">
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
-              <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
-            </svg>
+            <IconSchool size={22} />
           </span>
           <div className="home-brand-text">
             <strong>College-ERP</strong>
@@ -51,20 +40,7 @@ export function PublicNavbar({
             className="home-btn-signin"
             onClick={onSignInClick}
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
-              <polyline points="10 17 15 12 10 7"></polyline>
-              <line x1="15" y1="12" x2="3" y2="12"></line>
-            </svg>
+            <IconLogin size={16} />
             <span>Sign In</span>
           </button>
         </div>

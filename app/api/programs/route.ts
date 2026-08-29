@@ -8,7 +8,7 @@ type ProgramBody = {
   name?: unknown;
   code?: unknown;
   durationYears?: unknown;
-  departmentName?: unknown;
+  departmentId?: unknown;
 };
 
 export async function POST(request: Request) {
@@ -26,18 +26,23 @@ export async function POST(request: Request) {
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
   const durationYears = typeof body.durationYears === "number" ? body.durationYears : 0;
-  const departmentName = typeof body.departmentName === "string" ? body.departmentName.trim() : "";
+  const departmentId = typeof body.departmentId === "string" ? body.departmentId.trim() : "";
 
-  if (!name || !code || !departmentName || !Number.isInteger(durationYears) || durationYears < 1) {
+  if (!name || !code || !departmentId || !Number.isInteger(durationYears) || durationYears < 1) {
     return NextResponse.json(
-      { error: "Name, code, department name, and a positive duration are required" },
+      { error: "Name, code, department, and a positive duration are required" },
       { status: 400 },
     );
   }
 
+  const department = await prisma.department.findUnique({ where: { id: departmentId } });
+  if (!department) {
+    return NextResponse.json({ error: "Selected department does not exist" }, { status: 400 });
+  }
+
   try {
     const program = await prisma.program.create({
-      data: { name, code, durationYears, departmentName },
+      data: { name, code, durationYears, departmentId, departmentName: department.name },
     });
     return NextResponse.json({ program }, { status: 201 });
   } catch (error) {
@@ -64,19 +69,24 @@ export async function PUT(request: Request) {
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
   const durationYears = typeof body.durationYears === "number" ? body.durationYears : 0;
-  const departmentName = typeof body.departmentName === "string" ? body.departmentName.trim() : "";
+  const departmentId = typeof body.departmentId === "string" ? body.departmentId.trim() : "";
 
-  if (!id || !name || !code || !departmentName || !Number.isInteger(durationYears) || durationYears < 1) {
+  if (!id || !name || !code || !departmentId || !Number.isInteger(durationYears) || durationYears < 1) {
     return NextResponse.json(
-      { error: "Program ID, name, code, department name, and a positive duration are required" },
+      { error: "Program ID, name, code, department, and a positive duration are required" },
       { status: 400 },
     );
+  }
+
+  const department = await prisma.department.findUnique({ where: { id: departmentId } });
+  if (!department) {
+    return NextResponse.json({ error: "Selected department does not exist" }, { status: 400 });
   }
 
   try {
     const program = await prisma.program.update({
       where: { id },
-      data: { name, code, durationYears, departmentName },
+      data: { name, code, durationYears, departmentId, departmentName: department.name },
     });
     return NextResponse.json({ program }, { status: 200 });
   } catch (error) {

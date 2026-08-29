@@ -68,12 +68,23 @@ model User {
   notifications         Notification[]
 }
 
+model Department {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  code      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  programs  Program[]
+}
+
 model Program {
   id             String          @id @default(cuid())
   name           String
   code           String          @unique
   durationYears  Int             @default(4)
   departmentName String
+  departmentId   String?
+  department     Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   students       Student[]
   subjects       Subject[]
   classes        Class[]
@@ -85,22 +96,43 @@ model Program {
 }
 
 model Student {
-  id                      String             @id @default(cuid())
-  userId                  String             @unique
-  enrollmentNumber        String             @unique
-  registrationId          String             @unique
-  rollNumber              String?            @unique
+  id                      String   @id @default(cuid())
+  userId                  String   @unique
+  enrollmentNumber        String   @unique
+  registrationId          String   @unique
+  rollNumber              String?  @unique
   profileImageUrl         String?
   programId               String?
-  currentSemester         Int?               @default(1)
+  currentSemester         Int?     @default(1)
   admissionDate           DateTime
-  programEnrollmentStatus String             @default("ENROLLED")
-  user                    User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  program                 Program?           @relation(fields: [programId], references: [id], onDelete: SetNull)
-  attendanceRecords       AttendanceRecord[]
-  results                 Result[]
-  createdAt               DateTime           @default(now())
-  updatedAt               DateTime           @updatedAt
+  programEnrollmentStatus String   @default("ENROLLED")
+
+  // Personal information — critical, set by admin only (student cannot edit).
+  gender      String?
+  bloodGroup  String?
+  nationality String?
+  religion    String?
+  category    String?
+
+  // Contact details — set/edited by the student themselves.
+  phone            String?
+  currentAddress   String?
+  permanentAddress String?
+  emergencyContact String?
+
+  // Guardian / parent details — set/edited by the student.
+  fatherName       String?
+  motherName       String?
+  guardianPhone    String?
+  guardianEmail    String?
+  guardianRelation String?
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  program           Program?           @relation(fields: [programId], references: [id], onDelete: SetNull)
+  attendanceRecords AttendanceRecord[]
+  results           Result[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   @@index([programId])
   @@index([currentSemester])

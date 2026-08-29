@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import {
   IconAlertTriangle,
   IconCircleCheck,
+  IconPencil,
   IconPlus,
   IconSearch,
+  IconTrash,
   IconX,
 } from "@tabler/icons-react";
 import { AdminShell } from "@/app/components/admin/AdminShell";
@@ -39,6 +41,10 @@ type StudentItem = {
   admissionDate: string;
   programId: string | null;
   currentSemester: number | null;
+  gender: string | null;
+  nationality: string | null;
+  religion: string | null;
+  category: string | null;
   program: { id: string; name: string; code: string } | null;
   user: {
     id: string;
@@ -95,6 +101,11 @@ const studentEmpty = {
   programId: "",
   currentSemester: "1",
   profileImageUrl: "",
+  // Critical personal information — admin-entered only.
+  gender: "",
+  nationality: "",
+  religion: "",
+  category: "",
 };
 
 /**
@@ -595,6 +606,10 @@ export default function AdminPeoplePage() {
       programId: student.programId || "",
       currentSemester: student.currentSemester ? String(student.currentSemester) : "1",
       profileImageUrl: student.profileImageUrl || "",
+      gender: student.gender || "",
+      nationality: student.nationality || "",
+      religion: student.religion || "",
+      category: student.category || "",
     });
   }
 
@@ -725,6 +740,10 @@ export default function AdminPeoplePage() {
         programId: editingStudent.programId || undefined,
         currentSemester: editingStudent.currentSemester ? Number(editingStudent.currentSemester) : undefined,
         profileImageUrl: editingStudent.profileImageUrl || undefined,
+        gender: editingStudent.gender || undefined,
+        nationality: editingStudent.nationality || undefined,
+        religion: editingStudent.religion || undefined,
+        category: editingStudent.category || undefined,
       };
       if (editingStudent.password) {
         payload.password = editingStudent.password;
@@ -836,7 +855,8 @@ export default function AdminPeoplePage() {
               setError("");
             }}
           >
-            + Add Teacher
+            <IconPlus size={15} aria-hidden="true" />
+            Add Teacher
           </button>
           <button
             className="btn-add"
@@ -847,7 +867,8 @@ export default function AdminPeoplePage() {
               setError("");
             }}
           >
-            + Add Student
+            <IconPlus size={15} aria-hidden="true" />
+            Add Student
           </button>
         </div>
       </div>
@@ -959,10 +980,7 @@ export default function AdminPeoplePage() {
                           title="Edit Faculty Profile"
                           aria-label="Edit Faculty Profile"
                         >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                          </svg>
+                          <IconPencil size={15} />
                         </button>
                         <button
                           type="button"
@@ -978,12 +996,7 @@ export default function AdminPeoplePage() {
                           title="Delete Faculty Account"
                           aria-label="Delete Faculty Account"
                         >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                            <line x1="10" y1="11" x2="10" y2="17"></line>
-                            <line x1="14" y1="11" x2="14" y2="17"></line>
-                          </svg>
+                          <IconTrash size={15} />
                         </button>
                       </div>
                     </td>
@@ -1096,10 +1109,7 @@ export default function AdminPeoplePage() {
                           title="Edit Student Profile"
                           aria-label="Edit Student Profile"
                         >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                          </svg>
+                          <IconPencil size={15} />
                         </button>
                         <button
                           type="button"
@@ -1115,12 +1125,7 @@ export default function AdminPeoplePage() {
                           title="Delete Student Account"
                           aria-label="Delete Student Account"
                         >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                            <line x1="10" y1="11" x2="10" y2="17"></line>
-                            <line x1="14" y1="11" x2="14" y2="17"></line>
-                          </svg>
+                          <IconTrash size={15} />
                         </button>
                       </div>
                     </td>
@@ -1218,7 +1223,12 @@ export default function AdminPeoplePage() {
 
             <div className="modal-actions">
               <button className="btn-primary" type="submit" disabled={saving}>
-                {saving ? "Creating…" : "+ Create Faculty Account"}
+                {saving ? "Creating…" : (
+                  <>
+                    <IconPlus size={15} aria-hidden="true" />
+                    Create Faculty Account
+                  </>
+                )}
               </button>
               <button
                 className="btn-ghost"
@@ -1463,6 +1473,56 @@ export default function AdminPeoplePage() {
               </label>
             </div>
 
+            <p className="form-hint" style={{ marginTop: 2 }}>
+              Personal information below is critical — only admins can set it, students cannot
+              change it later. Contact &amp; guardian details are filled in by the student from
+              their own profile.
+            </p>
+            <div className="inline-pair">
+              <label>
+                Gender
+                <select
+                  value={studentForm.gender}
+                  onChange={(e) => setStudentForm({ ...studentForm, gender: e.target.value })}
+                >
+                  <option value="">Not specified</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </label>
+              <label>
+                Category
+                <input
+                  type="text"
+                  placeholder="e.g. Open, Reserved"
+                  value={studentForm.category}
+                  onChange={(e) => setStudentForm({ ...studentForm, category: e.target.value })}
+                />
+              </label>
+            </div>
+
+            <div className="inline-pair">
+              <label>
+                Nationality
+                <input
+                  type="text"
+                  placeholder="e.g. Nepali"
+                  value={studentForm.nationality}
+                  onChange={(e) => setStudentForm({ ...studentForm, nationality: e.target.value })}
+                />
+              </label>
+              <label>
+                Religion
+                <input
+                  type="text"
+                  placeholder="e.g. Hindu"
+                  value={studentForm.religion}
+                  onChange={(e) => setStudentForm({ ...studentForm, religion: e.target.value })}
+                />
+              </label>
+            </div>
+
             <ImageUploadCrop
               label="Profile Photo (Crop to Square)"
               value={studentForm.profileImageUrl || ""}
@@ -1473,7 +1533,12 @@ export default function AdminPeoplePage() {
 
             <div className="modal-actions">
               <button className="btn-primary" type="submit" disabled={saving}>
-                {saving ? "Creating…" : "+ Create Student Account"}
+                {saving ? "Creating…" : (
+                  <>
+                    <IconPlus size={15} aria-hidden="true" />
+                    Create Student Account
+                  </>
+                )}
               </button>
               <button
                 className="btn-ghost"
@@ -1614,6 +1679,55 @@ export default function AdminPeoplePage() {
                     </option>
                   ))}
                 </select>
+              </label>
+            </div>
+
+            <p className="form-hint" style={{ marginTop: 2 }}>
+              Personal information below is critical — only admins can set it, students cannot
+              change it later.
+            </p>
+            <div className="inline-pair">
+              <label>
+                Gender
+                <select
+                  value={editingStudent.gender}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, gender: e.target.value })}
+                >
+                  <option value="">Not specified</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </label>
+              <label>
+                Category
+                <input
+                  type="text"
+                  placeholder="e.g. Open, Reserved"
+                  value={editingStudent.category}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, category: e.target.value })}
+                />
+              </label>
+            </div>
+
+            <div className="inline-pair">
+              <label>
+                Nationality
+                <input
+                  type="text"
+                  placeholder="e.g. Nepali"
+                  value={editingStudent.nationality}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, nationality: e.target.value })}
+                />
+              </label>
+              <label>
+                Religion
+                <input
+                  type="text"
+                  placeholder="e.g. Hindu"
+                  value={editingStudent.religion}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, religion: e.target.value })}
+                />
               </label>
             </div>
 

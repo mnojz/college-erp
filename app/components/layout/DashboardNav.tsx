@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { IconSchool } from "@tabler/icons-react";
 import { ThemeToggle } from "@/app/components/common/ThemeToggle";
 import { NotificationDropdown } from "@/app/components/common/NotificationDropdown";
 
@@ -52,19 +53,7 @@ export function DashboardNav({
           className="home-brand-icon"
           style={{ width: 38, height: 38, borderRadius: "10px", background: brandIconBg }}
         >
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M22 10v6M 2 10l10-5 10 5-10 5z"></path>
-            <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
-          </svg>
+          <IconSchool size={22} />
         </span>
         <div className="home-brand-text">
           <strong>{brandTitle}</strong>

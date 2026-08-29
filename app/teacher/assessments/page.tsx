@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { IconPlus } from "@tabler/icons-react";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
 
 type Student = {
@@ -395,7 +396,14 @@ export default function TeacherAssessmentsPage() {
                 cursor: "pointer",
               }}
             >
-              {isCreatingAssessment ? "Creating Assessment..." : "+ Create Assessment"}
+              {isCreatingAssessment ? (
+                "Creating Assessment..."
+              ) : (
+                <>
+                  <IconPlus size={14} aria-hidden="true" />
+                  Create Assessment
+                </>
+              )}
             </button>
           </form>
         </section>

@@ -2045,6 +2045,27 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
   height: 100%;
 }
 
+/* Single-column scrollable list inside the "All Announcements" popup. */
+.notice-all-modal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Student dashboard "latest announcements" row — 3–4 cards per line,
+   collapsing naturally on narrower screens. Cards use the compact variant. */
+.notice-latest-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 560px) {
+  .notice-latest-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ─── Course Structure Viewer ────────────────────────────────── */
 /* Timetable: weekdays as rows, time flowing horizontally */
 .tt-scroll {

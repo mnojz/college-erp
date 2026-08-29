@@ -4,8 +4,15 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
-import { AssetIcon, studentAssets } from "@/app/components/student/assets";
-import { IconClipboardCheck, IconTarget, IconArrowRight } from "@tabler/icons-react";
+import {
+  IconArrowRight,
+  IconBook,
+  IconCalendarCheck,
+  IconClipboardCheck,
+  IconReportAnalytics,
+  IconTarget,
+  IconUser,
+} from "@tabler/icons-react";
 
 type TeacherData = {
   id: string;
@@ -169,11 +176,11 @@ export default function TeacherOverviewPage() {
           </div>
           <div className="profile-meta-row">
             <span>
-              <AssetIcon src={studentAssets.academic} size={16} />
+              <IconBook size={16} />
               {departmentName}
             </span>
             <span>
-              <AssetIcon src={studentAssets.user} size={16} />
+              <IconUser size={16} />
               Employee ID: <strong>{data.employeeNo}</strong>
             </span>
           </div>
@@ -194,7 +201,7 @@ export default function TeacherOverviewPage() {
               textDecoration: "none",
             }}
           >
-            <AssetIcon src={studentAssets.attendance} size={16} />
+            <IconCalendarCheck size={16} />
             Take Attendance
           </Link>
           <Link
@@ -213,7 +220,7 @@ export default function TeacherOverviewPage() {
               textDecoration: "none",
             }}
           >
-            <AssetIcon src={studentAssets.result} size={16} />
+            <IconReportAnalytics size={16} />
             Manage Grades
           </Link>
         </div>

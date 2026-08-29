@@ -22,21 +22,32 @@ const parseTime = (timeStr: string) => {
 async function main() {
   console.log("🌱 Starting database seeding...");
 
+  // ─── Departments ────────────────────────────────────────────
+  await prisma.department.upsert({
+    where: { code: "ENG" },
+    update: { name: "Engineering" },
+    create: { name: "Engineering", code: "ENG" },
+  });
+
   // ─── Programs ───────────────────────────────────────────────
+  const engineering = await prisma.department.findUnique({ where: { code: "ENG" } });
+  if (!engineering) throw new Error("Engineering department missing after seed upsert");
+  const engineeringLink = { departmentId: engineering.id, departmentName: engineering.name };
+
   const bct = await prisma.program.upsert({
     where: { code: "BCT" },
-    update: {},
-    create: { name: "B.E. Degree in Computer Engineering", code: "BCT", durationYears: 4, departmentName: "Engineering" },
+    update: { departmentId: engineering.id, departmentName: engineering.name },
+    create: { name: "B.E. Degree in Computer Engineering", code: "BCT", durationYears: 4, ...engineeringLink },
   });
   await prisma.program.upsert({
     where: { code: "BCE" },
-    update: {},
-    create: { name: "Civil", code: "BCE", durationYears: 4, departmentName: "Engineering" },
+    update: { departmentId: engineering.id, departmentName: engineering.name },
+    create: { name: "Civil", code: "BCE", durationYears: 4, ...engineeringLink },
   });
   await prisma.program.upsert({
     where: { code: "BE. ARCH" },
-    update: {},
-    create: { name: "Architecture", code: "BE. ARCH", durationYears: 4, departmentName: "Engineering" },
+    update: { departmentId: engineering.id, departmentName: engineering.name },
+    create: { name: "Architecture", code: "BE. ARCH", durationYears: 4, ...engineeringLink },
   });
     console.log("✅ Programs: BCT, BCE, BE ARCH");
 

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminShell } from "@/app/components/admin/AdminShell";
-import { IconX } from "@tabler/icons-react";
+import { IconPlus, IconX } from "@tabler/icons-react";
 
 type Program = {
   id: string;
@@ -387,9 +387,17 @@ export default function AdminCurriculumPage() {
           <button
             type="button"
             onClick={addYear}
-            style={{ ...inputStyle, width: "auto", cursor: "pointer" }}
+            style={{
+              ...inputStyle,
+              width: "auto",
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+            }}
           >
-            + Add Year
+            <IconPlus size={14} aria-hidden="true" />
+            Add Year
           </button>
 
           <button
@@ -562,9 +570,18 @@ export default function AdminCurriculumPage() {
               <button
                 type="button"
                 onClick={() => addSemester(yi)}
-                style={{ ...inputStyle, width: "auto", justifySelf: "start", cursor: "pointer" }}
+                style={{
+                  ...inputStyle,
+                  width: "auto",
+                  justifySelf: "start",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
               >
-                + Add Semester
+                <IconPlus size={14} aria-hidden="true" />
+                Add Semester
               </button>
             </section>
           ))}

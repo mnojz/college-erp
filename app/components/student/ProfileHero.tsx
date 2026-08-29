@@ -1,4 +1,4 @@
-import { AssetIcon, studentAssets } from "./assets";
+import { IconCalendar, IconPencil, IconPointFilled, IconSchool } from "@tabler/icons-react";
 
 type ProfileHeroProps = {
   name: string;
@@ -9,6 +9,7 @@ type ProfileHeroProps = {
   admissionNo: string;
   rollNumber: string | null;
   profileImageUrl: string | null;
+  onEdit?: () => void;
 };
 
 export function ProfileHero({
@@ -20,6 +21,7 @@ export function ProfileHero({
   admissionNo,
   rollNumber,
   profileImageUrl,
+  onEdit,
 }: ProfileHeroProps) {
   const studentId = rollNumber || admissionNo;
   const initials = name
@@ -50,16 +52,17 @@ export function ProfileHero({
         <div className="profile-name-row">
           <h1>{name}</h1>
           <span className={`badge ${status.toUpperCase() === "ACTIVE" ? "badge-green" : "badge-slate"}`}>
-            ● {status}
+            <IconPointFilled size={10} />
+            {status}
           </span>
         </div>
         <div className="profile-meta-row">
           <span>
-            <AssetIcon src={studentAssets.school} size={14} />
+            <IconSchool size={14} />
             {department || "Department not assigned"}
           </span>
           <span>
-            <AssetIcon src={studentAssets.calendar} size={14} />
+            <IconCalendar size={14} />
             {program || "Program not assigned"}
           </span>
         </div>
@@ -71,12 +74,8 @@ export function ProfileHero({
       </div>
 
       <div className="profile-hero-actions">
-        <button type="button">
-          <AssetIcon src={studentAssets.download} size={16} />
-          Download ID Card
-        </button>
-        <button className="profile-edit-button" type="button">
-          <AssetIcon src={studentAssets.edit} size={16} />
+        <button className="profile-edit-button" type="button" onClick={onEdit}>
+          <IconPencil size={16} />
           Edit Profile
         </button>
       </div>

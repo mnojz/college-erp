@@ -15,6 +15,11 @@ type CreateStudentBody = {
   admissionDate?: unknown;
   programId?: unknown;
   currentSemester?: unknown;
+  // Critical personal information — admin-entered only.
+  gender?: unknown;
+  nationality?: unknown;
+  religion?: unknown;
+  category?: unknown;
 };
 
 type UpdateStudentBody = {
@@ -30,6 +35,11 @@ type UpdateStudentBody = {
   admissionDate?: unknown;
   programId?: unknown;
   currentSemester?: unknown;
+  // Critical personal information — admin-entered only.
+  gender?: unknown;
+  nationality?: unknown;
+  religion?: unknown;
+  category?: unknown;
 };
 
 export async function POST(request: Request) {
@@ -60,6 +70,10 @@ export async function POST(request: Request) {
       : typeof body.currentSemester === "string" && body.currentSemester !== ""
         ? Number(body.currentSemester)
         : undefined;
+  const gender = typeof body.gender === "string" ? body.gender.trim() || null : null;
+  const nationality = typeof body.nationality === "string" ? body.nationality.trim() || null : null;
+  const religion = typeof body.religion === "string" ? body.religion.trim() || null : null;
+  const category = typeof body.category === "string" ? body.category.trim() || null : null;
 
   if (!email || !password || !firstName || !lastName || !enrollmentNumber || !registrationId || !admissionDate) {
     return NextResponse.json(
@@ -95,10 +109,11 @@ export async function POST(request: Request) {
         data: { email, passwordHash: await hash(password, 12), firstName, lastName, role: "STUDENT" },
       });
       return tx.student.create({
-        data: { userId: user.id, enrollmentNumber, registrationId, rollNumber, profileImageUrl, admissionDate, programId, currentSemester },
+        data: { userId: user.id, enrollmentNumber, registrationId, rollNumber, profileImageUrl, admissionDate, programId, currentSemester, gender, nationality, religion, category },
         select: {
           id: true, enrollmentNumber: true, registrationId: true, rollNumber: true, profileImageUrl: true,
           admissionDate: true, programId: true, currentSemester: true,
+          gender: true, nationality: true, religion: true, category: true,
           user: { select: { id: true, email: true, firstName: true, lastName: true, role: true } },
         },
       });
@@ -145,6 +160,10 @@ export async function PUT(request: Request) {
       : typeof body.currentSemester === "string" && body.currentSemester !== ""
         ? Number(body.currentSemester)
         : null;
+  const gender = typeof body.gender === "string" ? body.gender.trim() || null : null;
+  const nationality = typeof body.nationality === "string" ? body.nationality.trim() || null : null;
+  const religion = typeof body.religion === "string" ? body.religion.trim() || null : null;
+  const category = typeof body.category === "string" ? body.category.trim() || null : null;
 
   if (!id || !email || !firstName || !lastName || !enrollmentNumber || !registrationId || !admissionDate) {
     return NextResponse.json(
@@ -210,6 +229,10 @@ export async function PUT(request: Request) {
           admissionDate,
           programId,
           currentSemester,
+          gender,
+          nationality,
+          religion,
+          category,
         },
         select: {
           id: true,
@@ -220,6 +243,10 @@ export async function PUT(request: Request) {
           admissionDate: true,
           programId: true,
           currentSemester: true,
+          gender: true,
+          nationality: true,
+          religion: true,
+          category: true,
           program: { select: { id: true, name: true, code: true } },
           user: { select: { id: true, email: true, firstName: true, lastName: true, status: true } },
         },
@@ -295,6 +322,7 @@ export async function GET() {
       select: {
         id: true, enrollmentNumber: true, registrationId: true, rollNumber: true,
         profileImageUrl: true, admissionDate: true, programId: true, currentSemester: true,
+        gender: true, nationality: true, religion: true, category: true,
         program: { select: { id: true, name: true, code: true } },
         user: { select: { id: true, email: true, firstName: true, lastName: true, status: true } },
       },
