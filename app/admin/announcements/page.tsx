@@ -214,7 +214,7 @@ export default function AdminAnnouncementsPage() {
       </div>
 
       {/* Announcements List */}
-      <div style={{ display: "grid", gap: "16px" }}>
+      <div className="admin-notice-grid">
         {announcements.length === 0 && !loading ? (
           <div className="admin-table-wrap">
             <div className="admin-table-empty">

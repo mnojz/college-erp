@@ -981,6 +981,16 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
   gap: 10px;
 }
 
+.admin-notice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+  gap: 16px;
+}
+
+.admin-notice-grid .notice-post {
+  height: 100%;
+}
+
 .btn-add {
   display: inline-flex;
   align-items: center;
@@ -1725,6 +1735,21 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
   border: 1px dashed var(--line);
   border-radius: 14px;
   color: var(--ink-soft);
+}
+
+.public-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 20px;
+}
+
+.notice-list {
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+}
+
+.notice-list .notice-post {
+  /* Cards fill the grid row height so edit actions line up */
+  height: 100%;
 }
 
 /* ─── Course Structure Viewer ────────────────────────────────── */
@@ -3624,11 +3649,18 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
   color: var(--ink-soft);
 }
 
+.notice-post-side {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+
 .notice-post-actions {
-  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .notice-post-title {
@@ -3739,6 +3771,10 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
 
   .notice-post-main {
     gap: 10px;
+  }
+
+  .notice-post-side {
+    gap: 8px;
   }
 
   .notice-post-thumb {

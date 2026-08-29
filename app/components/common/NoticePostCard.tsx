@@ -12,7 +12,8 @@ import { IconBell, IconFileText, IconZoomIn } from "@tabler/icons-react";
  * Post-style notice card: author byline, title, short body text and a small
  * square attachment preview on the right end. Clicking the card opens the
  * detail popup, where the full image is shown with a zoom/pan viewer.
- * `actions` is an optional slot for admin edit/delete controls.
+ * `actions` is an optional slot for admin edit/delete controls that are
+ * rendered inline to the right of the attachment thumbnail.
  */
 export function NoticePostCard({
   notice,
@@ -63,11 +64,6 @@ export function NoticePostCard({
             })}
           </span>
         </div>
-        {actions && (
-          <div className="notice-post-actions" onClick={(e) => e.stopPropagation()}>
-            {actions}
-          </div>
-        )}
       </div>
 
       <div className="notice-post-main">
@@ -76,31 +72,44 @@ export function NoticePostCard({
           <p className="notice-post-body">{notice.body}</p>
         </div>
 
-        {attachment && (
-          <div
-            className="notice-post-thumb"
-            aria-hidden="true"
-            title={`${attachment.fileName} · ${formatBytes(attachment.size)}`}
-          >
-            {isImage ? (
-              /* eslint-disable-next-line @next/next/no-img-element -- attachment streamed by our own API */
-              <img
-                src={noticeAttachmentUrl(notice.id, true)}
-                alt=""
-                loading="lazy"
-                draggable={false}
-              />
-            ) : (
-              <span className="notice-post-thumb-file">
-                <IconFileText size={24} aria-hidden="true" />
-                <small>
-                  {attachment.fileName.split(".").pop()?.slice(0, 4) ?? "FILE"}
-                </small>
-              </span>
+        {(attachment || actions) && (
+          <div className="notice-post-side">
+            {attachment && (
+              <div
+                className="notice-post-thumb"
+                aria-hidden="true"
+                title={`${attachment.fileName} · ${formatBytes(attachment.size)}`}
+              >
+                {isImage ? (
+                  /* eslint-disable-next-line @next/next/no-img-element -- attachment streamed by our own API */
+                  <img
+                    src={noticeAttachmentUrl(notice.id, true)}
+                    alt=""
+                    loading="lazy"
+                    draggable={false}
+                  />
+                ) : (
+                  <span className="notice-post-thumb-file">
+                    <IconFileText size={24} aria-hidden="true" />
+                    <small>
+                      {attachment.fileName.split(".").pop()?.slice(0, 4) ?? "FILE"}
+                    </small>
+                  </span>
+                )}
+                <span className="notice-post-thumb-overlay">
+                  <IconZoomIn size={16} aria-hidden="true" />
+                </span>
+              </div>
             )}
-            <span className="notice-post-thumb-overlay">
-              <IconZoomIn size={16} aria-hidden="true" />
-            </span>
+
+            {actions && (
+              <div
+                className="notice-post-actions"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {actions}
+              </div>
+            )}
           </div>
         )}
       </div>
