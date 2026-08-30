@@ -80,7 +80,7 @@ export default function TeacherAssessmentsPage() {
           profRes.status === 401 ||
           profRes.status === 403
         ) {
-          router.replace("/");
+          router.replace("/dashboard");
           return;
         }
 

@@ -58,7 +58,7 @@ export default function TeacherMaterialsPage() {
       try {
         const profileRes = await fetch("/api/teacher/profile");
         if (profileRes.status === 401 || profileRes.status === 403) {
-          router.replace("/");
+          router.replace("/dashboard");
           return;
         }
         const [materialsRes, metaRes] = await Promise.all([

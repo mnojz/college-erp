@@ -42,7 +42,7 @@ export default function StudentResultsPage() {
         ]);
 
         if (!profileRes.ok || !resultsRes.ok) {
-          router.replace("/");
+          router.replace("/dashboard");
           return;
         }
 

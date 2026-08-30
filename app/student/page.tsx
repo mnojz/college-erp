@@ -239,7 +239,7 @@ export default function StudentPage() {
       .then(async (response) => {
         const result = await response.json();
         if (!response.ok) {
-          router.replace("/");
+          router.replace("/dashboard");
           return;
         }
         setProfile(result.student);
@@ -273,7 +273,7 @@ export default function StudentPage() {
 
   return (
     <StudentShell
-      active="/student"
+      active="/dashboard"
       name={fullName}
       studentId={profile.rollNumber || profile.enrollmentNumber}
       avatarUrl={profile.profileImageUrl}

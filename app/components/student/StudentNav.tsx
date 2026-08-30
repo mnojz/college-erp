@@ -13,7 +13,7 @@ export function StudentNav({ name, studentId, avatarUrl }: StudentNavProps) {
     <DashboardNav
       brandTitle="College-ERP"
       brandSubtitle="Student Portal"
-      brandHomeHref="/student"
+      brandHomeHref="/dashboard"
       brandIconBg="#0284c7"
       userName={name}
       userSubtitle={`ID: ${studentId}`}

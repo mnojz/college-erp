@@ -12,7 +12,7 @@ import {
 } from "@tabler/icons-react";
 
 const adminLinks = [
-  ["Overview", "/admin", IconDashboard],
+  ["Overview", "/dashboard", IconDashboard],
   ["Departments & Programs", "/admin/setup", IconSchool],
   ["Curriculum", "/admin/curriculum", IconBooks],
   ["Syllabi", "/admin/syllabi", IconFileDescription],
@@ -37,7 +37,7 @@ export function AdminShell({
       navProps={{
         brandTitle: "College-ERP",
         brandSubtitle: "Administration",
-        brandHomeHref: "/admin",
+        brandHomeHref: "/dashboard",
         brandIconBg: "#0284c7",
         userName: "Administrator",
         userSubtitle: "Sign out",

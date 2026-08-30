@@ -506,8 +506,62 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
   place-items: center;
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.05em;
+    letter-spacing: 0.05em;
   flex-shrink: 0;
+}
+
+/* ─── User Account Dropdown ─────────────────────────────────────── */
+.student-nav-user-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.student-user-trigger {
+  gap: 8px;
+}
+
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 50;
+  min-width: 184px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-elevated);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+}
+
+.user-dropdown::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  right: 12px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid var(--line);
+}
+
+.user-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.user-dropdown-item:hover {
+  background: var(--table-row-hover);
 }
 
 /* ─── Sidebar & Workspace ─────────────────────────────────────── */

@@ -50,6 +50,14 @@ enum MaterialVisibility {
   CLASSES
 }
 
+// Visibility a user can assign to their own profile fields. "RESTRICTED"
+// fields are NOT stored with this enum — they are institution-controlled and
+// can never be made public by the owner (see ProfilePrivacy + field registry).
+enum FieldVisibility {
+  PUBLIC
+  PRIVATE
+}
+
 model User {
   id                    String          @id @default(cuid())
   email                 String          @unique
@@ -66,6 +74,7 @@ model User {
   uploadedMaterials     StudyMaterial[]
   bookmarks             Bookmark[]
   notifications         Notification[]
+  privacySettings       ProfilePrivacy[]
 }
 
 model Department {
@@ -143,6 +152,14 @@ model Teacher {
   userId          String           @unique
   employeeNo      String           @unique
   profileImageUrl String?
+
+  // Contact / professional details — edited by the teacher, visibility
+  // governed by the profile privacy system (app/lib/profile-shared.ts).
+  phone           String?
+  office          String?
+  qualification   String?
+  bio             String?
+
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   classes         Class[]
   announcements   Announcement[]
@@ -450,4 +467,23 @@ model Syllabus {
   @@index([programId, semester])
   @@index([semester])
   @@index([createdAt])
+}
+
+// ─── Profile privacy (who can see which profile field) ─────────
+// One row per USER-controlled profile field the owner has explicitly set.
+// An absent row means "use the registry default" (app/lib/profile-shared.ts).
+// RESTRICTED fields (roll number, category, guardian contacts, …) are never
+// stored here: their visibility is role policy and cannot be changed by the
+// profile owner.
+model ProfilePrivacy {
+  id         String          @id @default(cuid())
+  userId     String
+  fieldKey   String
+  visibility FieldVisibility
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, fieldKey])
+  @@index([userId])
 }

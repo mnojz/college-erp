@@ -64,7 +64,7 @@ export default function AdminSetupPage() {
     async function load() {
       const me = await fetch("/api/auth/me");
       if (!me.ok || (await me.json()).user.role !== "ADMIN") {
-        router.replace("/");
+        router.replace("/dashboard");
         return;
       }
       await refresh();

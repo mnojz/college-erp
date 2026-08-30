@@ -87,7 +87,7 @@ export default function StudentSubjectsPage() {
         ]);
 
         if (profileRes.status === 401 || profileRes.status === 403) {
-          router.replace("/");
+          router.replace("/dashboard");
           return;
         }
         if (!profileRes.ok || !subjectsRes.ok || !classesRes.ok) {

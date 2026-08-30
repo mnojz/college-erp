@@ -73,7 +73,7 @@ export default function StudentNotesPage() {
       try {
         const profileRes = await fetch("/api/student/profile");
         if (profileRes.status === 401 || profileRes.status === 403) {
-          router.replace("/");
+          router.replace("/dashboard");
           return;
         }
         const [materialsRes, metaRes, subjectsRes] = await Promise.all([

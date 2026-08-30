@@ -107,7 +107,7 @@ export default function AdminAnnouncementsPage() {
       try {
         const me = await fetch("/api/auth/me");
         if (!me.ok || (await me.json()).user.role !== "ADMIN") {
-          router.replace("/");
+          router.replace("/dashboard");
           return;
         }
         const res = await fetch("/api/announcements");

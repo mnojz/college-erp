@@ -13,7 +13,7 @@ import {
 } from "@tabler/icons-react";
 
 const studentLinks = [
-  ["Profile", "/student", IconUser],
+  ["Profile", "/dashboard", IconUser],
   ["Result", "/student/results", IconReport],
   ["Attendance", "/student/attendance", IconCalendarCheck],
   ["Subjects", "/student/subjects", IconBook2],
@@ -46,7 +46,7 @@ export function StudentShell({
       navProps={{
         brandTitle: "College-ERP",
         brandSubtitle: "Student Portal",
-        brandHomeHref: "/student",
+        brandHomeHref: "/dashboard",
         brandIconBg: "#0284c7",
         userName: name,
         userSubtitle: `ID: ${studentId}`,

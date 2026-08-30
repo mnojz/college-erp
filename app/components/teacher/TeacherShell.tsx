@@ -21,7 +21,7 @@ type TeacherShellProps = {
 };
 
 const teacherLinks = [
-  ["Overview", "/teacher", IconDashboard],
+  ["Overview", "/dashboard", IconDashboard],
   ["Attendance", "/teacher/attendance", IconCalendarCheck],
   ["Class Schedule", "/teacher/schedule", IconCalendarClock],
   ["Assessments & Marks", "/teacher/assessments", IconClipboardCheck],
@@ -43,7 +43,7 @@ export function TeacherShell({
       navProps={{
         brandTitle: "College-ERP",
         brandSubtitle: "Faculty Portal",
-        brandHomeHref: "/teacher",
+        brandHomeHref: "/dashboard",
         brandIconBg: "#0ea5e9",
         userName: teacherName,
         userSubtitle: `Emp ID: ${employeeNo}`,

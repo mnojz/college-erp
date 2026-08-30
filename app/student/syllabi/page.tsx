@@ -33,11 +33,11 @@ export default function StudentSyllabiPage() {
       try {
         const me = await fetch("/api/auth/me");
         if (!me.ok || (await me.json()).user.role !== "STUDENT") {
-          router.replace("/");
+          router.replace("/dashboard");
           return;
         }
       } catch {
-        router.replace("/");
+        router.replace("/dashboard");
         return;
       }
       try {

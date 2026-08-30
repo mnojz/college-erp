@@ -50,11 +50,11 @@ export default function AdminSyllabiPage() {
       try {
         const me = await fetch("/api/auth/me");
         if (!me.ok || (await me.json()).user.role !== "ADMIN") {
-          router.replace("/");
+          router.replace("/dashboard");
           return;
         }
       } catch {
-        router.replace("/");
+        router.replace("/dashboard");
         return;
       }
 

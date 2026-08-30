@@ -53,7 +53,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
         return;
       }
       setShowLoginModal(false);
-      router.push(result.user.role === "ADMIN" ? "/admin" : result.user.role === "TEACHER" ? "/teacher" : "/student");
+      router.push("/dashboard");
       router.refresh();
     } catch {
       setError("Unable to reach the server");

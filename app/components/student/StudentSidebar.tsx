@@ -12,7 +12,7 @@ import {
 } from "@tabler/icons-react";
 
 const items = [
-  ["Profile", "/student", IconUser],
+  ["Profile", "/dashboard", IconUser],
   ["Result", "/student/results", IconReport],
   ["Attendance", "/student/attendance", IconCalendarCheck],
   ["Subjects", "/student/subjects", IconBook2],

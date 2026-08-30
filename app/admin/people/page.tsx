@@ -504,7 +504,7 @@ export default function AdminPeoplePage() {
       try {
         const me = await fetch("/api/auth/me");
         if (!me.ok || (await me.json()).user.role !== "ADMIN") {
-          router.replace("/");
+          router.replace("/dashboard");
           return;
         }
         const [tRes, sRes, pRes, subRes] = await Promise.all([

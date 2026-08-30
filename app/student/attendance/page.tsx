@@ -41,7 +41,7 @@ export default function StudentAttendancePage() {
         ]);
 
         if (!profileRes.ok || !attRes.ok) {
-          router.replace("/");
+          router.replace("/dashboard");
           return;
         }
 

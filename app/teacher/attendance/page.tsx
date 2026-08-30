@@ -60,7 +60,7 @@ export default function TeacherAttendancePage() {
         ]);
 
         if (attRes.status === 403 || attRes.status === 401 || profRes.status === 403 || profRes.status === 401) {
-          router.replace("/");
+          router.replace("/dashboard");
           return;
         }
 

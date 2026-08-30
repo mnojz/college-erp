@@ -52,7 +52,7 @@ export default function StudentSchedulesPage() {
         ]);
 
         if (!profileRes.ok || !classesRes.ok) {
-          router.replace("/");
+          router.replace("/dashboard");
           return;
         }
 

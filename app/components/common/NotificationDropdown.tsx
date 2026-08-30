@@ -43,13 +43,8 @@ const timeAgo = (iso: string) => {
   return `${d}d ago`;
 };
 
-/** Fallback landing page when a notification has no link — role-aware. */
-const defaultNotificationHref = () => {
-  const path = typeof window !== "undefined" ? window.location.pathname : "";
-  if (path.startsWith("/teacher")) return "/teacher";
-  if (path.startsWith("/admin")) return "/admin";
-  return "/student";
-};
+/** Fallback landing page when a notification has no link — all roles use /dashboard. */
+const defaultNotificationHref = () => "/dashboard";
 
 export type NotificationDropdownProps = {
   compact?: boolean;

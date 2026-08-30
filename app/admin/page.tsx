@@ -139,9 +139,9 @@ export default function AdminPage() {
   useEffect(() => {
     async function load() {
       const me = await fetch("/api/auth/me");
-      if (!me.ok) return router.replace("/");
+      if (!me.ok) return router.replace("/dashboard");
       const user = await me.json();
-      if (user.user.role !== "ADMIN") return router.replace("/");
+      if (user.user.role !== "ADMIN") return router.replace("/dashboard");
 
       const endpoints = ["students", "teachers", "programs", "subjects", "classes", "assessments"];
       const responses = await Promise.all(endpoints.map((ep) => fetch(`/api/${ep}`)));
@@ -162,7 +162,7 @@ export default function AdminPage() {
   }, [router]);
 
   return (
-    <AdminShell title="College Overview" subtitle="Administration" active="/admin">
+    <AdminShell title="College Overview" subtitle="Administration" active="/dashboard">
       {/* Hero Banner */}
       <section className="admin-welcome">
         <div>

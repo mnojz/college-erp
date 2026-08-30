@@ -284,7 +284,7 @@ export async function POST(request: Request) {
           type: "notice",
           title: `New notice in ${subjectInfo?.code ?? "your subject"} — ${subjectInfo?.name ?? ""}`.replace(/ — $/, ""),
           body: title,
-          link: "/student",
+          link: "/dashboard",
         },
         { excludeUserId: session.userId },
       );
@@ -309,7 +309,7 @@ export async function POST(request: Request) {
       title: "New campus announcement",
       body: title,
     } as const;
-    await notifyUsers(studentIds, { ...payload, link: "/student" }, { excludeUserId: session.userId });
+    await notifyUsers(studentIds, { ...payload, link: "/dashboard" }, { excludeUserId: session.userId });
     await notifyUsers(teacherIds, { ...payload, link: "/teacher/announcements" }, { excludeUserId: session.userId });
     await notifyUsers(adminIds, { ...payload, link: "/admin/announcements" }, { excludeUserId: session.userId });
 

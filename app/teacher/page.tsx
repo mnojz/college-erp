@@ -57,7 +57,7 @@ export default function TeacherOverviewPage() {
       try {
         const response = await fetch("/api/teacher/profile");
         if (response.status === 401 || response.status === 403) {
-          router.replace("/");
+          router.replace("/dashboard");
           return;
         }
         const resJson = await response.json();
@@ -84,7 +84,7 @@ export default function TeacherOverviewPage() {
         <button
           className="primary-button"
           type="button"
-          onClick={() => router.replace("/")}
+          onClick={() => router.replace("/dashboard")}
           style={{ marginTop: "16px" }}
         >
           Back to Login
@@ -120,7 +120,7 @@ export default function TeacherOverviewPage() {
 
   return (
     <TeacherShell
-      active="/teacher"
+      active="/dashboard"
       title="Faculty Overview & Workspace"
       subtitle="Teacher Portal"
       teacherName={fullName}
