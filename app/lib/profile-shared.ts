@@ -59,7 +59,7 @@ export const STUDENT_PROFILE_FIELDS: ProfileFieldDef[] = [
   { key: "registrationId",          label: "Registration ID",   section: "academic", control: "RESTRICTED", defaultVisibility: "PRIVATE", restrictedViewers: FACULTY_AND_ADMIN },
   { key: "rollNumber",              label: "Roll number",       section: "academic", control: "RESTRICTED", defaultVisibility: "PRIVATE", restrictedViewers: FACULTY_AND_ADMIN },
   { key: "admissionDate",           label: "Admission date",    section: "academic", control: "RESTRICTED", defaultVisibility: "PRIVATE", restrictedViewers: FACULTY_AND_ADMIN },
-  { key: "programEnrollmentStatus", label: "Enrollment status", section: "academic", control: "RESTRICTED", defaultVisibility: "PRIVATE", restrictedViewers: FACULTY_AND_ADMIN },
+  { key: "status", label: "Student status", section: "academic", control: "RESTRICTED", defaultVisibility: "PRIVATE", restrictedViewers: FACULTY_AND_ADMIN },
   // Personal — sensitive attributes are institution-controlled.
   { key: "gender",      label: "Gender",      section: "personal", control: "RESTRICTED", defaultVisibility: "PRIVATE", restrictedViewers: FACULTY_AND_ADMIN },
   { key: "bloodGroup",  label: "Blood group", section: "personal", control: "RESTRICTED", defaultVisibility: "PRIVATE", restrictedViewers: FACULTY_AND_ADMIN },

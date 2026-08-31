@@ -36,7 +36,7 @@ export async function GET() {
               departmentName: true,
               durationYears: true,
               students: {
-                where: { programEnrollmentStatus: "ENROLLED" },
+                where: { status: "ACTIVE" },
                 select: { id: true },
               },
             },

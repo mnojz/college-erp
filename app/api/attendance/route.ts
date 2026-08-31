@@ -42,7 +42,7 @@ export async function GET() {
             name: true,
             code: true,
             students: {
-              where: { programEnrollmentStatus: "ENROLLED" },
+              where: { status: "ACTIVE" },
               select: {
                 id: true,
                 enrollmentNumber: true,
@@ -97,7 +97,7 @@ export async function POST(request: Request) {
 
   const studentIds = (
     await prisma.student.findMany({
-      where: { programId: classRecord.programId, programEnrollmentStatus: "ENROLLED" },
+        where: { programId: classRecord.programId, status: "ACTIVE" },
       select: { id: true },
     })
   ).map((s) => s.id);

@@ -54,6 +54,27 @@ export async function requireAdmin() {
   return session?.role === "ADMIN" ? session : null;
 }
 
+/**
+ * Require any authenticated session. Returns the session, or `null` (the
+ * caller should respond with 401).
+ */
+export async function requireAuth(): Promise<Session | null> {
+  return getSession();
+}
+
+/**
+ * Require an authenticated session whose `role` is one of the allowed values.
+ * Returns the session, or `null` (the caller should respond with 403). A
+ * missing session and a wrong-role session both return `null` — matching the
+ * existing `requireAdmin` behaviour where unauthenticated access on admin
+ * endpoints is treated as 403 rather than 401.
+ */
+export async function requireRole(...roles: string[]): Promise<Session | null> {
+  const session = await getSession();
+  if (!session) return null;
+  return roles.includes(session.role) ? session : null;
+}
+
 export const sessionCookieOptions = {
   httpOnly: true,
   sameSite: "lax" as const,

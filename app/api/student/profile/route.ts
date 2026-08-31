@@ -10,7 +10,7 @@ const PROFILE_SELECT = {
   rollNumber: true,
   profileImageUrl: true,
   admissionDate: true,
-  programEnrollmentStatus: true,
+  status: true,
   programId: true,
   currentSemester: true,
   // Personal information (admin-entered)

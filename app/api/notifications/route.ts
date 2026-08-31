@@ -1,18 +1,30 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/app/lib/auth";
+import { z } from "zod";
+import { requireAuth } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
+import { jsonBody } from "@/app/lib/validation";
+import { parsePageParams, paginatedResponse } from "@/app/lib/pagination";
+
+const ReadBodySchema = z.object({
+  id: z.string().optional(),
+  all: z.boolean().optional(),
+});
 
 /** Latest notifications for the signed-in user + unread count. */
-export async function GET() {
-  const session = await getSession();
+export async function GET(request: Request) {
+  const session = await requireAuth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const { searchParams } = new URL(request.url);
+  const { page, pageSize, skip, limit } = parsePageParams(searchParams, { pageSize: 30 });
+
   try {
-    const [notifications, unread] = await Promise.all([
+    const [notifications, total, unread] = await Promise.all([
       prisma.notification.findMany({
         where: { userId: session.userId },
         orderBy: { createdAt: "desc" },
-        take: 30,
+        skip,
+        take: limit,
         select: {
           id: true,
           type: true,
@@ -23,10 +35,13 @@ export async function GET() {
           createdAt: true,
         },
       }),
+      prisma.notification.count({ where: { userId: session.userId } }),
       prisma.notification.count({ where: { userId: session.userId, readAt: null } }),
     ]);
 
-    return NextResponse.json({ notifications, unread });
+    const { items, pagination } = paginatedResponse(notifications, total, page, pageSize);
+
+    return NextResponse.json({ notifications: items, unread, pagination });
   } catch (error) {
     console.error("GET /api/notifications error:", error);
     return NextResponse.json({ error: "Unable to load notifications" }, { status: 500 });
@@ -35,15 +50,12 @@ export async function GET() {
 
 /** Mark notifications as read — either a single id or everything unread. */
 export async function POST(request: Request) {
-  const session = await getSession();
+  const session = await requireAuth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: { id?: unknown; all?: unknown };
-  try {
-    body = (await request.json()) as { id?: unknown; all?: unknown };
-  } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-  }
+  const parsed = await jsonBody(request, ReadBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.value;
 
   try {
     if (body.all === true) {
@@ -54,7 +66,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
 
-    if (typeof body.id === "string" && body.id.trim()) {
+    if (body.id && body.id.trim()) {
       await prisma.notification.updateMany({
         where: { id: body.id.trim(), userId: session.userId, readAt: null },
         data: { readAt: new Date() },

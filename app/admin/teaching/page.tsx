@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { AdminModal } from "@/app/components/admin/AdminModal";
+import { TimetableGrid } from "@/app/components/timetable/TimetableGrid";
 import { IconPlus, IconAlertTriangle, IconCircleCheck } from "@tabler/icons-react";
 
 type ProgramOption = { id: string; name: string; code: string; durationYears: number };
@@ -27,12 +28,12 @@ type ClassItem = {
   type?: string | null;
   group?: string | null;
   subjectId: string;
-  teacherId: string;
+  teacherId: string | null;
   programId: string;
   semester: number;
   subject: { name: string; code: string };
   program: { name: string; code: string };
-  teacher: { employeeNo: string; user: { firstName: string; lastName: string } };
+  teacher: { employeeNo: string; user: { firstName: string; lastName: string } } | null;
 };
 type CurriculumCourseRow = {
   key: string;
@@ -42,34 +43,16 @@ type CurriculumCourseRow = {
   semesterNo: number; // global semester number across the program
   programId: string;
 };
-type Block = ClassItem & { startMin: number; endMin: number; colorIndex: number; conflict: boolean };
+type Block = ClassItem & { startMin: number; endMin: number; conflict: boolean };
 
 // Full week on the timetable (Sat & Sun typically stay empty but keep the
 // week visually complete).
 const WORK_DAYS = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"] as const;
-// Lunch applies Monday–Friday only (Saturday/Sunday stay unaffected).
-const LUNCH_DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"] as const;
-const LUNCH_START_DEFAULT = "13:00";
-const LUNCH_END_DEFAULT = "14:00";
-// Timetable geometry (days = rows, time = columns). Every block is rendered at
-// LANE_PITCH height so slots look uniform; rows only grow when several
-// parallel slots (e.g. Gr. A/B practicals) must stack inside one day.
-const ROW_H = 76;
-const LANE_PITCH = 38;
+// The lunch break is a regular class slot (type "Lunch", no teacher) stored in
+// the classes table — one per program+semester. It is picked in the slot
+// editor's Subject dropdown and rendered as the shaded Mon–Fri band.
+const LUNCH_OPTION = "__lunch__";
 const FALLBACK_START = 9 * 60;
-const FALLBACK_END = 15 * 60;
-const PALETTE = [
-  "#0ea5e9",
-  "#8b5cf6",
-  "#f59e0b",
-  "#10b981",
-  "#ef4444",
-  "#3b82f6",
-  "#ec4899",
-  "#14b8a6",
-  "#f97316",
-  "#6366f1",
-];
 
 const emptyClassForm = {
   subjectId: "",
@@ -106,40 +89,6 @@ function minutesToHHMM(totalMinutes: number) {
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 }
 
-function parseHHMM(value: string) {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(value);
-  if (!m) return null;
-  const mins = Number(m[1]) * 60 + Number(m[2]);
-  return mins >= 0 && mins <= 24 * 60 - 1 ? mins : null;
-}
-
-function colorIndexFor(code: string) {
-  let hash = 0;
-  for (let i = 0; i < code.length; i += 1) hash = (hash * 31 + code.charCodeAt(i)) >>> 0;
-  return hash % PALETTE.length;
-}
-
-// Greedy lane packing: blocks sharing the same time window (parallel practical
-// groups, teacher-conflicts) stack vertically inside the day row instead of
-// rendering on top of each other.
-function packLanes<T extends { startMin: number; endMin: number }>(
-  blocks: T[],
-): Array<T & { lane: number }> {
-  const laneEnds: number[] = [];
-  return [...blocks]
-    .sort((a, b) => a.startMin - b.startMin)
-    .map((b) => {
-      let idx = laneEnds.findIndex((end) => end <= b.startMin);
-      if (idx === -1) {
-        laneEnds.push(b.endMin);
-        idx = laneEnds.length - 1;
-      } else {
-        laneEnds[idx] = b.endMin;
-      }
-      return { ...b, lane: idx };
-    });
-}
-
 export default function AdminTeachingPage() {
   const router = useRouter();
   const [programs, setPrograms] = useState<ProgramOption[]>([]);
@@ -163,10 +112,6 @@ export default function AdminTeachingPage() {
   // Scheduling context
   const [selectedProgramId, setSelectedProgramId] = useState("");
   const [selectedSemester, setSelectedSemester] = useState("");
-
-  // Configurable lunch break (Mon–Fri only)
-  const [lunchStart, setLunchStart] = useState(LUNCH_START_DEFAULT);
-  const [lunchEnd, setLunchEnd] = useState(LUNCH_END_DEFAULT);
 
   // Modals
   const [showClassModal, setShowClassModal] = useState(false);
@@ -281,7 +226,6 @@ export default function AdminTeachingPage() {
         ...c,
         startMin: toMinutes(c.startTime) ?? FALLBACK_START,
         endMin: toMinutes(c.endTime) ?? FALLBACK_START + 90,
-        colorIndex: colorIndexFor(c.subject.code),
         conflict: false,
       }))
       .sort((a, b) => a.startMin - b.startMin);
@@ -320,30 +264,6 @@ export default function AdminTeachingPage() {
     return flagged;
   }, [scheduledBlocks]);
 
-  // Lunch window (null when disabled via equal or reversed times).
-  const lunchStartMin = parseHHMM(lunchStart);
-  const lunchEndMin = parseHHMM(lunchEnd);
-  const lunchActive =
-    lunchStartMin !== null && lunchEndMin !== null && lunchEndMin > lunchStartMin;
-
-  // Time window of the week grid (floored/ceiling hours). The lunch window is
-  // included so the break stays visible even when no classes touch it.
-  const dayStart = useMemo(() => {
-    const starts = scheduledBlocks.map((b) => b.startMin);
-    const ls = lunchStartMin;
-    if (ls !== null) starts.push(ls);
-    if (starts.length === 0) return FALLBACK_START;
-    return Math.floor(Math.min(...starts) / 60) * 60;
-  }, [scheduledBlocks, lunchStartMin]);
-  const dayEnd = useMemo(() => {
-    const ends = scheduledBlocks.map((b) => b.endMin);
-    const le = lunchEndMin;
-    if (le !== null) ends.push(le);
-    if (ends.length === 0) return FALLBACK_END;
-    return Math.ceil(Math.max(...ends) / 60) * 60;
-  }, [scheduledBlocks, lunchEndMin]);
-  const gridMinutes = Math.max(60, dayEnd - dayStart);
-
   // Curriculum subjects of this semester that have no scheduled slot yet.
   const unscheduledSubjects = useMemo(() => {
     const scheduledSubjectIds = new Set(scheduledBlocks.map((b) => b.subjectId));
@@ -364,6 +284,17 @@ export default function AdminTeachingPage() {
         .filter((x): x is { id: string; label: string } => x !== null),
     [semesterCourses, resolveSubjectId],
   );
+
+  // Whether this table already has its single lunch-break slot, and whether
+  // the open modal is currently scheduling/editing the lunch break.
+  const lunchExists = classes.some(
+    (c) =>
+      c.programId === selectedProgramId &&
+      c.semester === Number(selectedSemester) &&
+      c.type === "Lunch",
+  );
+  const createIsLunch = classForm.subjectId === LUNCH_OPTION;
+  const editIsLunch = editingClass?.type === "Lunch";
 
   // Same mapping, but for the slot being edited (may differ if the stored
   // subject no longer maps cleanly — keep its current value selectable).
@@ -417,6 +348,20 @@ export default function AdminTeachingPage() {
 
   function openEdit(block: Block) {
     setError("");
+    if (block.type === "Lunch") {
+      // The lunch break is edited as its own pseudo-subject in the editor.
+      setEditingClass({
+        id: block.id,
+        subjectId: LUNCH_OPTION,
+        teacherId: "",
+        dayOfWeek: block.dayOfWeek,
+        startTime: minutesToHHMM(toMinutes(block.startTime) ?? 0),
+        endTime: minutesToHHMM(toMinutes(block.endTime) ?? 0),
+        type: "Lunch",
+        group: "",
+      });
+      return;
+    }
     const subjectAssignments = assignedTeachersFor(block.subjectId);
     setEditingClass({
       id: block.id,
@@ -424,9 +369,9 @@ export default function AdminTeachingPage() {
       // Keep the stored teacher when they're still assigned to this subject;
       // otherwise fall back to the subject's first assigned teacher.
       teacherId:
-        subjectAssignments.some((t) => t.id === block.teacherId)
+        block.teacherId && subjectAssignments.some((t) => t.id === block.teacherId)
           ? block.teacherId
-          : (subjectAssignments[0]?.id ?? block.teacherId),
+          : (subjectAssignments[0]?.id ?? ""),
       dayOfWeek: block.dayOfWeek,
       startTime: minutesToHHMM(toMinutes(block.startTime) ?? 0),
       endTime: minutesToHHMM(toMinutes(block.endTime) ?? 0),
@@ -444,6 +389,7 @@ export default function AdminTeachingPage() {
   async function handleCreateClass(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!selectedProgramId || !selectedSemester) return;
+    const isLunch = classForm.subjectId === LUNCH_OPTION;
     setError("");
     setSaving(true);
     try {
@@ -453,13 +399,13 @@ export default function AdminTeachingPage() {
         body: JSON.stringify({
           programId: selectedProgramId,
           semester: Number(selectedSemester),
-          subjectId: classForm.subjectId,
-          teacherId: classForm.teacherId,
+          subjectId: isLunch ? "" : classForm.subjectId,
+          teacherId: isLunch ? "" : classForm.teacherId,
           dayOfWeek: classForm.dayOfWeek,
           startTime: classForm.startTime,
           endTime: classForm.endTime,
-          type: classForm.type,
-          group: classForm.group,
+          type: isLunch ? "Lunch" : classForm.type,
+          group: isLunch ? "" : classForm.group,
         }),
       });
       const data = await res.json();
@@ -480,6 +426,7 @@ export default function AdminTeachingPage() {
   async function handleUpdateClass(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!editingClass) return;
+    const isLunch = editingClass.type === "Lunch";
     setError("");
     setSaving(true);
     try {
@@ -490,8 +437,8 @@ export default function AdminTeachingPage() {
           id: editingClass.id,
           programId: selectedProgramId,
           semester: Number(selectedSemester),
-          subjectId: editingClass.subjectId,
-          teacherId: editingClass.teacherId,
+          subjectId: isLunch ? "" : editingClass.subjectId,
+          teacherId: isLunch ? "" : editingClass.teacherId,
           dayOfWeek: editingClass.dayOfWeek,
           startTime: editingClass.startTime,
           endTime: editingClass.endTime,
@@ -535,26 +482,13 @@ export default function AdminTeachingPage() {
     }
   }
 
-  // Click an empty spot on a day row to schedule at that time.
-  function handleDayClick(day: string, e: React.MouseEvent<HTMLDivElement>) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = (e.clientX - rect.left) / rect.width;
-    let minutes = dayStart + Math.round((ratio * gridMinutes) / 30) * 30;
-    minutes = Math.max(dayStart, Math.min(dayEnd - 60, minutes));
+  // Click an empty spot on a day row → open the "schedule class" dialog at that time.
+  function handleTrackClick(day: string, minutes: number) {
     openCreate(day, minutes);
   }
 
-  const teacherName = (id: string) =>
-    teachers.find((t) => t.id === id)?.name ?? "Unknown";
-
-  // 30-minute grid: mark every half hour along the time axis.
-  const timeMarks: number[] = [];
-  for (let m = Math.floor(dayStart / 30) * 30; m <= dayEnd; m += 30) {
-    timeMarks.push(m);
-  }
-
-  const hourPeriod = `${(60 / gridMinutes) * 100}%`;
-  const halfHourPeriod = `${(30 / gridMinutes) * 100}%`;
+  const teacherName = (id: string | null) =>
+    (id && teachers.find((t) => t.id === id)?.name) || "Unknown";
 
   const ttInput: React.CSSProperties = {
     padding: "9px 12px",
@@ -620,33 +554,6 @@ export default function AdminTeachingPage() {
             </select>
           </label>
 
-          <label
-            style={{ display: "grid", gap: "6px", width: "150px" }}
-            title="Lunch break applies Monday–Friday only"
-          >
-            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--ink-soft)" }}>Lunch Start</span>
-            <input
-              type="time"
-              value={lunchStart}
-              onChange={(e) => setLunchStart(e.target.value)}
-              style={ttInput}
-              disabled={!selectedProgramId}
-            />
-          </label>
-          <label
-            style={{ display: "grid", gap: "6px", width: "150px" }}
-            title="Lunch break applies Monday–Friday only"
-          >
-            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--ink-soft)" }}>Lunch End</span>
-            <input
-              type="time"
-              value={lunchEnd}
-              onChange={(e) => setLunchEnd(e.target.value)}
-              style={ttInput}
-              disabled={!selectedProgramId}
-            />
-          </label>
-
           <button
             type="button"
             className="btn-add"
@@ -679,110 +586,17 @@ export default function AdminTeachingPage() {
               border: "1px solid var(--line)",
             }}
           >
-            <div className="tt-scroll">
-              <div className="tt-inner">
-                {/* Time axis header — every half hour, hours labelled */}
-                <div className="tt-row tt-head-row">
-                  <div className="tt-corner" />
-                  <div className="tt-axis-x">
-                    {timeMarks.map((m) => {
-                      const isHour = m % 60 === 0;
-                      return (
-                        <span
-                          key={m}
-                          className={`tt-hour${isHour ? "" : " tt-hour-half"}${
-                            m === dayStart ? " tt-hour-first" : ""
-                          }${m === timeMarks[timeMarks.length - 1] ? " tt-hour-last" : ""}`}
-                          style={{ left: `${((m - dayStart) / gridMinutes) * 100}%` }}
-                        >
-                          {minutesToHHMM(m)}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* One row per weekday, classes positioned horizontally by time */}
-                {WORK_DAYS.map((day) => {
-                  const packed = packLanes(
-                    scheduledBlocks.filter((b) => b.dayOfWeek === day),
-                  );
-                  const laneCount = packed.reduce((mx, p) => Math.max(mx, p.lane + 1), 1);
-                  const rowH = Math.max(ROW_H, laneCount * LANE_PITCH + 8);
-                  const laneOffset = Math.max(4, (rowH - laneCount * LANE_PITCH) / 2);
-                  const slotH = LANE_PITCH - 4; // uniform block height everywhere
-                  const isLunchDay = (LUNCH_DAYS as readonly string[]).includes(day);
-                  return (
-                    <div key={day} className="tt-row" style={{ height: rowH }}>
-                      <div className="tt-day-cell">{day.slice(0, 3)}</div>
-                      <div
-                        className="tt-day-track"
-                        style={{
-                          backgroundImage: `repeating-linear-gradient(to right, var(--line-faint) 0px, var(--line-faint) 1px, transparent 1px, transparent ${halfHourPeriod}), repeating-linear-gradient(to right, var(--line) 0px, var(--line) 1px, transparent 1px, transparent ${hourPeriod})`,
-                        }}
-                        title={`Click to schedule a ${day.toLowerCase()} class`}
-                        onClick={(e) => handleDayClick(day, e)}
-                      >
-                        {lunchActive && isLunchDay && (
-                          <div
-                            className="tt-lunch"
-                            style={{
-                              left: `${((lunchStartMin! - dayStart) / gridMinutes) * 100}%`,
-                              width: `${((lunchEndMin! - lunchStartMin!) / gridMinutes) * 100}%`,
-                            }}
-                          >
-                            <span>Lunch</span>
-                          </div>
-                        )}
-                        {packed.map(({ lane, ...b }) => {
-                          const color = PALETTE[b.colorIndex];
-                          const conflicted = conflictedBlocks.has(b.id);
-                          return (
-                            <button
-                              key={b.id}
-                              type="button"
-                              className={`tt-block${laneCount > 1 ? " tt-block-sm" : ""}${
-                                conflicted ? " tt-block-conflict" : ""
-                              }`}
-                              style={{
-                                left: `${((b.startMin - dayStart) / gridMinutes) * 100}%`,
-                                width: `calc(${((b.endMin - b.startMin) / gridMinutes) * 100}% - 6px)`,
-                                top: Math.round(laneOffset + lane * LANE_PITCH),
-                                height: slotH,
-                                borderLeftColor: color,
-                                background: `linear-gradient(to right, ${color}26, ${color}12)`,
-                              }}
-                              title={`${b.subject.code} · ${b.subject.name}${b.group ? ` (${b.group})` : ""}\n${b.type}\n${teacherName(
-                                b.teacherId,
-                              )}\n${formatTime(b.startTime)} – ${formatTime(b.endTime)}${
-                                conflicted ? "\nOverlapping slots" : ""
-                              }`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openEdit(b);
-                              }}
-                            >
-                              <strong className="tt-block-title">
-                                <span>
-                                  {b.subject.code}
-                                  {b.type === "Practical" ? " · Lab" : ""}
-                                </span>
-                                {conflicted && (
-                                  <IconAlertTriangle size={11} className="tt-block-warn" aria-hidden="true" />
-                                )}
-                              </strong>
-                              <span className="tt-block-name">
-                                {b.group ? `${b.group} · ${b.subject.name}` : b.subject.name}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <TimetableGrid
+              items={scheduledBlocks.map((b) => ({
+                ...b,
+                conflict: conflictedBlocks.has(b.id),
+                subjectTeacherName: teacherName(b.teacherId),
+              }))}
+              onTrackClick={(day, minutes) => handleTrackClick(day, minutes)}
+              onBlockClick={(b) => openEdit(b as Block)}
+              onLunchClick={(b) => openEdit(b as Block)}
+              trackHint={(day) => `Click to schedule a ${day.toLowerCase()} class`}
+            />
           </section>
         )}
 
@@ -869,11 +683,16 @@ export default function AdminTeachingPage() {
                   value={classForm.subjectId}
                   onChange={(e) => {
                     const subjectId = e.target.value;
+                    if (subjectId === LUNCH_OPTION) {
+                      setClassForm({ ...classForm, subjectId, teacherId: "", type: "Lunch", group: "" });
+                      return;
+                    }
                     const options = assignedTeachersFor(subjectId);
                     setClassForm({
                       ...classForm,
                       subjectId,
                       teacherId: options[0]?.id ?? "",
+                      type: classForm.type === "Lunch" ? "Lecture" : classForm.type,
                     });
                   }}
                   required
@@ -882,6 +701,9 @@ export default function AdminTeachingPage() {
                     {classSubjectOptions.length === 0
                       ? "No subjects in curriculum for this semester"
                       : "Select Subject"}
+                  </option>
+                  <option value={LUNCH_OPTION} disabled={lunchExists}>
+                    {lunchExists ? "Lunch Break (already set — click it on the table)" : "Lunch Break"}
                   </option>
                   {classSubjectOptions.map((option) => (
                     <option key={option.id} value={option.id}>
@@ -897,9 +719,11 @@ export default function AdminTeachingPage() {
                   value={classForm.teacherId}
                   onChange={(e) => setClassForm({ ...classForm, teacherId: e.target.value })}
                   required
-                  disabled={assignedTeachersFor(classForm.subjectId).length === 0}
+                  disabled={createIsLunch || assignedTeachersFor(classForm.subjectId).length === 0}
                 >
-                  {assignedTeachersFor(classForm.subjectId).length === 0 ? (
+                  {createIsLunch ? (
+                    <option value="">No teacher — campus break</option>
+                  ) : assignedTeachersFor(classForm.subjectId).length === 0 ? (
                     <option value="">No teacher assigned to this subject</option>
                   ) : (
                     <>
@@ -913,8 +737,9 @@ export default function AdminTeachingPage() {
                   )}
                 </select>
                 <span className="form-hint">
-                  Auto-filled from subject assignments. Assign teachers to subjects on the Faculty
-                  page.
+                  {createIsLunch
+                    ? "The lunch break is a campus-wide slot — no teacher is assigned."
+                    : "Auto-filled from subject assignments. Assign teachers to subjects on the Faculty page."}
                 </span>
               </label>
 
@@ -965,7 +790,9 @@ export default function AdminTeachingPage() {
                     value={classForm.type}
                     onChange={(e) => setClassForm({ ...classForm, type: e.target.value })}
                     required
+                    disabled={createIsLunch}
                   >
+                    {createIsLunch && <option value="Lunch">Lunch Break</option>}
                     <option value="Lecture">Lecture</option>
                     <option value="Practical">Practical</option>
                   </select>
@@ -977,6 +804,7 @@ export default function AdminTeachingPage() {
                     placeholder="e.g. Gr. A"
                     value={classForm.group}
                     onChange={(e) => setClassForm({ ...classForm, group: e.target.value })}
+                    disabled={createIsLunch}
                   />
                 </label>
               </div>
@@ -1024,6 +852,10 @@ export default function AdminTeachingPage() {
                   value={editingClass.subjectId}
                   onChange={(e) => {
                     const subjectId = e.target.value;
+                    if (subjectId === LUNCH_OPTION) {
+                      setEditingClass({ ...editingClass, subjectId, teacherId: "", type: "Lunch", group: "" });
+                      return;
+                    }
                     const options = assignedTeachersFor(subjectId);
                     setEditingClass({
                       ...editingClass,
@@ -1032,12 +864,14 @@ export default function AdminTeachingPage() {
                     });
                   }}
                   required
+                  disabled={editIsLunch}
                 >
                   <option value="">
                     {editClassSubjectOptions.length === 0
                       ? "No subjects in curriculum for this semester"
                       : "Select Subject"}
                   </option>
+                  <option value={LUNCH_OPTION}>Lunch Break</option>
                   {editClassSubjectOptions.map((option) => (
                     <option key={option.id} value={option.id}>
                       {option.label}
@@ -1052,9 +886,11 @@ export default function AdminTeachingPage() {
                   value={editingClass.teacherId}
                   onChange={(e) => setEditingClass({ ...editingClass, teacherId: e.target.value })}
                   required
-                  disabled={assignedTeachersFor(editingClass.subjectId).length === 0}
+                  disabled={editIsLunch || assignedTeachersFor(editingClass.subjectId).length === 0}
                 >
-                  {assignedTeachersFor(editingClass.subjectId).length === 0 ? (
+                  {editIsLunch ? (
+                    <option value="">No teacher — campus break</option>
+                  ) : assignedTeachersFor(editingClass.subjectId).length === 0 ? (
                     <option value="">No teacher assigned to this subject</option>
                   ) : (
                     <>
@@ -1118,7 +954,9 @@ export default function AdminTeachingPage() {
                     value={editingClass.type}
                     onChange={(e) => setEditingClass({ ...editingClass, type: e.target.value })}
                     required
+                    disabled={editIsLunch}
                   >
+                    {editIsLunch && <option value="Lunch">Lunch Break</option>}
                     <option value="Lecture">Lecture</option>
                     <option value="Practical">Practical</option>
                   </select>
@@ -1130,6 +968,7 @@ export default function AdminTeachingPage() {
                     placeholder="e.g. Gr. A"
                     value={editingClass.group}
                     onChange={(e) => setEditingClass({ ...editingClass, group: e.target.value })}
+                    disabled={editIsLunch}
                   />
                 </label>
               </div>

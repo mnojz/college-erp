@@ -14,10 +14,13 @@ type Profile = {
 };
 
 type ResultRecord = {
+  id: string;
   marks: number | string;
   grade: string | null;
   assessment: {
+    id: string;
     name: string;
+    semester: number;
     maxMarks: number | string;
     assessmentDate: string | null;
     subject: { code: string; name: string };
@@ -25,24 +28,51 @@ type ResultRecord = {
   };
 };
 
+type Pagination = {
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasMore: boolean;
+};
+
+type SubjectOption = { code: string; name: string };
+
+type Summary = { totalAssessments: number; averagePercentage: number };
+
 export default function StudentResultsPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [results, setResults] = useState<ResultRecord[]>([]);
+  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filterSubject, setFilterSubject] = useState("ALL");
+  const [filterSemester, setFilterSemester] = useState("ALL");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     async function loadData() {
       try {
+        const params = new URLSearchParams();
+        params.set("page", String(page));
+        if (filterSubject !== "ALL") params.set("subject", filterSubject);
+        if (filterSemester !== "ALL") params.set("semester", filterSemester);
+
         const [profileRes, resultsRes] = await Promise.all([
           fetch("/api/student/profile"),
-          fetch("/api/student/results"),
+          fetch(`/api/student/results?${params.toString()}`),
         ]);
 
-        if (!profileRes.ok || !resultsRes.ok) {
+        if (!profileRes.ok) {
+          // Bad session/profile is not recoverable here — back to dashboard.
           router.replace("/dashboard");
+          return;
+        }
+        if (!resultsRes.ok) {
+          setError("Unable to load results from server");
           return;
         }
 
@@ -51,6 +81,9 @@ export default function StudentResultsPage() {
 
         setProfile(profileData.student);
         setResults(resultsData.results ?? []);
+        setSubjects(resultsData.subjects ?? []);
+        setSummary(resultsData.summary ?? null);
+        setPagination(resultsData.pagination ?? null);
       } catch {
         setError("Unable to load results from server");
       } finally {
@@ -59,7 +92,7 @@ export default function StudentResultsPage() {
     }
 
     loadData();
-  }, [router]);
+  }, [router, page, filterSubject, filterSemester]);
 
   if (error) return <main className="profile-error">{error}</main>;
   if (loading || !profile) return <main className="profile-loading">Loading results...</main>;
@@ -67,27 +100,39 @@ export default function StudentResultsPage() {
   const fullName = `${profile.user.firstName} ${profile.user.lastName}`;
   const studentId = profile.rollNumber || profile.enrollmentNumber;
 
-  const subjects = Array.from(
-    new Set(results.map((r) => `${r.assessment.subject.code} - ${r.assessment.subject.name}`))
-  );
+  // Subject list comes from the API (computed across the FULL result set, so a
+  // selected filter never disappears from the dropdown); fall back to whatever
+  // subjects are visible on the current page.
+  const subjectOptions: SubjectOption[] =
+    subjects.length > 0
+      ? subjects
+      : Array.from(
+          new Map(
+            results.map((r) => [
+              r.assessment.subject.code,
+              { code: r.assessment.subject.code, name: r.assessment.subject.name },
+            ]),
+          ).values(),
+        ).sort((a, b) => a.code.localeCompare(b.code));
 
-  const filteredResults =
-    filterSubject === "ALL"
-      ? results
-      : results.filter(
-          (r) => `${r.assessment.subject.code} - ${r.assessment.subject.name}` === filterSubject
-        );
+  // Rows are filtered, sorted and paginated server-side.
+  const pageResults = results;
 
-  const totalAssessments = results.length;
+  // Header stats cover ALL of the student's results (server-computed), not
+  // just the current page.
+  const totalAssessments = summary?.totalAssessments ?? pagination?.total ?? results.length;
   const avgPercentage =
-    totalAssessments > 0
-      ? (
-          results.reduce(
-            (acc, curr) => acc + (Number(curr.marks) / Number(curr.assessment.maxMarks)) * 100,
-            0
-          ) / totalAssessments
-        ).toFixed(1)
-      : "0";
+    summary?.averagePercentage ??
+    (pageResults.length > 0
+      ? Number(
+          (
+            pageResults.reduce(
+              (acc, curr) => acc + (Number(curr.marks) / Number(curr.assessment.maxMarks)) * 100,
+              0
+            ) / pageResults.length
+          ).toFixed(1),
+        )
+      : 0);
 
   return (
     <StudentShell
@@ -117,30 +162,65 @@ export default function StudentResultsPage() {
             </article>
           </section>
 
-          {subjects.length > 1 && (
-            <div style={{ marginBottom: "18px", display: "flex", gap: "12px", alignItems: "center" }}>
+          {subjectOptions.length > 0 && (
+            <div
+              style={{
+                marginBottom: "18px",
+                display: "flex",
+                gap: "12px",
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              {subjectOptions.length > 1 && (
+                <>
+                  <label style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+                    Filter by Subject:
+                  </label>
+                  <select
+                    value={filterSubject}
+                    onChange={(e) => {
+                      setFilterSubject(e.target.value);
+                      setPage(1);
+                    }}
+                    style={{ width: "auto", minWidth: "220px", padding: "8px 12px" }}
+                  >
+                    <option value="ALL">All Subjects</option>
+                    {subjectOptions.map((sub) => (
+                      <option key={sub.code} value={sub.code}>
+                        {sub.code} - {sub.name}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
               <label style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
-                Filter by Subject:
+                Filter by Semester:
               </label>
               <select
-                value={filterSubject}
-                onChange={(e) => setFilterSubject(e.target.value)}
-                style={{ width: "auto", minWidth: "220px", padding: "8px 12px" }}
+                value={filterSemester}
+                onChange={(e) => {
+                  setFilterSemester(e.target.value);
+                  setPage(1);
+                }}
+                style={{ width: "auto", minWidth: "140px", padding: "8px 12px" }}
               >
-                <option value="ALL">All Subjects</option>
-                {subjects.map((sub) => (
-                  <option key={sub} value={sub}>
-                    {sub}
+                <option value="ALL">All Semesters</option>
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
+                  <option key={sem} value={String(sem)}>
+                    Semester {sem}
                   </option>
                 ))}
               </select>
             </div>
           )}
 
-          {filteredResults.length === 0 ? (
+          {pageResults.length === 0 ? (
             <div className="profile-info-card" style={{ padding: "32px", textAlign: "center" }}>
               <p style={{ margin: 0, color: "var(--ink-soft)" }}>
-                No published assessment results found yet.
+                {totalAssessments > 0
+                  ? "No results match the selected filters."
+                  : "No published assessment results found yet."}
               </p>
             </div>
           ) : (
@@ -157,7 +237,7 @@ export default function StudentResultsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredResults.map((item, idx) => {
+                  {pageResults.map((item) => {
                     const marks = Number(item.marks);
                     const maxMarks = Number(item.assessment.maxMarks);
                     const pct = maxMarks > 0 ? ((marks / maxMarks) * 100).toFixed(1) : "0";
@@ -165,7 +245,7 @@ export default function StudentResultsPage() {
 
                     return (
                       <tr
-                        key={idx}
+                        key={item.id}
                         style={{
                           borderBottom: "1px solid var(--line)",
                           transition: "background 120ms ease",
@@ -218,6 +298,59 @@ export default function StudentResultsPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {pagination && pagination.totalPages > 1 && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "12px",
+                marginTop: "16px",
+              }}
+            >
+              <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+                Showing {pageResults.length} of {pagination.total} results
+              </span>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: "8px",
+                    border: "1px solid var(--line)",
+                    background: "transparent",
+                    color: "var(--ink)",
+                    cursor: page <= 1 ? "default" : "pointer",
+                    opacity: page <= 1 ? 0.5 : 1,
+                    fontSize: "0.8rem",
+                  }}
+                >
+                  Previous
+                </button>
+                <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+                  Page {pagination.page} of {pagination.totalPages}
+                </span>
+                <button
+                  onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+                  disabled={!pagination.hasMore}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: "8px",
+                    border: "1px solid var(--line)",
+                    background: "transparent",
+                    color: "var(--ink)",
+                    cursor: pagination.hasMore ? "pointer" : "default",
+                    opacity: pagination.hasMore ? 1 : 0.5,
+                    fontSize: "0.8rem",
+                  }}
+                >
+                  Next
+                </button>
+              </div>
             </div>
           )}
     </StudentShell>

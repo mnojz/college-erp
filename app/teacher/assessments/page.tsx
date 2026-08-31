@@ -1,9 +1,11 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { IconPlus } from "@tabler/icons-react";
+import { IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
+import { AdminModal } from "@/app/components/admin/AdminModal";
+import { gradeForMarks } from "@/app/lib/grading";
 
 type Student = {
   id: string;
@@ -18,15 +20,10 @@ type ClassItem = {
   programId: string;
   semester: number;
   subject: { code: string; name: string };
-  program: {
-    id: string;
-    name: string;
-    code: string;
-    students: Student[];
-  };
+  program: { name: string; code: string; students: Student[] };
 };
 
-type Assessment = {
+type AssessmentItem = {
   id: string;
   name: string;
   maxMarks: number | string;
@@ -36,6 +33,7 @@ type Assessment = {
   semester: number;
   subject: { code: string; name: string };
   program: { code: string; name: string };
+  _count?: { results: number };
 };
 
 type TeacherInfo = {
@@ -45,25 +43,77 @@ type TeacherInfo = {
   profileImageUrl: string | null;
 };
 
+type Banner = { kind: "success" | "error"; text: string } | null;
+type ModalState = { kind: "create" } | { kind: "edit"; assessment: AssessmentItem } | null;
+
+const inputStyle: CSSProperties = {
+  width: "100%",
+  padding: "10px 12px",
+  borderRadius: "8px",
+  border: "1px solid var(--line, #e2e8f0)",
+  background: "var(--panel, #fff)",
+  color: "inherit",
+  fontSize: "0.9rem",
+};
+
+const labelStyle: CSSProperties = {
+  display: "block",
+  marginBottom: "6px",
+  fontSize: "0.8rem",
+  color: "var(--ink-soft)",
+  fontWeight: "600",
+};
+
+const thStyle: CSSProperties = { padding: "10px 14px", fontWeight: "600", fontSize: "0.78rem" };
+const tdStyle: CSSProperties = { padding: "10px 14px", verticalAlign: "middle" };
+
+const iconBtnStyle: CSSProperties = {
+  width: "34px",
+  height: "34px",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: "8px",
+  border: "1px solid var(--line, #e2e8f0)",
+  background: "transparent",
+  cursor: "pointer",
+  color: "var(--ink-soft)",
+};
+
+function fmtDate(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? "—"
+    : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
 export default function TeacherAssessmentsPage() {
   const router = useRouter();
   const [classes, setClasses] = useState<ClassItem[]>([]);
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [assessments, setAssessments] = useState<AssessmentItem[]>([]);
   const [teacherInfo, setTeacherInfo] = useState<TeacherInfo | null>(null);
-  const [selectedAssessmentId, setSelectedAssessmentId] = useState("");
-  const [marksState, setMarksState] = useState<Record<string, { marks: string; grade: string }>>({});
-
-  // New assessment form state
-  const [selectedClassIndex, setSelectedClassIndex] = useState("0");
-  const [assessmentName, setAssessmentName] = useState("");
-  const [maxMarks, setMaxMarks] = useState("100");
-  const [assessmentDate, setAssessmentDate] = useState(() => new Date().toISOString().slice(0, 10));
-
   const [isLoading, setIsLoading] = useState(true);
+  const [banner, setBanner] = useState<Banner>(null);
+
+  // Create / edit modal
+  const [modal, setModal] = useState<ModalState>(null);
+  const [formClassId, setFormClassId] = useState("");
+  const [formName, setFormName] = useState("");
+  const [formMaxMarks, setFormMaxMarks] = useState("100");
+  const [formDate, setFormDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [formError, setFormError] = useState("");
+  const [isSavingAssessment, setIsSavingAssessment] = useState(false);
+
+  // Delete confirmation
+  const [deleteTarget, setDeleteTarget] = useState<AssessmentItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Marks entry panel
+  const [openMarksId, setOpenMarksId] = useState<string | null>(null);
+  const [marksLoading, setMarksLoading] = useState(false);
+  const [marksState, setMarksState] = useState<Record<string, string>>({});
   const [isSubmittingMarks, setIsSubmittingMarks] = useState(false);
-  const [isCreatingAssessment, setIsCreatingAssessment] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
 
   useEffect(() => {
     async function loadData() {
@@ -75,10 +125,7 @@ export default function TeacherAssessmentsPage() {
         ]);
 
         if (
-          classesRes.status === 401 ||
-          classesRes.status === 403 ||
-          profRes.status === 401 ||
-          profRes.status === 403
+          [classesRes, assessmentsRes, profRes].some((r) => r.status === 401 || r.status === 403)
         ) {
           router.replace("/dashboard");
           return;
@@ -89,13 +136,7 @@ export default function TeacherAssessmentsPage() {
         const profData = await profRes.json();
 
         setClasses(classesData.classes ?? []);
-        const loadedAssessments: Assessment[] = assessmentsData.assessments ?? [];
-        setAssessments(loadedAssessments);
-
-        if (loadedAssessments.length > 0) {
-          setSelectedAssessmentId(loadedAssessments[0].id);
-        }
-
+        setAssessments(assessmentsData.assessments ?? []);
         if (profRes.ok && profData.teacher) {
           setTeacherInfo({
             firstName: profData.teacher.user.firstName,
@@ -105,7 +146,7 @@ export default function TeacherAssessmentsPage() {
           });
         }
       } catch {
-        setError("Unable to load teaching and assessment records");
+        setBanner({ kind: "error", text: "Unable to load teaching and assessment records" });
       } finally {
         setIsLoading(false);
       }
@@ -114,501 +155,593 @@ export default function TeacherAssessmentsPage() {
     loadData();
   }, [router]);
 
-  const selectedAssessment = useMemo(
-    () => assessments.find((a) => a.id === selectedAssessmentId),
-    [assessments, selectedAssessmentId],
+  async function refreshAssessments(): Promise<AssessmentItem[]> {
+    const res = await fetch("/api/assessments");
+    if (!res.ok) throw new Error("Unable to refresh assessments");
+    const data = await res.json();
+    const list: AssessmentItem[] = data.assessments ?? [];
+    setAssessments(list);
+    return list;
+  }
+
+  /** Active students of the assessment's class (deduped across parallel slots). */
+  function rosterFor(a: AssessmentItem): Student[] {
+    const sameSemester = classes.filter(
+      (c) => c.programId === a.programId && c.semester === a.semester,
+    );
+    const pool =
+      sameSemester.length > 0 ? sameSemester : classes.filter((c) => c.programId === a.programId);
+    const byId = new Map<string, Student>();
+    for (const c of pool) for (const s of c.program.students) byId.set(s.id, s);
+    return [...byId.values()].sort((x, y) => {
+      const rx = Number(x.rollNumber);
+      const ry = Number(y.rollNumber);
+      if (Number.isFinite(rx) && Number.isFinite(ry)) return rx - ry;
+      return x.enrollmentNumber.localeCompare(y.enrollmentNumber);
+    });
+  }
+
+  const filledCount = useMemo(
+    () => Object.values(marksState).filter((v) => v.trim() !== "").length,
+    [marksState],
   );
 
-  // Find students belonging to the program of the selected assessment
-  const relevantStudents = useMemo(() => {
-    if (!selectedAssessment) return [];
-    const matchedClass =
+  function openCreate() {
+    setModal({ kind: "create" });
+    setFormClassId(classes[0]?.id ?? "");
+    setFormName("");
+    setFormMaxMarks("100");
+    setFormDate(new Date().toISOString().slice(0, 10));
+    setFormError("");
+  }
+
+  function openEdit(a: AssessmentItem) {
+    const match =
       classes.find(
         (c) =>
-          c.subjectId === selectedAssessment.subjectId &&
-          c.programId === selectedAssessment.programId,
-      ) || classes.find((c) => c.programId === selectedAssessment.programId);
-    return matchedClass?.program.students ?? [];
-  }, [selectedAssessment, classes]);
+          c.subjectId === a.subjectId && c.programId === a.programId && c.semester === a.semester,
+      ) ?? classes.find((c) => c.subjectId === a.subjectId);
+    setModal({ kind: "edit", assessment: a });
+    setFormClassId(match?.id ?? "");
+    setFormName(a.name);
+    setFormMaxMarks(String(Number(a.maxMarks)));
+    setFormDate(
+      a.assessmentDate
+        ? new Date(a.assessmentDate).toISOString().slice(0, 10)
+        : new Date().toISOString().slice(0, 10),
+    );
+    setFormError("");
+  }
 
-  async function handleCreateAssessment(e: FormEvent<HTMLFormElement>) {
+  async function submitAssessment(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setError("");
-    setMessage("");
-    setIsCreatingAssessment(true);
+    if (!modal) return;
 
-    const chosenClass = classes[Number(selectedClassIndex)];
+    const chosenClass = classes.find((c) => c.id === formClassId);
     if (!chosenClass) {
-      setError("Please select a valid class");
-      setIsCreatingAssessment(false);
+      setFormError("Please select a class / subject");
+      return;
+    }
+    const max = Number(formMaxMarks);
+    if (!Number.isFinite(max) || max <= 0) {
+      setFormError("Full marks must be a positive number");
       return;
     }
 
-    try {
-      const response = await fetch("/api/assessments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          subjectId: chosenClass.subjectId,
-          programId: chosenClass.programId,
-          semester: chosenClass.semester,
-          name: assessmentName,
-          maxMarks: Number(maxMarks),
-          assessmentDate: new Date(assessmentDate).toISOString(),
-        }),
-      });
+    setFormError("");
+    setIsSavingAssessment(true);
+    const payload = {
+      subjectId: chosenClass.subjectId,
+      name: formName.trim(),
+      maxMarks: max,
+      assessmentDate: formDate ? new Date(formDate).toISOString() : undefined,
+    };
 
-      const data = await response.json();
-      if (!response.ok) {
-        setError(data.error ?? "Failed to create assessment");
+    try {
+      const res = await fetch("/api/assessments", {
+        method: modal.kind === "create" ? "POST" : "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          modal.kind === "create" ? payload : { ...payload, id: modal.assessment.id },
+        ),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFormError(data.error ?? "Failed to save assessment");
         return;
       }
 
-      setMessage(`Assessment "${assessmentName}" created successfully!`);
-      setAssessmentName("");
-
-      // Refresh assessments list
-      const reload = await fetch("/api/assessments");
-      const reloadedData = await reload.json();
-      const newAssessments = reloadedData.assessments ?? [];
-      setAssessments(newAssessments);
-      setSelectedAssessmentId(data.assessment.id);
+      setBanner({
+        kind: "success",
+        text:
+          modal.kind === "create"
+            ? `Assessment “${payload.name}” created.`
+            : `Assessment “${payload.name}” updated.`,
+      });
+      setModal(null);
+      await refreshAssessments().catch(() => {});
+      if (modal.kind === "create" && data.assessment?.id) {
+        setOpenMarksId(data.assessment.id);
+        setMarksState({});
+      }
+      if (modal.kind === "edit" && openMarksId === modal.assessment.id) {
+        setOpenMarksId(null);
+        setMarksState({});
+      }
     } catch {
-      setError("Failed to create assessment");
+      setFormError("Failed to reach the server");
     } finally {
-      setIsCreatingAssessment(false);
+      setIsSavingAssessment(false);
     }
   }
 
-  async function handleSaveResults() {
-    if (!selectedAssessment) return;
-    setError("");
-    setMessage("");
+  function askDelete(a: AssessmentItem) {
+    setDeleteTarget(a);
+  }
+
+  async function doDelete() {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/assessments?id=${deleteTarget.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        setBanner({ kind: "error", text: data.error ?? "Unable to delete assessment" });
+        return;
+      }
+      const n = data.deletedResults ?? 0;
+      setBanner({
+        kind: "success",
+        text:
+          n > 0
+            ? `Deleted “${deleteTarget.name}” along with ${n} recorded result(s).`
+            : `Deleted “${deleteTarget.name}”.`,
+      });
+      if (openMarksId === deleteTarget.id) {
+        setOpenMarksId(null);
+        setMarksState({});
+      }
+      setDeleteTarget(null);
+      await refreshAssessments().catch(() => {});
+    } catch {
+      setBanner({ kind: "error", text: "Unable to reach the server" });
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  async function openMarks(a: AssessmentItem) {
+    if (openMarksId === a.id) {
+      setOpenMarksId(null);
+      setMarksState({});
+      return;
+    }
+    setOpenMarksId(a.id);
+    setMarksState({});
+    setMarksLoading(true);
+    try {
+      const res = await fetch(`/api/results?assessmentId=${a.id}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setBanner({ kind: "error", text: data.error ?? "Unable to load recorded marks" });
+        return;
+      }
+      const state: Record<string, string> = {};
+      for (const r of (data.results ?? []) as { studentId: string; marks: number | string }[]) {
+        state[r.studentId] = String(Number(r.marks));
+      }
+      setMarksState(state);
+    } catch {
+      setBanner({ kind: "error", text: "Unable to load recorded marks" });
+    } finally {
+      setMarksLoading(false);
+    }
+  }
+
+  async function saveMarks(a: AssessmentItem) {
+    const max = Number(a.maxMarks);
+    const rows = Object.entries(marksState).filter(([, v]) => v.trim() !== "");
+    if (rows.length === 0) {
+      setBanner({ kind: "error", text: "Enter marks for at least one student before saving." });
+      return;
+    }
+    if (rows.some(([, v]) => !Number.isFinite(Number(v)) || Number(v) < 0 || Number(v) > max)) {
+      setBanner({ kind: "error", text: `Marks must be between 0 and ${max}.` });
+      return;
+    }
+
     setIsSubmittingMarks(true);
-
-    const resultsToSubmit = relevantStudents
-      .filter((s) => marksState[s.id]?.marks !== undefined && marksState[s.id]?.marks !== "")
-      .map((s) => ({
-        studentId: s.id,
-        marks: Number(marksState[s.id].marks),
-        grade: marksState[s.id].grade || null,
-      }));
-
-    if (resultsToSubmit.length === 0) {
-      setError("Please enter marks for at least one student before saving.");
-      setIsSubmittingMarks(false);
-      return;
-    }
-
-    // Validate marks don't exceed maxMarks
-    const max = Number(selectedAssessment.maxMarks);
-    if (resultsToSubmit.some((r) => r.marks < 0 || r.marks > max)) {
-      setError(`Marks must be between 0 and ${max}`);
-      setIsSubmittingMarks(false);
-      return;
-    }
-
     try {
-      const response = await fetch("/api/results", {
+      const res = await fetch("/api/results", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          assessmentId: selectedAssessment.id,
-          results: resultsToSubmit,
+          assessmentId: a.id,
+          results: rows.map(([studentId, v]) => ({ studentId, marks: Number(v) })),
         }),
       });
-
-      const data = await response.json();
-      if (!response.ok) {
-        setError(data.error ?? "Unable to save results");
+      const data = await res.json();
+      if (!res.ok) {
+        setBanner({ kind: "error", text: data.error ?? "Unable to save marks" });
         return;
       }
-
-      setMessage(`Grades successfully saved for ${resultsToSubmit.length} student(s).`);
+      setBanner({
+        kind: "success",
+        text: `Saved marks for ${rows.length} student(s) — grades calculated automatically.`,
+      });
+      await refreshAssessments().catch(() => {});
     } catch {
-      setError("Unable to reach the server");
+      setBanner({ kind: "error", text: "Unable to reach the server" });
     } finally {
       setIsSubmittingMarks(false);
     }
   }
+
+  const bannerStyle: CSSProperties =
+    banner?.kind === "error"
+      ? { background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca" }
+      : { background: "#ecfdf5", color: "#047857", border: "1px solid #a7f3d0" };
 
   return (
     <TeacherShell
       active="/teacher/assessments"
-      title="Assessments &amp; Student Grading"
+      title="Assessments & Student Grading"
       subtitle="Evaluation & Marks Management"
       teacherName={teacherInfo ? `${teacherInfo.firstName} ${teacherInfo.lastName}` : "Faculty Member"}
       employeeNo={teacherInfo?.employeeNo}
       avatarUrl={teacherInfo?.profileImageUrl}
     >
-      {/* Alert Messages */}
-      {error && (
+      {banner && (
         <div
+          role={banner.kind === "error" ? "alert" : "status"}
           style={{
             padding: "12px 16px",
             borderRadius: "8px",
-            background: "#fef2f2",
-            color: "#b91c1c",
-            border: "1px solid #fecaca",
             marginBottom: "16px",
             fontSize: "0.88rem",
+            ...bannerStyle,
           }}
-          role="alert"
         >
-          {error}
+          {banner.text}
         </div>
       )}
-      {message && (
-        <div
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "12px",
+          marginBottom: "16px",
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <h2 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>My Assessments</h2>
+          <p style={{ margin: "4px 0 0", fontSize: "0.82rem", color: "var(--ink-soft)" }}>
+            {assessments.length} total · newest first
+          </p>
+        </div>
+        <button
+          onClick={openCreate}
+          disabled={classes.length === 0}
+          title={classes.length === 0 ? "Assigned classes will appear here" : "Create a new assessment"}
           style={{
-            padding: "12px 16px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "10px 18px",
             borderRadius: "8px",
-            background: "#ecfdf5",
-            color: "#047857",
-            border: "1px solid #a7f3d0",
-            marginBottom: "16px",
-            fontSize: "0.88rem",
+            background: "#0ea5e9",
+            color: "#fff",
+            fontWeight: "700",
+            fontSize: "0.85rem",
+            border: 0,
+            cursor: classes.length === 0 ? "not-allowed" : "pointer",
+            opacity: classes.length === 0 ? 0.5 : 1,
           }}
-          role="status"
         >
-          {message}
+          <IconPlus size={16} aria-hidden="true" />
+          New Assessment
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div className="profile-loading">Loading assessments…</div>
+      ) : classes.length === 0 ? (
+        <div
+          className="profile-info-card"
+          style={{ padding: "28px", textAlign: "center", color: "var(--ink-soft)" }}
+        >
+          No classes are assigned to you yet — assessments appear here once the timetable
+          assigns you a subject.
         </div>
-      )}
+      ) : assessments.length === 0 ? (
+        <div className="profile-info-card" style={{ padding: "28px", textAlign: "center" }}>
+          <p style={{ margin: 0, color: "var(--ink-soft)" }}>
+            No assessments yet. Click <strong>New Assessment</strong> to create the first one.
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: "12px" }}>
+          {assessments.map((a) => {
+            const max = Number(a.maxMarks);
+            const isOpen = openMarksId === a.id;
+            const recorded = a._count?.results ?? 0;
+            const roster = rosterFor(a);
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: "24px" }}>
-        {/* Create Assessment Card */}
-        <section className="profile-info-card" style={{ padding: "24px", height: "fit-content" }}>
-          <h2
-            style={{
-              padding: "0 0 14px 0",
-              fontSize: "1.15rem",
-              fontWeight: "700",
-              borderBottom: "1px solid var(--line, #e2e8f0)",
-            }}
-          >
-            Create New Assessment
-          </h2>
-
-          <form onSubmit={handleCreateAssessment} style={{ display: "grid", gap: "16px", marginTop: "16px" }}>
-            <div>
-              <label style={{ display: "block", marginBottom: "6px", fontSize: "0.8rem", color: "var(--ink-soft)" }}>
-                Class / Subject
-              </label>
-              <select
-                value={selectedClassIndex}
-                onChange={(e) => setSelectedClassIndex(e.target.value)}
-                disabled={classes.length === 0}
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: "8px",
-                  border: "1px solid var(--line, #e2e8f0)",
-                  background: "var(--panel, #fff)",
-                  color: "inherit",
-                }}
-              >
-                {classes.map((c, i) => (
-                  <option key={c.id} value={i}>
-                    {c.subject.code} · {c.subject.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label style={{ display: "block", marginBottom: "6px", fontSize: "0.8rem", color: "var(--ink-soft)" }}>
-                Assessment Title
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Mid-Term Exam, Quiz 1, Project"
-                value={assessmentName}
-                onChange={(e) => setAssessmentName(e.target.value)}
-                required
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: "8px",
-                  border: "1px solid var(--line, #e2e8f0)",
-                  background: "var(--panel, #fff)",
-                  color: "inherit",
-                }}
-              />
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-              <div>
-                <label style={{ display: "block", marginBottom: "6px", fontSize: "0.8rem", color: "var(--ink-soft)" }}>
-                  Maximum Marks
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="1000"
-                  value={maxMarks}
-                  onChange={(e) => setMaxMarks(e.target.value)}
-                  required
+            return (
+              <div key={a.id} className="profile-info-card" style={{ padding: "16px 20px" }}>
+                <div
                   style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    borderRadius: "8px",
-                    border: "1px solid var(--line, #e2e8f0)",
-                    background: "var(--panel, #fff)",
-                    color: "inherit",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "14px",
+                    flexWrap: "wrap",
                   }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: "block", marginBottom: "6px", fontSize: "0.8rem", color: "var(--ink-soft)" }}>
-                  Assessment Date
-                </label>
-                <input
-                  type="date"
-                  value={assessmentDate}
-                  onChange={(e) => setAssessmentDate(e.target.value)}
-                  required
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    borderRadius: "8px",
-                    border: "1px solid var(--line, #e2e8f0)",
-                    background: "var(--panel, #fff)",
-                    color: "inherit",
-                  }}
-                />
-              </div>
-            </div>
-
-            <button
-              className="primary-button"
-              type="submit"
-              disabled={isCreatingAssessment || classes.length === 0}
-              style={{
-                marginTop: "6px",
-                padding: "10px 18px",
-                borderRadius: "8px",
-                background: "#0ea5e9",
-                color: "#fff",
-                fontWeight: "700",
-                fontSize: "0.85rem",
-                border: 0,
-                cursor: "pointer",
-              }}
-            >
-              {isCreatingAssessment ? (
-                "Creating Assessment..."
-              ) : (
-                <>
-                  <IconPlus size={14} aria-hidden="true" />
-                  Create Assessment
-                </>
-              )}
-            </button>
-          </form>
-        </section>
-
-        {/* Enter Marks & Grading Card */}
-        <section className="profile-info-card" style={{ padding: "24px" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: "12px",
-              paddingBottom: "14px",
-              borderBottom: "1px solid var(--line, #e2e8f0)",
-            }}
-          >
-            <h2 style={{ margin: 0, padding: 0, fontSize: "1.15rem", fontWeight: "700" }}>
-              Enter Student Grades
-            </h2>
-            <select
-              value={selectedAssessmentId}
-              onChange={(e) => {
-                setSelectedAssessmentId(e.target.value);
-                setMarksState({});
-                setMessage("");
-                setError("");
-              }}
-              style={{
-                minWidth: "220px",
-                padding: "8px 12px",
-                borderRadius: "8px",
-                border: "1px solid var(--line, #e2e8f0)",
-                fontSize: "0.82rem",
-                background: "var(--panel, #fff)",
-                color: "inherit",
-              }}
-              disabled={assessments.length === 0}
-            >
-              {assessments.length === 0 && <option value="">No assessments created</option>}
-              {assessments.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.subject.code} · {a.name} (Max: {String(a.maxMarks)})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {isLoading ? (
-            <p className="empty-state" style={{ textAlign: "center", padding: "40px 0" }}>
-              Loading assessment data...
-            </p>
-          ) : !selectedAssessment ? (
-            <p className="empty-state" style={{ textAlign: "center", padding: "40px 0" }}>
-              Create an assessment to start recording student grades.
-            </p>
-          ) : (
-            <div style={{ marginTop: "16px" }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "10px 14px",
-                  borderRadius: "8px",
-                  background: "rgba(14, 165, 233, 0.08)",
-                  fontSize: "0.82rem",
-                  marginBottom: "16px",
-                }}
-              >
-                <span>
-                  Subject: <strong>{selectedAssessment.subject.name}</strong> ({selectedAssessment.subject.code})
-                </span>
-                <span>
-                  Max Marks: <strong>{String(selectedAssessment.maxMarks)}</strong>
-                </span>
-              </div>
-
-              {relevantStudents.length === 0 ? (
-                <p className="empty-state" style={{ textAlign: "center", padding: "30px 0" }}>
-                  No enrolled students found in this program.
-                </p>
-              ) : (
-                <>
-                  <div
+                >
+                  <span
                     style={{
-                      maxHeight: "400px",
-                      overflowY: "auto",
-                      border: "1px solid var(--line, #e2e8f0)",
+                      flexShrink: 0,
+                      padding: "6px 10px",
                       borderRadius: "8px",
+                      background: "#e0f2fe",
+                      color: "#0369a1",
+                      fontWeight: 800,
+                      fontSize: "0.8rem",
                     }}
                   >
-                    <table
+                    {a.subject.code}
+                  </span>
+                  <div style={{ flex: "1 1 260px", minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>{a.name}</div>
+                    <div
                       style={{
-                        width: "100%",
-                        borderCollapse: "collapse",
-                        textAlign: "left",
-                        fontSize: "0.85rem",
+                        fontSize: "0.78rem",
+                        color: "var(--ink-soft)",
+                        marginTop: "3px",
                       }}
                     >
-                      <thead>
-                        <tr
-                          style={{
-                            background: "#f8fafc",
-                            borderBottom: "1px solid var(--line, #e2e8f0)",
-                            color: "var(--ink-soft)",
-                          }}
-                        >
-                          <th style={{ padding: "10px 14px", fontWeight: "600" }}>Roll / Enrollment</th>
-                          <th style={{ padding: "10px 14px", fontWeight: "600" }}>Student Name</th>
-                          <th style={{ padding: "10px 14px", width: "120px", fontWeight: "600" }}>Marks</th>
-                          <th style={{ padding: "10px 14px", width: "90px", fontWeight: "600" }}>Grade</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {relevantStudents.map((s) => {
-                          const currentMarks = marksState[s.id]?.marks ?? "";
-                          const currentGrade = marksState[s.id]?.grade ?? "";
-
-                          return (
-                            <tr key={s.id} style={{ borderBottom: "1px solid var(--line, #e2e8f0)" }}>
-                              <td style={{ padding: "10px 14px", fontWeight: "600" }}>
-                                {s.rollNumber || s.enrollmentNumber}
-                              </td>
-                              <td style={{ padding: "10px 14px" }}>
-                                {s.user.firstName} {s.user.lastName}
-                              </td>
-                              <td style={{ padding: "6px 14px" }}>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max={String(selectedAssessment.maxMarks)}
-                                  placeholder="0.0"
-                                  step="0.5"
-                                  value={currentMarks}
-                                  onChange={(e) =>
-                                    setMarksState({
-                                      ...marksState,
-                                      [s.id]: { ...marksState[s.id], marks: e.target.value },
-                                    })
-                                  }
-                                  style={{
-                                    width: "100%",
-                                    padding: "6px 10px",
-                                    borderRadius: "6px",
-                                    border: "1px solid var(--line, #e2e8f0)",
-                                    background: "var(--panel, #fff)",
-                                    color: "inherit",
-                                  }}
-                                />
-                              </td>
-                              <td style={{ padding: "6px 14px" }}>
-                                <input
-                                  type="text"
-                                  placeholder="A/B/C"
-                                  maxLength={3}
-                                  value={currentGrade}
-                                  onChange={(e) =>
-                                    setMarksState({
-                                      ...marksState,
-                                      [s.id]: { ...marksState[s.id], grade: e.target.value.toUpperCase() },
-                                    })
-                                  }
-                                  style={{
-                                    width: "100%",
-                                    padding: "6px 10px",
-                                    borderRadius: "6px",
-                                    border: "1px solid var(--line, #e2e8f0)",
-                                    background: "var(--panel, #fff)",
-                                    color: "inherit",
-                                  }}
-                                />
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                      {a.subject.name} · {a.program.code} · Sem {a.semester} · Max {max} ·{" "}
+                      {fmtDate(a.assessmentDate)}
+                    </div>
                   </div>
-
-                  <div style={{ marginTop: "18px", display: "flex", justifyContent: "flex-end" }}>
+                  <span
+                    style={{
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                      padding: "4px 10px",
+                      borderRadius: "999px",
+                      background: recorded > 0 ? "#dcfce7" : "var(--table-row-hover)",
+                      color: recorded > 0 ? "#15803d" : "var(--ink-soft)",
+                    }}
+                  >
+                    {recorded > 0 ? `${recorded} recorded` : "No marks yet"}
+                  </span>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                     <button
-                      className="primary-button"
-                      type="button"
-                      onClick={handleSaveResults}
-                      disabled={isSubmittingMarks}
+                      onClick={() => openMarks(a)}
                       style={{
-                        padding: "10px 24px",
+                        padding: "8px 14px",
                         borderRadius: "8px",
-                        background: "#0ea5e9",
-                        color: "#fff",
-                        fontWeight: "700",
-                        fontSize: "0.85rem",
-                        border: 0,
+                        fontSize: "0.8rem",
+                        fontWeight: 700,
                         cursor: "pointer",
+                        border: `1px solid ${isOpen ? "transparent" : "var(--line-strong)"}`,
+                        background: isOpen ? "#0ea5e9" : "transparent",
+                        color: isOpen ? "#fff" : "var(--ink)",
                       }}
                     >
-                      {isSubmittingMarks ? "Saving Grades..." : "Save Student Marks"}
+                      {isOpen ? "Hide Marks" : "Enter Marks"}
+                    </button>
+                    <button
+                      onClick={() => openEdit(a)}
+                      title="Edit assessment"
+                      aria-label={`Edit ${a.name}`}
+                      style={iconBtnStyle}
+                    >
+                      <IconPencil size={15} aria-hidden="true" />
+                    </button>
+                    <button
+                      onClick={() => askDelete(a)}
+                      title="Delete assessment"
+                      aria-label={`Delete ${a.name}`}
+                      style={{ ...iconBtnStyle, color: "#dc2626" }}
+                    >
+                      <IconTrash size={15} aria-hidden="true" />
                     </button>
                   </div>
-                </>
-              )}
-            </div>
-          )}
-        </section>
-      </div>
-    </TeacherShell>
-  );
-}
+                </div>
+
+                {isOpen && (
+                  <div
+                    style={{
+                      marginTop: "14px",
+                      borderTop: "1px solid var(--line)",
+                      paddingTop: "14px",
+                    }}
+                  >
+                    {marksLoading ? (
+                      <div style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>
+                        Loading recorded marks…
+                      </div>
+                    ) : roster.length === 0 ? (
+                      <div style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>
+                        No active students found for this class.
+                      </div>
+                    ) : (
+                      <>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            marginBottom: "10px",
+                            flexWrap: "wrap",
+                            gap: "8px",
+                          }}
+                        >
+                          <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+                            Grades calculate automatically from marks ÷ {max}. Pass mark 40%.
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                              color: "var(--ink-soft)",
+                            }}
+                          >
+                            {filledCount} of {roster.length} filled
+                          </span>
+                        </div>
+                        <div style={{ overflowX: "auto" }}>
+                          <table
+                            style={{
+                              width: "100%",
+                              borderCollapse: "collapse",
+                              fontSize: "0.85rem",
+                              textAlign: "left",
+                            }}
+                          >
+                            <thead>
+                              <tr
+                                style={{
+                                  borderBottom: "1px solid var(--line)",
+                                  background: "var(--table-header-bg)",
+                                  color: "var(--ink-soft)",
+                                }}
+                              >
+                                <th style={thStyle}>Roll</th>
+                                <th style={thStyle}>Student</th>
+                                <th style={thStyle}>Marks (0–{max})</th>
+                                <th style={thStyle}>Grade (auto)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {roster.map((s) => {
+                                const raw = marksState[s.id] ?? "";
+                                const n = Number(raw);
+                                const invalid =
+                                  raw.trim() !== "" &&
+                                  (!Number.isFinite(n) || n < 0 || n > max);
+                                const grade = gradeForMarks(n, max);
+                                return (
+                                  <tr
+                                    key={s.id}
+                                    style={{ borderBottom: "1px solid var(--line-faint)" }}
+                                  >
+                                    <td style={tdStyle}>
+                                      {s.rollNumber || s.enrollmentNumber}
+                                    </td>
+                                    <td style={tdStyle}>
+                                      {s.user.firstName} {s.user.lastName}
+                                      <div
+                                        style={{
+                                          fontSize: "0.72rem",
+                                          color: "var(--ink-soft)",
+                                        }}
+                                      >
+                                        {s.enrollmentNumber}
+                                      </div>
+                                    </td>
+                                    <td style={tdStyle}>
+                                      <input
+                                        type="number"
+                                        inputMode="decimal"
+                                        min="0"
+                                        max={String(max)}
+                                        step="0.5"
+                                        placeholder="—"
+                                        value={raw}
+                                        onChange={(e) =>
+                                          setMarksState((prev) => ({
+                                            ...prev,
+                                            [s.id]: e.target.value,
+                                          }))
+                                        }
+                                        style={{
+                                          width: "90px",
+                                          padding: "7px 10px",
+                                          borderRadius: "8px",
+                                          border: `1px solid ${
+                                            invalid ? "#ef4444" : "var(--line)"
+                                          }`,
+                                          background: "var(--panel)",
+                                          color: "inherit",
+                                        }}
+                                      />
+                                    </td>
+                                    <td style={tdStyle}>
+                                      {raw.trim() === "" || invalid || grade === null ? (
+                                        <span
+                                          style={{
+                                            color: invalid ? "#ef4444" : "var(--ink-soft)",
+                                            fontSize: "0.8rem",
+                                          }}
+                                        >
+                                          {invalid ? "out of range" : "—"}
+                                        </span>
+                                      ) : (
+                                        <span
+                                          style={{
+                                            display: "inline-block",
+                                            padding: "3px 10px",
+                                            borderRadius: "6px",
+                                            fontSize: "0.75rem",
+                                            fontWeight: 800,
+                                            background:
+                                              grade === "F" ? "#fee2e2" : "#dcfce7",
+                                            color: grade === "F" ? "#b91c1c" : "#15803d",
+                                          }}
+                                        >
+                                          {grade}
+                                        </span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div
+                          style={{
+                            marginTop: "14px",
+                            display: "flex",
+                            justifyContent: "flex-end",
+                            gap: "12px",
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
+                            Leave a field empty to skip that student.
+                          </span>
+                          <button
+                            onClick={() => saveMarks(a)}
+                            disabled={isSubmittingMarks}
+                            style={{
+                              padding: "10px 22px",
+                              borderRadius: "8px",
+                              background: "#0ea5e9",
+                              color: "#fff",
+                              fontWeight: "700",
+                              fontSize: "0.85rem",
+                              border: 0,
+                              cursor: isSubmittingMarks ? "wait" : "pointer",
+                            }}
+                          >
+                            {isSubmittingMarks
+                              ? "Saving…"
+                              : `Save Marks (${filledCount})`}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}

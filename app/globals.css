@@ -2194,6 +2194,15 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
   background: rgba(2, 132, 199, 0.04);
 }
 
+/* Read-only mode (student schedule view) — no add-slot cursor or hover tint. */
+.tt-day-track-readonly {
+  cursor: default;
+}
+
+.tt-day-track-readonly:hover {
+  background: transparent;
+}
+
 .tt-block {
   position: absolute;
   z-index: 1;
@@ -2205,6 +2214,7 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
   overflow: hidden;
   white-space: nowrap;
   padding: 2px 8px;
+  margin-left: 3px;
   border: 1px solid transparent;
   border-left-width: 4px;
   border-radius: 7px;
@@ -2215,6 +2225,13 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
 
 .tt-block:hover {
   box-shadow: 0 6px 16px -6px rgba(2, 132, 199, 0.45);
+}
+
+/* Read-only blocks (student view) — no pointer cursor or hover lift. */
+.tt-block-readonly,
+.tt-block-readonly:hover {
+  cursor: default;
+  box-shadow: none;
 }
 
 .tt-block strong {
@@ -2287,6 +2304,24 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
   background: var(--background);
   border-radius: 99px;
   padding: 1px 8px;
+}
+
+/* Admin editor: the lunch overlay is clickable to edit the single slot. */
+.tt-lunch-interactive {
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.tt-lunch-interactive:hover {
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(14, 165, 233, 0.14) 0,
+      rgba(14, 165, 233, 0.14) 8px,
+      rgba(14, 165, 233, 0.06) 8px,
+      rgba(14, 165, 233, 0.06) 16px
+    );
 }
 
 .tt-unscheduled {

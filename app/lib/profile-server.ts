@@ -31,7 +31,7 @@ const PROFILE_USER_SELECT = {
       rollNumber: true,
       currentSemester: true,
       admissionDate: true,
-      programEnrollmentStatus: true,
+      status: true,
       gender: true,
       bloodGroup: true,
       nationality: true,
@@ -171,8 +171,8 @@ function collectFieldValues(
     values.registrationId = s.registrationId;
     values.rollNumber = s.rollNumber;
     values.admissionDate = s.admissionDate ? formatProfileDate(s.admissionDate) : null;
-    values.programEnrollmentStatus = s.programEnrollmentStatus
-      ? formatEnumLabel(s.programEnrollmentStatus)
+    values.status = s.status
+      ? formatEnumLabel(s.status)
       : null;
     values.gender = s.gender;
     values.bloodGroup = s.bloodGroup;

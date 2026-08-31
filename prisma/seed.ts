@@ -51,6 +51,26 @@ async function main() {
   });
     console.log("✅ Programs: BCT, BCE, BE ARCH");
 
+  // ─── Academic Year ─────────────────────────────────────────
+  // A single live academic session; isCurrent marks the year that new
+  // semester enrollments attach to (e.g. the student-semesters advance action).
+  const academicYear = await prisma.academicYear.upsert({
+    where: { name: "2023/2024" },
+    update: {
+      startDate: new Date("2023-09-01"),
+      endDate: new Date("2025-06-30"),
+      isCurrent: true,
+      status: "ACTIVE",
+    },
+    create: {
+      name: "2023/2024",
+      startDate: new Date("2023-09-01"),
+      endDate: new Date("2025-06-30"),
+      isCurrent: true,
+      status: "ACTIVE",
+    },
+  });
+
   // ─── Users ──────────────────────────────────────────────────
   const adminHash = await hash("admin1234", 12);
   const adminUser = await prisma.user.upsert({
@@ -122,6 +142,50 @@ async function main() {
     studentMap[s.email] = student.id;
   }
     console.log("✅ Users: admin, 6 teachers, 3 students");
+
+  // ─── Student semester enrollment history ────────────────────
+  // Each seeded student is in semester 6; backfill a full history (semesters 1-5
+  // COMPLETED, 6 ACTIVE) so the academic-history view has real data to show.
+  for (const s of studentsInfo) {
+    const studentId = studentMap[s.email];
+    if (!studentId) continue;
+    for (let sem = 1; sem <= 5; sem++) {
+      await prisma.studentSemester.upsert({
+        where: {
+          studentId_academicYearId_semesterNo: {
+            studentId,
+            academicYearId: academicYear.id,
+            semesterNo: sem,
+          },
+        },
+        update: { status: "COMPLETED", startDate: new Date("2023-09-01") },
+        create: {
+          studentId,
+          academicYearId: academicYear.id,
+          semesterNo: sem,
+          status: "COMPLETED",
+          startDate: new Date("2023-09-01"),
+        },
+      });
+    }
+    await prisma.studentSemester.upsert({
+      where: {
+        studentId_academicYearId_semesterNo: {
+          studentId,
+          academicYearId: academicYear.id,
+          semesterNo: 6,
+        },
+      },
+      update: { status: "ACTIVE", startDate: new Date("2023-09-01") },
+      create: {
+        studentId,
+        academicYearId: academicYear.id,
+        semesterNo: 6,
+        status: "ACTIVE",
+        startDate: new Date("2023-09-01"),
+      },
+    });
+  }
 
     // ─── Curriculum ─────────────────────────────────────────────
   await prisma.$transaction(async (tx) => {
