@@ -17,7 +17,7 @@ const items = [
   ["Attendance", "/student/attendance", IconCalendarCheck],
   ["Subjects", "/student/subjects", IconBook2],
   ["Notes", "/student/notes", IconNotebook],
-  ["Syllabi", "/student/syllabi", IconFileDescription],
+  ["Syllabus", "/student/syllabus", IconFileDescription],
   ["Schedules", "/student/schedules", IconCalendarClock],
 ] as const;
 

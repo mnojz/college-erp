@@ -37,13 +37,29 @@ export default function AdminSyllabiPage() {
 
   // Search + filters
   const [q, setQ] = useState("");
-  const [filterDept, setFilterDept] = useState("");
   const [filterProgram, setFilterProgram] = useState("");
   const [filterSemester, setFilterSemester] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [message, setMessage] = useState("");
+
+  async function refresh() {
+    const [listRes, metaRes] = await Promise.all([
+      fetch("/api/syllabus"),
+      fetch("/api/syllabus/meta"),
+    ]);
+    if (!listRes.ok) throw new Error("Unable to load syllabus");
+    const listData = await listRes.json();
+    setSyllabi(listData.syllabi ?? []);
+    if (metaRes.ok) {
+      const metaData = await metaRes.json();
+      setMeta({
+        departments: metaData.departments ?? [],
+        programs: metaData.programs ?? [],
+      });
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -59,23 +75,9 @@ export default function AdminSyllabiPage() {
       }
 
       try {
-        const [listRes, metaRes] = await Promise.all([
-          fetch("/api/syllabi"),
-          fetch("/api/syllabi/meta"),
-        ]);
-        if (!listRes.ok) throw new Error("Unable to load syllabi");
-        const listData = await listRes.json();
-        setSyllabi(listData.syllabi ?? []);
-        if (metaRes.ok) {
-          const metaData = await metaRes.json();
-          setMeta({
-            departments: metaData.departments ?? [],
-            programs: metaData.programs ?? [],
-          });
-          if (metaData.departments?.length) setFilterDept(metaData.departments[0]);
-        }
+        await refresh();
       } catch (err) {
-        setError((err as Error).message ?? "Unable to load syllabi");
+        setError((err as Error).message ?? "Unable to load syllabus");
       } finally {
         setLoading(false);
       }
@@ -83,15 +85,9 @@ export default function AdminSyllabiPage() {
     load();
   }, [router]);
 
-  const departmentPrograms = useMemo(() => {
-    if (!filterDept) return meta.programs;
-    return meta.programs.filter((p) => p.departmentName === filterDept);
-  }, [meta.programs, filterDept]);
-
   const filtered = useMemo(() => {
     const term = q.toLowerCase().trim();
     return syllabi.filter((s) => {
-      if (filterDept && s.departmentName !== filterDept) return false;
       if (filterProgram && s.programId !== filterProgram) return false;
       if (filterSemester) {
         if (s.semester !== Number.parseInt(filterSemester, 10)) return false;
@@ -102,9 +98,9 @@ export default function AdminSyllabiPage() {
       }
       return true;
     });
-  }, [syllabi, q, filterDept, filterProgram, filterSemester]);
+  }, [syllabi, q, filterProgram, filterSemester]);
 
-        const groups: GroupedByDepartment[] = useSyllabusGroups(filtered, meta.programs);
+  const groups: GroupedByDepartment[] = useSyllabusGroups(filtered, meta.programs);
 
   async function handleCreate(values: SyllabusSubmitValues) {
     setFormError("");
@@ -113,16 +109,18 @@ export default function AdminSyllabiPage() {
     try {
       const fd = new FormData();
       fd.append("title", values.title);
-      fd.append("departmentName", values.departmentName);
+      fd.append("departmentName", meta.departments[0] ?? "");
       fd.append("programId", values.programId);
       fd.append("semester", values.semester);
       if (values.file) fd.append("file", values.file);
 
-      const res = await fetch("/api/syllabi", { method: "POST", body: fd });
+      const res = await fetch("/api/syllabus", { method: "POST", body: fd });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Unable to upload syllabus");
-      const created: Syllabus = data.syllabus as Syllabus;
-      setSyllabi((p) => [created, ...p]);
+      // The POST response only returns { id } — refetch so the list always
+      // holds complete rows (an optimistic prepend of a partial object
+      // previously crashed grouping and produced undefined React keys).
+      await refresh();
       setShowCreateModal(false);
       setMessage("Syllabus uploaded successfully.");
     } catch (err) {
@@ -140,30 +138,15 @@ export default function AdminSyllabiPage() {
     try {
       const fd = new FormData();
       fd.append("title", values.title);
-      fd.append("departmentName", values.departmentName);
+      fd.append("departmentName", meta.departments[0] ?? "");
       fd.append("programId", values.programId);
       fd.append("semester", values.semester);
       if (values.file) fd.append("file", values.file);
 
-      const res = await fetch(`/api/syllabi/${editing.id}`, { method: "PATCH", body: fd });
+      const res = await fetch(`/api/syllabus/${editing.id}`, { method: "PATCH", body: fd });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Unable to update syllabus");
-      setSyllabi((p) =>
-        p.map((s) =>
-          s.id === editing.id
-            ? {
-                ...s,
-                title: values.title,
-                departmentName: values.departmentName,
-                programId: values.programId || null,
-                semester: Number(values.semester),
-                ...(values.file
-                  ? { fileName: values.file.name, fileSize: values.file.size }
-                  : {}),
-              }
-            : s,
-        ),
-      );
+      await refresh();
       setEditing(null);
       setMessage("Syllabus updated successfully.");
     } catch (err) {
@@ -178,10 +161,10 @@ export default function AdminSyllabiPage() {
     setFormError("");
     setSaving(true);
     try {
-      const res = await fetch(`/api/syllabi/${deleting.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/syllabus/${deleting.id}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Unable to delete syllabus");
-      setSyllabi((p) => p.filter((s) => s.id !== deleting.id));
+      await refresh();
       setDeleting(null);
       setMessage("Syllabus deleted.");
     } catch (err) {
@@ -191,9 +174,8 @@ export default function AdminSyllabiPage() {
     }
   }
 
-    function resetFilters() {
+  function resetFilters() {
     setQ("");
-    setFilterDept("");
     setFilterProgram("");
     setFilterSemester("");
   }
@@ -201,9 +183,9 @@ export default function AdminSyllabiPage() {
   if (loading) {
     return (
       <AdminShell
-        title="Syllabi"
-        subtitle="Program syllabi library"
-        active="/admin/syllabi"
+        title="Syllabus"
+        subtitle="Program syllabus library"
+        active="/admin/syllabus"
       >
         <p>Loading…</p>
       </AdminShell>
@@ -212,55 +194,59 @@ export default function AdminSyllabiPage() {
 
   return (
     <AdminShell
-      title="Syllabi"
-      subtitle="Program syllabi library"
-      active="/admin/syllabi"
+      title="Syllabus"
+      subtitle="Program syllabus library"
+      active="/admin/syllabus"
     >
       <div>
+        {/* Top bar */}
+        <div className="admin-topbar">
+          <p style={{ margin: 0, color: "var(--ink-soft)", fontSize: 13, fontFamily: "Arial, sans-serif" }}>
+            {`${syllabi.length} syllabus file${syllabi.length !== 1 ? "s" : ""} registered`}
+          </p>
+          <div className="admin-topbar-actions">
+            <button
+              type="button"
+              className="btn-add"
+              onClick={() => {
+                setFormError("");
+                setShowCreateModal(true);
+              }}
+            >
+              <IconPlus size={15} aria-hidden="true" />
+              Upload Syllabus
+            </button>
+          </div>
+        </div>
+
         {message && <p className="notes-success-banner">{message}</p>}
         {error && <p className="notes-form-error">{error}</p>}
 
         {/* Metrics */}
         <section className="admin-metric-grid" style={{ marginBottom: "24px" }}>
           <div className="admin-metric-card">
-            <span>Total Syllabi</span>
+            <span>Total Syllabus</span>
             <strong>{syllabi.length}</strong>
           </div>
           <div className="admin-metric-card">
-            <span>Departments</span>
-            <strong>{groups.length}</strong>
+            <span>Programs</span>
+            <strong>{new Set(syllabi.map((s) => s.programId).filter(Boolean)).size}</strong>
           </div>
           <div className="admin-metric-card">
-            <span>Filtered</span>
+            <span>Showing</span>
             <strong>{filtered.length}</strong>
           </div>
         </section>
 
-        {/* Toolbar */}
-        <div
-          style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "16px" }}
-        >
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={() => {
-              setFormError("");
-              setShowCreateModal(true);
-            }}
-          >
-            <IconPlus size={16} aria-hidden="true" />
-            Upload Syllabus
-          </button>
+        {/* Search + filters */}
+        <div style={{ marginBottom: "16px" }}>
           <SyllabusToolbar
-            meta={meta}
             q={q}
-            filterDept={filterDept}
             filterProgram={filterProgram}
             filterSemester={filterSemester}
-            departmentPrograms={departmentPrograms}
+            programs={meta.programs}
             onChange={(p) => {
               if (p.q !== undefined) setQ(p.q);
-              if (p.filterDept !== undefined) setFilterDept(p.filterDept);
               if (p.filterProgram !== undefined) setFilterProgram(p.filterProgram);
               if (p.filterSemester !== undefined) setFilterSemester(p.filterSemester);
             }}
@@ -277,11 +263,11 @@ export default function AdminSyllabiPage() {
 
         {filtered.length === 0 && !error && (
           <div className="profile-info-card notes-empty">
-            <h3>No syllabi found</h3>
+            <h3>No syllabus found</h3>
             <p>
               {syllabi.length === 0
-                ? "No syllabi have been uploaded yet. Click \u201cUpload Syllabus\u201d to get started."
-                : "No syllabi match the selected filters. Try adjusting your search or filters."}
+                ? "No syllabus files have been uploaded yet. Click \u201cUpload Syllabus\u201d to get started."
+                : "No syllabus files match the selected filters. Try adjusting your search or filters."}
             </p>
           </div>
         )}
@@ -308,7 +294,6 @@ export default function AdminSyllabiPage() {
               meta={meta}
               initial={{
                 title: editing.title ?? "",
-                departmentName: editing.departmentName,
                 programId: editing.programId ?? "",
                 semester: String(editing.semester),
               }}

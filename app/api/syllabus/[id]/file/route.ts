@@ -4,7 +4,7 @@ import { prisma } from "@/app/lib/prisma";
 type RouteContext = { params: Promise<{ id: string }> };
 
 /**
- * GET /api/syllabi/[id]/file — stream the stored PDF to any viewer (public).
+ * GET /api/syllabus/[id]/file — stream the stored PDF to any viewer (public).
  * `?inline=1` renders in-browser when the mime type is previewable.
  */
 export async function GET(request: Request, ctx: RouteContext) {
@@ -38,7 +38,7 @@ export async function GET(request: Request, ctx: RouteContext) {
       },
     });
   } catch (error) {
-    console.error("GET /api/syllabi/[id]/file error:", error);
+    console.error("GET /api/syllabus/[id]/file error:", error);
     return NextResponse.json(
       { error: "Unable to download syllabus" },
       { status: 500 },

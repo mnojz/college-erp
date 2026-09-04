@@ -174,8 +174,7 @@ model Student {
   currTole           String?
 
   // Guardian / parent details — set/edited by the student.
-  fatherName       String?
-  motherName       String?
+  guardianName     String?
   guardianPhone    String?
   guardianEmail    String?
   guardianRelation String?

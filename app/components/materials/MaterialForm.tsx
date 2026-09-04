@@ -90,16 +90,6 @@ export function MaterialForm({
   const [fileName, setFileName] = useState("");
   const [file, setFile] = useState<File | null>(null);
 
-  const departments = meta.departments;
-
-  const filteredPrograms = useMemo(
-    () =>
-      values.departmentName
-        ? meta.programs.filter((p) => p.departmentName === values.departmentName)
-        : meta.programs,
-    [meta.programs, values.departmentName],
-  );
-
   const selectedProgram = meta.programs.find((p) => p.id === values.programId);
   const semesterOptions = useMemo(
     () => (selectedProgram ? semestersForDuration(selectedProgram.durationYears) : []),
@@ -118,10 +108,6 @@ export function MaterialForm({
 
   function set<K extends keyof typeof values>(key: K, value: (typeof values)[K]) {
     setValues((v) => ({ ...v, [key]: value }));
-  }
-
-  function handleDepartmentChange(department: string) {
-    setValues((v) => ({ ...v, departmentName: department, programId: "", semester: "", subjectId: "" }));
   }
 
   function handleProgramChange(programId: string) {
@@ -226,22 +212,10 @@ export function MaterialForm({
 
       <div className="inline-pair">
         <label>
-          Department
-          <select value={values.departmentName} onChange={(e) => handleDepartmentChange(e.target.value)}>
-            <option value="">Not specific</option>
-            {departments.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
           Program
           <select value={values.programId} onChange={(e) => handleProgramChange(e.target.value)}>
             <option value="">Not specific</option>
-            {filteredPrograms.map((p) => (
+            {meta.programs.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.code} — {p.name}
               </option>

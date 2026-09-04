@@ -52,7 +52,6 @@ export function CourseStructureViewer() {
   const [loadingPrograms, setLoadingPrograms] = useState(true);
   const [error, setError] = useState("");
 
-  const [department, setDepartment] = useState("");
   const [programId, setProgramId] = useState("");
   const [curriculum, setCurriculum] = useState<Curriculum | null>(null);
   const [loadingCurriculum, setLoadingCurriculum] = useState(false);
@@ -67,97 +66,61 @@ export function CourseStructureViewer() {
       })
       .then((loaded: Program[]) => {
         setPrograms(loaded);
-        if (loaded.length > 0) setDepartment(loaded[0].departmentName);
       })
       .catch((reason: Error) => setError(reason.message))
       .finally(() => setLoadingPrograms(false));
   }, []);
 
-  const departments = useMemo(
-    () =>
-      [...new Set(programs.map((p) => p.departmentName))].sort((a, b) =>
-        a.localeCompare(b),
-      ),
+  const programOptions = useMemo(
+    () => programs.sort((a, b) => a.name.localeCompare(b.name)),
     [programs],
   );
 
-  const programOptions = useMemo(
-    () =>
-      programs
-        .filter((p) => p.departmentName === department)
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [programs, department],
-  );
+  // 2. Effective selection: falls back to the first program while none has
+  //    been picked. Derived during render — no effect, no cascading setState.
+  const selectedId = programId || programOptions[0]?.id || "";
 
-  // 2. Auto-select the first program when the department changes and no
-  //    program is currently selected.
+  // 3. Load the selected program's curriculum from the database. The state
+  //    reset + fetch start are deferred by a zero-delay timer so the effect
+  //    body stays side-effect-free (react-hooks/set-state-in-effect).
   useEffect(() => {
-    if (!programId && programOptions.length > 0) {
-      setProgramId(programOptions[0].id);
-    }
-  }, [programOptions, programId]);
-
-  // 3. Load the selected program's curriculum from the database.
-  useEffect(() => {
-    if (!programId) {
-      setCurriculum(null);
-      return;
-    }
+    if (!selectedId) return;
     let cancelled = false;
-    setLoadingCurriculum(true);
-    setError("");
-    fetch(`/api/curriculum?programId=${programId}`)
-      .then(async (res) => {
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Unable to load curriculum");
-        return data.curriculum as Curriculum | null;
-      })
-      .then((data) => {
-        if (!cancelled) setCurriculum(data);
-      })
-      .catch((reason: Error) => {
-        if (!cancelled) setError(reason.message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingCurriculum(false);
-      });
+    const timer = setTimeout(() => {
+      setLoadingCurriculum(true);
+      setError("");
+      fetch(`/api/curriculum?programId=${selectedId}`)
+        .then(async (res) => {
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error ?? "Unable to load curriculum");
+          return data.curriculum as Curriculum | null;
+        })
+        .then((data) => {
+          if (!cancelled) setCurriculum(data);
+        })
+        .catch((reason: Error) => {
+          if (!cancelled) setError(reason.message);
+        })
+        .finally(() => {
+          if (!cancelled) setLoadingCurriculum(false);
+        });
+    }, 0);
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
-  }, [programId]);
+  }, [selectedId]);
 
-  function selectDepartment(dept: string) {
-    setDepartment(dept);
-    setProgramId("");
-    setCurriculum(null);
-  }
-
-  const selectedProgram = programOptions.find((p) => p.id === programId);
+  const selectedProgram = programOptions.find((p) => p.id === selectedId);
 
   return (
     <div className="cs-root">
       {/* ─── Selectors ─────────────────────────────────────────────── */}
       <div className="cs-selectors">
         <label className="cs-field">
-          <span>Department</span>
-          <select
-            value={department}
-            onChange={(e) => selectDepartment(e.target.value)}
-            disabled={loadingPrograms || departments.length === 0}
-          >
-            {departments.length === 0 && <option value="">Loading…</option>}
-            {departments.map((dept) => (
-              <option key={dept} value={dept}>
-                {dept}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="cs-field">
           <span>Program</span>
           <select
-            value={programId}
+            value={selectedId}
             onChange={(e) => setProgramId(e.target.value)}
             disabled={programOptions.length === 0}
           >

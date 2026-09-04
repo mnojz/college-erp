@@ -3,7 +3,7 @@ import { prisma } from "@/app/lib/prisma";
 import { type SyllabusMeta } from "@/app/lib/syllabi-shared";
 
 /**
- * GET /api/syllabi/meta — public filter options:
+ * GET /api/syllabus/meta — public filter options:
  * distinct departments and all programs (with their departments).
  */
 export async function GET() {
@@ -24,7 +24,7 @@ export async function GET() {
     const meta: SyllabusMeta = { departments, programs };
     return NextResponse.json(meta);
   } catch (error) {
-    console.error("GET /api/syllabi/meta error:", error);
+    console.error("GET /api/syllabus/meta error:", error);
     return NextResponse.json(
       { error: "Unable to load filter options" },
       { status: 500 },

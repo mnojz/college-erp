@@ -66,8 +66,7 @@ type Profile = {
   currWard: number | null;
   currTole: string | null;
   // Guardian / parent details — editable by the student.
-  fatherName: string | null;
-  motherName: string | null;
+  guardianName: string | null;
   guardianPhone: string | null;
   guardianEmail: string | null;
   guardianRelation: string | null;
@@ -100,8 +99,7 @@ type EditFormState = {
   currWard: number | null;
   currTole: string;
   emergencyContact: string;
-  fatherName: string;
-  motherName: string;
+  guardianName: string;
   guardianPhone: string;
   guardianEmail: string;
   guardianRelation: string;
@@ -204,8 +202,7 @@ export default function StudentPage() {
       currWard: profile.currWard ?? null,
       currTole: profile.currTole ?? "",
       emergencyContact: profile.emergencyContact ?? "",
-      fatherName: profile.fatherName ?? "",
-      motherName: profile.motherName ?? "",
+      guardianName: profile.guardianName ?? "",
       guardianPhone: profile.guardianPhone ?? "",
       guardianEmail: profile.guardianEmail ?? "",
       guardianRelation: profile.guardianRelation ?? "",
@@ -262,8 +259,7 @@ export default function StudentPage() {
       currWard: editForm.currWard,
       currTole: editForm.currTole,
       emergencyContact: editForm.emergencyContact,
-      fatherName: editForm.fatherName,
-      motherName: editForm.motherName,
+      guardianName: editForm.guardianName,
       guardianPhone: editForm.guardianPhone,
       guardianEmail: editForm.guardianEmail,
       guardianRelation: editForm.guardianRelation,
@@ -413,8 +409,7 @@ export default function StudentPage() {
           title="Guardian / Parent Details"
           icon={IconUsersGroup}
           rows={[
-            ["Father's Name", profile.fatherName || "Not provided"],
-            ["Mother's Name", profile.motherName || "Not provided"],
+            ["Guardian's Name", profile.guardianName || "Not provided"],
             ["Guardian Phone", profile.guardianPhone || "Not provided"],
             ["Guardian Email", profile.guardianEmail || "Not provided"],
             ["Relation", profile.guardianRelation || "Not provided"],
@@ -836,24 +831,14 @@ export default function StudentPage() {
             >
               Parent / Guardian Details
             </h3>
-            <div className="inline-pair">
-              <label>
-                Father&apos;s Name
-                <input
-                  type="text"
-                  value={editForm.fatherName}
-                  onChange={(e) => setEditForm({ ...editForm, fatherName: e.target.value })}
-                />
-              </label>
-              <label>
-                Mother&apos;s Name
-                <input
-                  type="text"
-                  value={editForm.motherName}
-                  onChange={(e) => setEditForm({ ...editForm, motherName: e.target.value })}
-                />
-              </label>
-            </div>
+            <label>
+              Guardian&apos;s Name
+              <input
+                type="text"
+                value={editForm.guardianName}
+                onChange={(e) => setEditForm({ ...editForm, guardianName: e.target.value })}
+              />
+            </label>
 
             <div className="inline-pair">
               <label>

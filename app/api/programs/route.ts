@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@/app/generated/prisma/client";
 import { requireAdmin } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
+import { getDepartmentId } from "@/app/lib/department";
 
 type ProgramBody = {
   id?: unknown;
   name?: unknown;
   code?: unknown;
   durationYears?: unknown;
-  departmentId?: unknown;
 };
 
 export async function POST(request: Request) {
@@ -26,18 +26,20 @@ export async function POST(request: Request) {
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
   const durationYears = typeof body.durationYears === "number" ? body.durationYears : 0;
-  const departmentId = typeof body.departmentId === "string" ? body.departmentId.trim() : "";
+
+  // Single-department mode: programs are auto-assigned to the one department.
+  const departmentId = await getDepartmentId();
 
   if (!name || !code || !departmentId || !Number.isInteger(durationYears) || durationYears < 1) {
     return NextResponse.json(
-      { error: "Name, code, department, and a positive duration are required" },
+      { error: "Name, code, and a positive duration are required. Set up your department first." },
       { status: 400 },
     );
   }
 
   const department = await prisma.department.findUnique({ where: { id: departmentId } });
   if (!department) {
-    return NextResponse.json({ error: "Selected department does not exist" }, { status: 400 });
+    return NextResponse.json({ error: "Department is not set up yet" }, { status: 400 });
   }
 
   try {
@@ -69,18 +71,20 @@ export async function PUT(request: Request) {
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
   const durationYears = typeof body.durationYears === "number" ? body.durationYears : 0;
-  const departmentId = typeof body.departmentId === "string" ? body.departmentId.trim() : "";
+
+  // Single-department mode: keep the existing department assignment on edit.
+  const departmentId = await getDepartmentId();
 
   if (!id || !name || !code || !departmentId || !Number.isInteger(durationYears) || durationYears < 1) {
     return NextResponse.json(
-      { error: "Program ID, name, code, department, and a positive duration are required" },
+      { error: "Program ID, name, code, and a positive duration are required" },
       { status: 400 },
     );
   }
 
   const department = await prisma.department.findUnique({ where: { id: departmentId } });
   if (!department) {
-    return NextResponse.json({ error: "Selected department does not exist" }, { status: 400 });
+    return NextResponse.json({ error: "Department is not set up yet" }, { status: 400 });
   }
 
   try {

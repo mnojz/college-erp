@@ -6,7 +6,6 @@ import { IconUpload, IconFileText, IconX } from "@tabler/icons-react";
 
 export type SyllabusSubmitValues = {
   title: string; // optional at submission (trimmed); empty => server derives from file
-  departmentName: string;
   programId: string;
   semester: string; // 1..8 as a string from the select
   file: File | null;
@@ -24,7 +23,6 @@ type Props = {
 
 const emptyValues: SyllabusSubmitValues = {
   title: "",
-  departmentName: "",
   programId: "",
   semester: "",
   file: null,
@@ -46,11 +44,7 @@ export function SyllabusForm({
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Programs belonging to the currently selected department. Changing the
-  // department clears programId in its own onChange, so no sync effect is needed.
-  const departmentPrograms = (meta.programs ?? []).filter(
-    (p) => p.departmentName === values.departmentName,
-  );
+  const programs = meta.programs ?? [];
 
   function applyFile(f: File | null) {
     setValues((v) => ({ ...v, file: f }));
@@ -73,9 +67,6 @@ export function SyllabusForm({
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (submitting) return;
-    if (!values.departmentName) {
-      return;
-    }
     if (mode === "create" && !values.file) {
       return;
     }
@@ -84,7 +75,6 @@ export function SyllabusForm({
 
   const canSubmit =
     !submitting &&
-    !!values.departmentName &&
     !!values.programId &&
     !!values.semester &&
     (mode === "edit" ? true : !!values.file);
@@ -105,35 +95,16 @@ export function SyllabusForm({
         />
       </label>
 
-      <label htmlFor="syllabus-department">
-        Department *
-        <select
-          id="syllabus-department"
-          value={values.departmentName}
-          onChange={(e) =>
-            setValues({ ...values, departmentName: e.target.value, programId: "" })
-          }
-          disabled={submitting}
-        >
-          <option value="">Select a department</option>
-          {(meta.departments ?? []).map((d) => (
-            <option key={d} value={d}>
-              {d}
-            </option>
-          ))}
-        </select>
-      </label>
-
       <label htmlFor="syllabus-program">
         Program *
         <select
           id="syllabus-program"
           value={values.programId}
           onChange={(e) => setValues({ ...values, programId: e.target.value })}
-          disabled={submitting || !values.departmentName}
+          disabled={submitting || programs.length === 0}
         >
           <option value="">Select a program</option>
-          {departmentPrograms.map((p) => (
+          {programs.map((p) => (
             <option key={p.id} value={p.id}>
               {p.code} — {p.name}
             </option>

@@ -72,10 +72,9 @@ export const STUDENT_PROFILE_FIELDS: ProfileFieldDef[] = [
   { key: "permProvinceName", label: "Permanent address", section: "contact", control: "USER", defaultVisibility: "PRIVATE", restrictedViewers: [] },
   { key: "currProvinceName", label: "Current address",   section: "contact", control: "USER", defaultVisibility: "PRIVATE", restrictedViewers: [] },
   { key: "emergencyContact", label: "Emergency contact", section: "contact", control: "USER", defaultVisibility: "PRIVATE", restrictedViewers: [] },
-  // Family / guardian — names are optional to share; guardian contact
+  // Family / guardian — name is optional to share; guardian contact
   // details are institution-controlled.
-  { key: "fatherName",       label: "Father's name",     section: "guardian", control: "USER", defaultVisibility: "PRIVATE", restrictedViewers: [] },
-  { key: "motherName",       label: "Mother's name",     section: "guardian", control: "USER", defaultVisibility: "PRIVATE", restrictedViewers: [] },
+  { key: "guardianName",     label: "Guardian's name",   section: "guardian", control: "USER", defaultVisibility: "PRIVATE", restrictedViewers: [] },
   { key: "guardianRelation", label: "Guardian relation", section: "guardian", control: "USER", defaultVisibility: "PRIVATE", restrictedViewers: [] },
   { key: "guardianPhone",    label: "Guardian phone",    section: "guardian", control: "RESTRICTED", defaultVisibility: "PRIVATE", restrictedViewers: FACULTY_AND_ADMIN },
   { key: "guardianEmail",    label: "Guardian email",    section: "guardian", control: "RESTRICTED", defaultVisibility: "PRIVATE", restrictedViewers: FACULTY_AND_ADMIN },

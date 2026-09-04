@@ -27,9 +27,12 @@ export function useSyllabusGroups(
   return useMemo(() => {
     const byDept = new Map<string, Syllabus[]>();
     for (const s of syllabi) {
-      const arr = byDept.get(s.departmentName) ?? [];
+      // Defensive: a row without a department would create an `undefined`
+      // group key (React key warning) — park it under a visible label instead.
+      const dept = s.departmentName ?? "Unassigned";
+      const arr = byDept.get(dept) ?? [];
       arr.push(s);
-      byDept.set(s.departmentName, arr);
+      byDept.set(dept, arr);
     }
 
     const result: GroupedByDepartment[] = [];
@@ -75,15 +78,18 @@ export function useSyllabusGroups(
 function indexBySemester(items: Syllabus[]): Map<number, Syllabus[]> {
   const bySemester = new Map<number, Syllabus[]>();
   for (const s of items) {
+    // Defensive: rows without a valid semester can never land in a 1..8 slot.
+    if (typeof s.semester !== "number") continue;
     const arr = bySemester.get(s.semester) ?? [];
     arr.push(s);
     bySemester.set(s.semester, arr);
   }
   // Deterministic, readable order inside every semester slot.
   for (const arr of bySemester.values()) {
-    arr.sort((a, b) =>
-      (a.title ?? a.fileName).localeCompare(b.title ?? b.fileName) ||
-      a.fileName.localeCompare(b.fileName),
+    arr.sort(
+      (a, b) =>
+        (a.title ?? a.fileName ?? "").localeCompare(b.title ?? b.fileName ?? "") ||
+        (a.fileName ?? "").localeCompare(b.fileName ?? ""),
     );
   }
   return bySemester;

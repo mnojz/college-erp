@@ -45,8 +45,7 @@ const PROFILE_SELECT = {
   currWard: true,
   currTole: true,
   // Guardian / parent details (student-editable)
-  fatherName: true,
-  motherName: true,
+  guardianName: true,
   guardianPhone: true,
   guardianEmail: true,
   guardianRelation: true,
@@ -102,8 +101,7 @@ const SELF_EDITABLE = new Set([
   "currWard",
   "currTole",
   // Guardian
-  "fatherName",
-  "motherName",
+  "guardianName",
   "guardianPhone",
   "guardianEmail",
   "guardianRelation",

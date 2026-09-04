@@ -21,7 +21,10 @@ export function SyllabusGroupedView({ groups, onEdit, onDelete }: Props) {
     <div className="syllabus-grouped">
       {groups.map((deptGroup) => (
         <div key={deptGroup.department} className="syllabus-dept">
-          <h3 className="syllabus-dept-name">{deptGroup.department}</h3>
+          {/* Single-department mode: a lone banner is redundant noise. */}
+          {groups.length > 1 && (
+            <h3 className="syllabus-dept-name">{deptGroup.department}</h3>
+          )}
           {deptGroup.programs.map((pg, pi) => {
             const progLabel = pg.program ? pg.program.label : "Department-wide";
             const hasAny = SEMESTERS.some(
@@ -65,7 +68,7 @@ export function SyllabusGroupedView({ groups, onEdit, onDelete }: Props) {
                       marginTop: 8,
                     }}
                   >
-                    No syllabi for this program yet.
+                    No syllabus for this program yet.
                   </p>
                 ) : null}
               </div>

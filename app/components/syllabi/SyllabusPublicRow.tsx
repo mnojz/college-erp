@@ -14,7 +14,7 @@ export function SyllabusPublicRow({ syllabus }: Props) {
   return (
     <article className="syllabus-admin-row">
       <a
-        href={`/api/syllabi/${syllabus.id}/file?inline=1`}
+        href={`/api/syllabus/${syllabus.id}/file?inline=1`}
         target="_blank"
         rel="noopener noreferrer"
         className="syllabus-admin-link"
@@ -28,7 +28,7 @@ export function SyllabusPublicRow({ syllabus }: Props) {
       </a>
       <div className="syllabus-admin-actions">
         <a
-          href={`/api/syllabi/${syllabus.id}/file?inline=1`}
+          href={`/api/syllabus/${syllabus.id}/file?inline=1`}
           target="_blank"
           rel="noopener noreferrer"
           className="btn-ghost btn-small"
@@ -38,7 +38,7 @@ export function SyllabusPublicRow({ syllabus }: Props) {
           <IconEye size={16} aria-hidden="true" />
         </a>
         <a
-          href={`/api/syllabi/${syllabus.id}/file`}
+          href={`/api/syllabus/${syllabus.id}/file`}
           download
           className="btn-ghost btn-small"
           title="Download PDF"

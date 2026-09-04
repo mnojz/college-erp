@@ -8,7 +8,7 @@ import {
 import { type SyllabusDto } from "@/app/lib/syllabi-shared";
 
 /**
- * GET /api/syllabi — public syllabus library listing.
+ * GET /api/syllabus — public syllabus library listing.
  *
  * No authentication required (public-domain content). Supports filtering:
  *   ?q=            search by title / program code / program name / department
@@ -75,13 +75,13 @@ export async function GET(request: Request) {
     const syllabi: SyllabusDto[] = rows.map(serializeSyllabus);
     return NextResponse.json({ syllabi });
   } catch (error) {
-    console.error("GET /api/syllabi error:", error);
+    console.error("GET /api/syllabus error:", error);
     return NextResponse.json({ error: "Unable to load syllabi" }, { status: 500 });
   }
 }
 
 /**
- * POST /api/syllabi — upload a new syllabus (admin only, multipart/form-data).
+ * POST /api/syllabus — upload a new syllabus (admin only, multipart/form-data).
  * Fields: title (optional), departmentName, programId, semester, file (PDF).
  */
 export async function POST(request: Request) {
@@ -122,7 +122,7 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
-    console.error("POST /api/syllabi error:", error);
+    console.error("POST /api/syllabus error:", error);
     return NextResponse.json({ error: "Unable to upload syllabus" }, { status: 500 });
   }
 }

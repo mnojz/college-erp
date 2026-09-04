@@ -6,7 +6,7 @@ import { parseSyllabusForm, serializeSyllabus } from "@/app/lib/syllabi-server";
 type RouteContext = { params: Promise<{ id: string }> };
 
 /**
- * GET /api/syllabi/[id] — admin detail view for a syllabus.
+ * GET /api/syllabus/[id] — admin detail view for a syllabus.
  */
 export async function GET(_request: Request, ctx: RouteContext) {
   const session = await getSession();
@@ -36,13 +36,13 @@ export async function GET(_request: Request, ctx: RouteContext) {
 
     return NextResponse.json({ syllabus: serializeSyllabus(row) });
   } catch (error) {
-    console.error("GET /api/syllabi/[id] error:", error);
+    console.error("GET /api/syllabus/[id] error:", error);
     return NextResponse.json({ error: "Unable to load syllabus" }, { status: 500 });
   }
 }
 
 /**
- * PATCH /api/syllabi/[id] — edit metadata and/or replace the file (admin only).
+ * PATCH /api/syllabus/[id] — edit metadata and/or replace the file (admin only).
  */
 export async function PATCH(request: Request, ctx: RouteContext) {
   const session = await getSession();
@@ -85,13 +85,13 @@ export async function PATCH(request: Request, ctx: RouteContext) {
 
     return NextResponse.json({ message: "Syllabus updated", syllabus: { id } });
   } catch (error) {
-    console.error("PATCH /api/syllabi/[id] error:", error);
+    console.error("PATCH /api/syllabus/[id] error:", error);
     return NextResponse.json({ error: "Unable to update syllabus" }, { status: 500 });
   }
 }
 
 /**
- * DELETE /api/syllabi/[id] — remove an uploaded syllabus (admin only).
+ * DELETE /api/syllabus/[id] — remove an uploaded syllabus (admin only).
  */
 export async function DELETE(_request: Request, ctx: RouteContext) {
   const session = await getSession();
@@ -112,7 +112,7 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
     await prisma.syllabus.delete({ where: { id } });
     return NextResponse.json({ message: `Deleted "${syllabus.fileName}"` });
   } catch (error) {
-    console.error("DELETE /api/syllabi/[id] error:", error);
+    console.error("DELETE /api/syllabus/[id] error:", error);
     return NextResponse.json({ error: "Unable to delete syllabus" }, { status: 500 });
   }
 }

@@ -15,7 +15,7 @@ const adminLinks = [
   ["Overview", "/dashboard", IconDashboard],
   ["Departments & Programs", "/admin/setup", IconSchool],
   ["Curriculum", "/admin/curriculum", IconBooks],
-  ["Syllabi", "/admin/syllabi", IconFileDescription],
+  ["Syllabus", "/admin/syllabus", IconFileDescription],
   ["Class Scheduling", "/admin/teaching", IconCalendarClock],
   ["People", "/admin/people", IconUsersGroup],
   ["Announcements", "/admin/announcements", IconBell],

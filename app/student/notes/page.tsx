@@ -46,7 +46,6 @@ const TABS: { key: TabKey; label: string }[] = [
 
 const EMPTY_FILTERS = {
   q: "",
-  department: "",
   programId: "",
   semester: "",
   subjectId: "",
@@ -175,7 +174,6 @@ export default function StudentNotesPage() {
         return haystack.includes(q);
       });
     }
-    if (filters.department) list = list.filter((m) => (m.program?.departmentName ?? m.departmentName) === filters.department);
     if (filters.programId) list = list.filter((m) => m.program?.id === filters.programId);
     if (filters.semester) list = list.filter((m) => String(m.semester ?? "") === filters.semester);
     if (filters.subjectId) list = list.filter((m) => m.subject?.id === filters.subjectId);
@@ -239,7 +237,6 @@ export default function StudentNotesPage() {
       ...f,
       [key]: value,
       // reset dependent cascades
-      ...(key === "department" ? { programId: "" } : {}),
       ...(key === "programId" ? { subjectId: "" } : {}),
     }));
   }
@@ -250,9 +247,7 @@ export default function StudentNotesPage() {
   const fullName = `${profile.user.firstName} ${profile.user.lastName}`;
   const studentId = profile.rollNumber || profile.enrollmentNumber;
 
-  const myProgramFilteredPrograms = filters.department
-    ? meta.programs.filter((p) => p.departmentName === filters.department)
-    : meta.programs;
+  const myProgramFilteredPrograms = meta.programs;
   const subjectOptions = filters.programId
     ? meta.subjects.filter((s) => s.programId === filters.programId)
     : meta.subjects;
@@ -330,13 +325,6 @@ export default function StudentNotesPage() {
       </div>
 
       <div className="notes-filter-row">
-        <select value={filters.department} onChange={(e) => updateFilter("department", e.target.value)} aria-label="Department filter">
-          <option value="">All Departments</option>
-          {meta.departments.map((d) => (
-            <option key={d} value={d}>{d}</option>
-          ))}
-        </select>
-
         <select value={filters.programId} onChange={(e) => updateFilter("programId", e.target.value)} aria-label="Program filter">
           <option value="">All Programs</option>
           {myProgramFilteredPrograms.map((p) => (

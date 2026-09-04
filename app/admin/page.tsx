@@ -46,7 +46,7 @@ const METRIC_CONFIG: Record<keyof Counts, MetricConfig> = {
     icon: <IconUsers size={20} />,
   },
   teachers: {
-    label: "Faculty",
+    label: "Teachers",
     description: "Teaching staff",
     iconBg: "rgba(124,58,237,0.12)",
     iconColor: "#7c3aed",

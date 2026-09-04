@@ -18,12 +18,10 @@ type Program = {
   name: string;
   code: string;
   departmentName: string;
-  departmentId?: string | null;
   durationYears: number;
 };
 
-const deptEmpty = { name: "", code: "" };
-const programEmpty = { name: "", code: "", departmentId: "", durationYears: "4" };
+const programEmpty = { name: "", code: "", durationYears: "4" };
 
 /** Derive a short department code from its name, e.g. "Engineering" → "ENG". */
 function suggestDeptCode(name: string) {
@@ -33,7 +31,7 @@ function suggestDeptCode(name: string) {
 export default function AdminSetupPage() {
   const router = useRouter();
   const [programs, setPrograms] = useState<Program[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const [department, setDepartment] = useState<Department | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Program modals
@@ -42,12 +40,9 @@ export default function AdminSetupPage() {
   const [deletingProgram, setDeletingProgram] = useState<Program | null>(null);
   const [programForm, setProgramForm] = useState(programEmpty);
 
-  // Department modals
-  const [showCreateDept, setShowCreateDept] = useState(false);
-  const [editingDept, setEditingDept] = useState<Department | null>(null);
-  const [deletingDept, setDeletingDept] = useState<Department | null>(null);
-  const [deptForm, setDeptForm] = useState(deptEmpty);
-  const [deptCodeTouched, setDeptCodeTouched] = useState(false);
+  // One-time department setup
+  const [deptForm, setDeptForm] = useState({ name: "", code: "" });
+  const [showSetDept, setShowSetDept] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -57,7 +52,7 @@ export default function AdminSetupPage() {
     const [pRes, dRes] = await Promise.all([fetch("/api/programs"), fetch("/api/departments")]);
     const [pData, dData] = await Promise.all([pRes.json(), dRes.json()]);
     setPrograms(pData.programs ?? []);
-    setDepartments(dData.departments ?? []);
+    setDepartment(dData.department ?? null);
   }
 
   useEffect(() => {
@@ -73,68 +68,30 @@ export default function AdminSetupPage() {
     load().catch(() => { setError("Unable to load academic structure"); setLoading(false); });
   }, [router]);
 
-  /* ── Department handlers ─────────────────────────────────── */
+  /* ── Department setup (single, one-time) ─────────────────────── */
 
-  async function handleCreateDept(e: FormEvent<HTMLFormElement>) {
+  async function handleSetDept(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
     setSaving(true);
+    const updating = Boolean(department);
     try {
       const res = await fetch("/api/departments", {
-        method: "POST",
+        method: updating ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(deptForm),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Unable to create department"); return; }
+      if (!res.ok) { setError(data.error ?? "Unable to save department"); return; }
       await refresh();
-      setDeptForm(deptEmpty);
-      setDeptCodeTouched(false);
-      setShowCreateDept(false);
-      setMessage(`Department ${data.department.code} created successfully.`);
+      setShowSetDept(false);
+      setMessage(
+        updating
+          ? "Department updated successfully. Its new name/code is used everywhere across the system."
+          : `Department ${data.department.code} set successfully. It is used everywhere across the system.`,
+      );
     } catch {
       setError("Unable to submit department");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleUpdateDept(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!editingDept) return;
-    setError("");
-    setSaving(true);
-    try {
-      const res = await fetch("/api/departments", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: editingDept.id, name: editingDept.name, code: editingDept.code }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Unable to update department"); return; }
-      await refresh();
-      setEditingDept(null);
-      setMessage(`Department ${data.department.code} updated successfully.`);
-    } catch {
-      setError("Unable to update department");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleDeleteDept() {
-    if (!deletingDept) return;
-    setError("");
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/departments?id=${deletingDept.id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Unable to delete department"); return; }
-      await refresh();
-      setMessage(`Department ${deletingDept.code} has been deleted.`);
-      setDeletingDept(null);
-    } catch {
-      setError("Unable to delete department");
     } finally {
       setSaving(false);
     }
@@ -178,7 +135,6 @@ export default function AdminSetupPage() {
           id: editingProgram.id,
           name: editingProgram.name,
           code: editingProgram.code,
-          departmentId: editingProgram.departmentId,
           durationYears: Number(editingProgram.durationYearsStr),
         }),
       });
@@ -212,26 +168,26 @@ export default function AdminSetupPage() {
     }
   }
 
-  const deleteGuarded = !!deletingDept && deletingDept.programCount > 0;
-
   return (
-    <AdminShell title="Departments & Programs" subtitle="Academic Structure" active="/admin/setup">
+    <AdminShell title="Department & Programs" subtitle="Academic Structure" active="/admin/setup">
       {/* Top bar */}
       <div className="admin-topbar">
         <p style={{ margin: 0, color: "var(--ink-soft)", fontSize: 13, fontFamily: "Arial, sans-serif" }}>
           {loading
             ? "Loading…"
-            : `${departments.length} department${departments.length !== 1 ? "s" : ""} · ${programs.length} program${programs.length !== 1 ? "s" : ""} registered`}
+            : `${department ? department.code : "Department not set yet"} · ${programs.length} program${programs.length !== 1 ? "s" : ""} registered`}
         </p>
         <div className="admin-topbar-actions">
-          <button
-            className="btn-add"
-            type="button"
-            onClick={() => { setShowCreateDept(true); setError(""); }}
-          >
-            <IconPlus size={15} aria-hidden="true" />
-            Add Department
-          </button>
+          {!department && (
+            <button
+              className="btn-add"
+              type="button"
+              onClick={() => { setDeptForm({ name: "", code: "" }); setShowSetDept(true); setError(""); }}
+            >
+              <IconPlus size={15} aria-hidden="true" />
+              Set Department
+            </button>
+          )}
           <button
             className="btn-add"
             type="button"
@@ -247,69 +203,75 @@ export default function AdminSetupPage() {
       {error && <p className="admin-message error">{error}</p>}
       {message && <p className="admin-message success">{message}</p>}
 
-      {/* Departments table */}
-      <div className="admin-table-wrap">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Code</th>
-              <th>Department</th>
-              <th>Programs</th>
-              <th style={{ textAlign: "right" }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {departments.length === 0 && !loading ? (
-              <tr>
-                <td colSpan={4} className="admin-table-empty">
-                  No departments yet. Click <strong>Add Department</strong> to create one.
-                </td>
-              </tr>
-            ) : (
-              departments.map((d) => (
-                <tr key={d.id}>
-                  <td>
-                    <span className="badge badge-violet">{d.code}</span>
-                  </td>
-                  <td style={{ fontWeight: 600 }}>{d.name}</td>
-                  <td>
-                    <span className="badge badge-slate">{d.programCount} program{d.programCount === 1 ? "" : "s"}</span>
-                  </td>
-                  <td>
-                    <div className="table-actions" style={{ justifyContent: "flex-end" }}>
-                      <button
-                        type="button"
-                        className="btn-action-edit"
-                        title="Edit Department"
-                        aria-label="Edit Department"
-                        onClick={() => {
-                          setError("");
-                          setDeptCodeTouched(true);
-                          setEditingDept({ ...d });
-                        }}
-                      >
-                        <IconPencil size={15} />
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-action-delete"
-                        title="Delete Department"
-                        aria-label="Delete Department"
-                        onClick={() => {
-                          setError("");
-                          setDeletingDept(d);
-                        }}
-                      >
-                        <IconTrash size={15} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      {/* Department card (single, one-time setup) */}
+      {department ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            background: "var(--panel, #fff)",
+            border: "1px solid var(--line, #e2e8f0)",
+            borderRadius: 14,
+            padding: "16px 18px",
+            marginBottom: 28,
+          }}
+        >
+          <span className="badge badge-violet" style={{ fontSize: 13, padding: "5px 10px" }}>
+            {department.code}
+          </span>
+          <div>
+            <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: "var(--ink)" }}>
+              {department.name} Department
+            </p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--ink-soft)" }}>
+              Your department. All programs, subjects, classes and users are assigned to it automatically.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn-action-edit"
+            title="Edit Department"
+            aria-label="Edit Department"
+            style={{ marginLeft: "auto", width: 34, height: 34, borderRadius: 8, flexShrink: 0 }}
+            onClick={() => {
+              setDeptForm({ name: department.name, code: department.code });
+              setError("");
+              setShowSetDept(true);
+            }}
+          >
+            <IconPencil size={15} />
+          </button>
+        </div>
+      ) : (
+        <div
+          style={{
+            background: "var(--panel, #fff)",
+            border: "1px dashed var(--line, #e2e8f0)",
+            borderRadius: 14,
+            padding: "18px 20px",
+            marginBottom: 28,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: "var(--ink)" }}>
+              Set up your department once
+            </p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--ink-soft)" }}>
+              Enter your department name and code — this is used across the entire system.
+            </p>
+          </div>
+          <button className="btn-add" type="button" onClick={() => { setDeptForm({ name: "", code: "" }); setShowSetDept(true); setError(""); }}>
+            <IconPlus size={15} aria-hidden="true" />
+            Set Department
+          </button>
+        </div>
+      )}
 
       {/* Programs table */}
       <div className="admin-table-wrap" style={{ marginTop: "28px" }}>
@@ -378,10 +340,10 @@ export default function AdminSetupPage() {
         </table>
       </div>
 
-      {/* Modal 1: Add Department */}
-      {showCreateDept && (
-        <AdminModal title="Add New Department" onClose={() => setShowCreateDept(false)}>
-          <form className="modal-form" onSubmit={handleCreateDept}>
+      {/* Modal 1: Set Department (one-time) */}
+      {showSetDept && (
+        <AdminModal title={department ? "Edit Department" : "Set Your Department"} onClose={() => setShowSetDept(false)}>
+          <form className="modal-form" onSubmit={handleSetDept}>
             <label>
               Department Name
               <input
@@ -392,7 +354,7 @@ export default function AdminSetupPage() {
                   setDeptForm((f) => ({
                     ...f,
                     name: e.target.value,
-                    code: deptCodeTouched ? f.code : suggestDeptCode(e.target.value),
+                    code: f.code || suggestDeptCode(e.target.value),
                   }))
                 }
                 required
@@ -404,22 +366,20 @@ export default function AdminSetupPage() {
                 type="text"
                 placeholder="e.g. ENG"
                 value={deptForm.code}
-                onChange={(e) => {
-                  setDeptCodeTouched(true);
-                  setDeptForm({ ...deptForm, code: e.target.value.toUpperCase() });
-                }}
+                onChange={(e) => setDeptForm({ ...deptForm, code: e.target.value.toUpperCase() })}
                 required
               />
             </label>
             <p style={{ margin: 0, fontSize: 12, color: "var(--ink-soft)", fontFamily: "Arial, sans-serif" }}>
-              Departments group related programs — create one here before adding its programs.
+              This is your institution&apos;s single department. It is assigned to every program, subject,
+              class and user automatically. You can update the name or code later from the department card.
             </p>
             {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
             <div className="modal-actions">
               <button className="btn-primary" type="submit" disabled={saving}>
-                {saving ? "Creating…" : "Create Department"}
+                {saving ? (department ? "Saving…" : "Setting…") : department ? "Save Changes" : "Set Department"}
               </button>
-              <button className="btn-ghost" type="button" onClick={() => setShowCreateDept(false)}>
+              <button className="btn-ghost" type="button" onClick={() => setShowSetDept(false)}>
                 Cancel
               </button>
             </div>
@@ -427,123 +387,10 @@ export default function AdminSetupPage() {
         </AdminModal>
       )}
 
-      {/* Modal 2: Edit Department */}
-      {editingDept && (
-        <AdminModal title={`Edit Department: ${editingDept.code}`} onClose={() => setEditingDept(null)}>
-          <form className="modal-form" onSubmit={handleUpdateDept}>
-            <label>
-              Department Name
-              <input
-                type="text"
-                value={editingDept.name}
-                onChange={(e) => setEditingDept({ ...editingDept, name: e.target.value })}
-                required
-              />
-            </label>
-            <label>
-              Department Code
-              <input
-                type="text"
-                value={editingDept.code}
-                onChange={(e) => setEditingDept({ ...editingDept, code: e.target.value.toUpperCase() })}
-                required
-              />
-            </label>
-            <p style={{ margin: 0, fontSize: 12, color: "var(--ink-soft)", fontFamily: "Arial, sans-serif" }}>
-              Renaming a department updates the department shown on all its programs.
-            </p>
-            {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
-            <div className="modal-actions">
-              <button className="btn-primary" type="submit" disabled={saving}>
-                {saving ? "Saving Changes…" : "Save Changes"}
-              </button>
-              <button className="btn-ghost" type="button" onClick={() => setEditingDept(null)}>
-                Cancel
-              </button>
-            </div>
-          </form>
-        </AdminModal>
-      )}
-
-      {/* Modal 3: Delete Department Confirmation */}
-      {deletingDept && (
-        <AdminModal title={`Delete Department: ${deletingDept.code}`} onClose={() => setDeletingDept(null)}>
-          <div className="modal-confirm-box">
-            <p>
-              Are you sure you want to delete the department <strong>{deletingDept.name} ({deletingDept.code})</strong>?
-            </p>
-            {deleteGuarded ? (
-              <p
-                style={{
-                  fontSize: "13px",
-                  color: "#b45309",
-                  background: "rgba(217, 119, 6, 0.1)",
-                  padding: "10px 14px",
-                  borderRadius: "8px",
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: "8px",
-                  margin: 0,
-                }}
-              >
-                <IconAlertTriangle size={15} aria-hidden="true" style={{ flexShrink: 0, marginTop: "2px" }} />
-                <span>
-                  This department still has {deletingDept.programCount} program{deletingDept.programCount === 1 ? "" : "s"} attached.
-                  Reassign or delete them first — the department cannot be removed until then.
-                </span>
-              </p>
-            ) : (
-              <p
-                style={{
-                  fontSize: "13px",
-                  color: "#dc2626",
-                  background: "rgba(220, 38, 38, 0.08)",
-                  padding: "10px 14px",
-                  borderRadius: "8px",
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: "8px",
-                  margin: 0,
-                }}
-              >
-                <IconAlertTriangle size={15} aria-hidden="true" style={{ flexShrink: 0, marginTop: "2px" }} />
-                <span>This department has no programs attached and can be safely deleted.</span>
-              </p>
-            )}
-            {error && <p style={{ margin: "12px 0 0", fontSize: 13, color: "#b91c1c" }}>{error}</p>}
-            <div className="modal-actions" style={{ marginTop: "20px" }}>
-              {!deleteGuarded && (
-                <button className="btn-danger" type="button" onClick={handleDeleteDept} disabled={saving}>
-                  {saving ? "Deleting…" : "Yes, Delete Department"}
-                </button>
-              )}
-              <button className="btn-ghost" type="button" onClick={() => setDeletingDept(null)} disabled={saving}>
-                {deleteGuarded ? "OK, I'll reassign programs first" : "Cancel"}
-              </button>
-            </div>
-          </div>
-        </AdminModal>
-      )}
-
-      {/* Modal 4: Add Program */}
+      {/* Modal 2: Add Program */}
       {showCreateProgram && (
         <AdminModal title="Add New Program" onClose={() => setShowCreateProgram(false)}>
           <form className="modal-form" onSubmit={handleCreateProgram}>
-            <label>
-              Department
-              <select
-                value={programForm.departmentId}
-                onChange={(e) => setProgramForm({ ...programForm, departmentId: e.target.value })}
-                required
-              >
-                <option value="">Select a department</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name} ({d.code})
-                  </option>
-                ))}
-              </select>
-            </label>
             <label>
               Program Name
               <input
@@ -595,21 +442,6 @@ export default function AdminSetupPage() {
       {editingProgram && (
         <AdminModal title={`Edit Program: ${editingProgram.code}`} onClose={() => setEditingProgram(null)}>
           <form className="modal-form" onSubmit={handleUpdateProgram}>
-            <label>
-              Department
-              <select
-                value={editingProgram.departmentId ?? ""}
-                onChange={(e) => setEditingProgram({ ...editingProgram, departmentId: e.target.value })}
-                required
-              >
-                <option value="">Select a department</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name} ({d.code})
-                  </option>
-                ))}
-              </select>
-            </label>
             <label>
               Program Name
               <input

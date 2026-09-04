@@ -4,16 +4,16 @@ import { requireAdmin } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
 
 type DepartmentBody = {
-  id?: unknown;
   name?: unknown;
   code?: unknown;
 };
 
-/** List every department (with program counts). Read-only, like /api/programs GET. */
+/**
+ * Single-department mode: GET returns the single department (or null if not set up yet).
+ */
 export async function GET() {
   try {
-    const departments = await prisma.department.findMany({
-      orderBy: { name: "asc" },
+    const department = await prisma.department.findFirst({
       select: {
         id: true,
         name: true,
@@ -22,17 +22,29 @@ export async function GET() {
       },
     });
     return NextResponse.json({
-      departments: departments.map(({ _count, ...d }) => ({ ...d, programCount: _count.programs })),
+      department: department
+        ? { ...department, programCount: department._count.programs }
+        : null,
     });
   } catch (error) {
     console.error("GET /api/departments error:", error);
-    return NextResponse.json({ error: "Unable to load departments" }, { status: 500 });
+    return NextResponse.json({ error: "Unable to load department" }, { status: 500 });
   }
 }
 
+/**
+ * Single-department mode: POST creates the department only if none exists.
+ * Once set, it cannot be changed through this endpoint.
+ */
 export async function POST(request: Request) {
   if (!(await requireAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Check if department already exists
+  const existing = await prisma.department.findFirst();
+  if (existing) {
+    return NextResponse.json({ error: "Department is already set. Use the edit action on the department card to change it." }, { status: 409 });
   }
 
   let body: DepartmentBody;
@@ -61,9 +73,19 @@ export async function POST(request: Request) {
   }
 }
 
+/**
+ * Single-department mode: PUT updates the department's name and/or code.
+ * The record (and its id) stays the same, so all existing program, subject,
+ * class and user references keep working.
+ */
 export async function PUT(request: Request) {
   if (!(await requireAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const existing = await prisma.department.findFirst();
+  if (!existing) {
+    return NextResponse.json({ error: "Department not set up yet" }, { status: 404 });
   }
 
   let body: DepartmentBody;
@@ -73,20 +95,17 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const id = typeof body.id === "string" ? body.id.trim() : "";
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
 
-  if (!id || !name || !code) {
-    return NextResponse.json({ error: "Department ID, name, and code are required" }, { status: 400 });
+  if (!name || !code) {
+    return NextResponse.json({ error: "Department name and code are required" }, { status: 400 });
   }
 
   try {
-    const department = await prisma.department.update({ where: { id }, data: { name, code } });
-    // Keep the denormalized display name on programs in sync after a rename.
-    await prisma.program.updateMany({
-      where: { departmentId: id },
-      data: { departmentName: name },
+    const department = await prisma.department.update({
+      where: { id: existing.id },
+      data: { name, code },
     });
     return NextResponse.json({ department });
   } catch (error) {
@@ -95,34 +114,5 @@ export async function PUT(request: Request) {
     }
     console.error("PUT /api/departments error:", error);
     return NextResponse.json({ error: "Unable to update department" }, { status: 500 });
-  }
-}
-
-export async function DELETE(request: Request) {
-  if (!(await requireAdmin())) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get("id");
-
-  if (!id) {
-    return NextResponse.json({ error: "Department ID is required" }, { status: 400 });
-  }
-
-  try {
-    const programCount = await prisma.program.count({ where: { departmentId: id } });
-    if (programCount > 0) {
-      return NextResponse.json(
-        { error: `This department still has ${programCount} program${programCount === 1 ? "" : "s"} attached. Reassign or delete them first.` },
-        { status: 409 },
-      );
-    }
-
-    await prisma.department.delete({ where: { id } });
-    return NextResponse.json({ success: true, message: "Department deleted successfully" });
-  } catch (error) {
-    console.error("DELETE /api/departments error:", error);
-    return NextResponse.json({ error: "Unable to delete department" }, { status: 500 });
   }
 }

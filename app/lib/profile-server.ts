@@ -61,8 +61,7 @@ const PROFILE_USER_SELECT = {
       currWard: true,
       currTole: true,
       emergencyContact: true,
-      fatherName: true,
-      motherName: true,
+      guardianName: true,
       guardianPhone: true,
       guardianEmail: true,
       guardianRelation: true,
@@ -228,8 +227,7 @@ function collectFieldValues(
       tole: s.permTole,
     });
     values.emergencyContact = s.emergencyContact;
-    values.fatherName = s.fatherName;
-    values.motherName = s.motherName;
+    values.guardianName = s.guardianName;
     values.guardianRelation = s.guardianRelation;
     values.guardianPhone = s.guardianPhone;
     values.guardianEmail = s.guardianEmail;

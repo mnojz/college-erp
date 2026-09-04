@@ -16,7 +16,7 @@ export function SyllabusAdminRow({ syllabus, onEdit, onDelete }: Props) {
   return (
     <article className="syllabus-admin-row">
       <a
-        href={`/api/syllabi/${syllabus.id}/file?inline=1`}
+        href={`/api/syllabus/${syllabus.id}/file?inline=1`}
         target="_blank"
         rel="noopener noreferrer"
         className="syllabus-admin-link"
@@ -29,7 +29,7 @@ export function SyllabusAdminRow({ syllabus, onEdit, onDelete }: Props) {
       </a>
       <div className="syllabus-admin-actions">
         <a
-          href={`/api/syllabi/${syllabus.id}/file`}
+          href={`/api/syllabus/${syllabus.id}/file`}
           download
           className="btn-ghost btn-small"
           title="Download PDF"

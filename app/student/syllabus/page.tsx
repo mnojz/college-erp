@@ -24,7 +24,6 @@ export default function StudentSyllabiPage() {
   const [error, setError] = useState("");
 
   const [q, setQ] = useState("");
-  const [filterDept, setFilterDept] = useState("");
   const [filterProgram, setFilterProgram] = useState("");
   const [filterSemester, setFilterSemester] = useState("");
 
@@ -42,10 +41,10 @@ export default function StudentSyllabiPage() {
       }
       try {
         const [listRes, metaRes] = await Promise.all([
-          fetch("/api/syllabi"),
-          fetch("/api/syllabi/meta"),
+          fetch("/api/syllabus"),
+          fetch("/api/syllabus/meta"),
         ]);
-        if (!listRes.ok) throw new Error("Unable to load syllabi");
+        if (!listRes.ok) throw new Error("Unable to load syllabus");
         const listData = await listRes.json();
         setSyllabi(listData.syllabi ?? []);
         if (metaRes.ok) {
@@ -54,26 +53,19 @@ export default function StudentSyllabiPage() {
             departments: metaData.departments ?? [],
             programs: metaData.programs ?? [],
           });
-          if (!filterDept && metaData.departments?.length) setFilterDept(metaData.departments[0]);
         }
       } catch (err) {
-        setError((err as Error).message ?? "Unable to load syllabi");
+        setError((err as Error).message ?? "Unable to load syllabus");
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, [router, filterDept]);
-
-  const departmentPrograms = useMemo(() => {
-    if (!filterDept) return meta.programs;
-    return meta.programs.filter((p) => p.departmentName === filterDept);
-  }, [meta.programs, filterDept]);
+  }, [router]);
 
   const filtered = useMemo(() => {
     const term = q.toLowerCase().trim();
     return syllabi.filter((s) => {
-      if (filterDept && s.departmentName !== filterDept) return false;
       if (filterProgram && s.programId !== filterProgram) return false;
       if (filterSemester && s.semester !== Number.parseInt(filterSemester, 10)) return false;
       if (term) {
@@ -82,69 +74,55 @@ export default function StudentSyllabiPage() {
       }
       return true;
     });
-  }, [syllabi, q, filterDept, filterProgram, filterSemester]);
+  }, [syllabi, q, filterProgram, filterSemester]);
 
   const groups: GroupedByDepartment[] = useSyllabusGroups(filtered, meta.programs);
 
   function resetFilters() {
     setQ("");
-    setFilterDept("");
     setFilterProgram("");
     setFilterSemester("");
   }
 
   if (loading) {
     return (
-      <StudentShell title="Syllabi" active="/student/syllabi">
+      <StudentShell title="Syllabus" active="/student/syllabus">
         <p>Loading…</p>
       </StudentShell>
     );
   }
 
   return (
-    <StudentShell title="Syllabi" active="/student/syllabi">
+    <StudentShell title="Syllabus" active="/student/syllabus">
       <div>
         {error && <p className="notes-form-error">{error}</p>}
 
-        <div
-          style={{
-            display: "flex",
-            gap: "12px",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            marginBottom: "16px",
+        <h2 style={{ margin: "0 0 4px", fontSize: "18px", fontWeight: 700 }}>
+          Syllabus Library
+        </h2>
+
+        <SyllabusToolbar
+          q={q}
+          filterProgram={filterProgram}
+          filterSemester={filterSemester}
+          programs={meta.programs}
+          onChange={(p) => {
+            if (p.q !== undefined) setQ(p.q);
+            if (p.filterProgram !== undefined) setFilterProgram(p.filterProgram);
+            if (p.filterSemester !== undefined) setFilterSemester(p.filterSemester);
           }}
-        >
-          <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 700 }}>
-            Syllabus Library
-          </h2>
-          <SyllabusToolbar
-            meta={meta}
-            q={q}
-            filterDept={filterDept}
-            filterProgram={filterProgram}
-            filterSemester={filterSemester}
-            departmentPrograms={departmentPrograms}
-            onChange={(p) => {
-              if (p.q !== undefined) setQ(p.q);
-              if (p.filterDept !== undefined) setFilterDept(p.filterDept);
-              if (p.filterProgram !== undefined) setFilterProgram(p.filterProgram);
-              if (p.filterSemester !== undefined) setFilterSemester(p.filterSemester);
-            }}
-            onReset={resetFilters}
-          />
-        </div>
+          onReset={resetFilters}
+        />
 
         <SyllabusPublicGroupedView groups={groups} />
 
         {filtered.length === 0 && !error && (
           <div className="profile-info-card notes-empty">
-            <h3>No syllabi found</h3>
+            <h3>No syllabus found</h3>
             <p>
               {syllabi.length === 0
-                ? "No syllabi are currently available."
-                : "No syllabi match the selected filters. Try adjusting your search or filters."}
+                ? "No syllabus files are currently available."
+                : "No syllabus files match the selected filters. Try adjusting your search or filters."}
             </p>
           </div>
         )}
