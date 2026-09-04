@@ -745,3 +745,172 @@ export default function TeacherAssessmentsPage() {
           })}
         </div>
       )}
+
+      {modal && (
+        <AdminModal
+          title={modal.kind === "create" ? "New Assessment" : "Edit Assessment"}
+          onClose={() => setModal(null)}
+        >
+          <form onSubmit={submitAssessment} style={{ display: "grid", gap: "14px", marginTop: "8px" }}>
+            <div>
+              <label style={labelStyle}>Class / Subject</label>
+              <select
+                value={formClassId}
+                onChange={(e) => setFormClassId(e.target.value)}
+                disabled={classes.length === 0}
+                style={inputStyle}
+                required
+              >
+                {classes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.subject.code} — {c.subject.name} ({c.program.code} · Sem {c.semester})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Assessment name</label>
+              <input
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                placeholder="e.g. Mid-Term Examination"
+                required
+                style={inputStyle}
+              />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              <div>
+                <label style={labelStyle}>Full marks</label>
+                <input
+                  type="number"
+                  min="1"
+                  step="0.5"
+                  value={formMaxMarks}
+                  onChange={(e) => setFormMaxMarks(e.target.value)}
+                  required
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Date</label>
+                <input
+                  type="date"
+                  value={formDate}
+                  onChange={(e) => setFormDate(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+            {formError && (
+              <div style={{ color: "#b91c1c", fontSize: "0.82rem" }}>{formError}</div>
+            )}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "10px",
+                marginTop: "4px",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setModal(null)}
+                style={{
+                  padding: "9px 16px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--line-strong)",
+                  background: "transparent",
+                  color: "var(--ink)",
+                  cursor: "pointer",
+                  fontSize: "0.85rem",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSavingAssessment}
+                style={{
+                  padding: "9px 20px",
+                  borderRadius: "8px",
+                  background: "#0ea5e9",
+                  color: "#fff",
+                  fontWeight: "700",
+                  fontSize: "0.85rem",
+                  border: 0,
+                  cursor: isSavingAssessment ? "wait" : "pointer",
+                }}
+              >
+                {isSavingAssessment
+                  ? "Saving…"
+                  : modal.kind === "create"
+                    ? "Create Assessment"
+                    : "Save Changes"}
+              </button>
+            </div>
+          </form>
+        </AdminModal>
+      )}
+
+
+
+      {deleteTarget && (
+        <AdminModal title="Delete Assessment" onClose={() => setDeleteTarget(null)}>
+          <p style={{ fontSize: "0.9rem", lineHeight: 1.6, marginTop: "8px" }}>
+            Delete <strong>{deleteTarget.name}</strong> ({deleteTarget.subject.code} · Max{" "}
+            {Number(deleteTarget.maxMarks)})?
+          </p>
+          {(deleteTarget._count?.results ?? 0) > 0 && (
+            <p
+              style={{
+                fontSize: "0.85rem",
+                color: "#b91c1c",
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                borderRadius: "8px",
+                padding: "10px 12px",
+              }}
+            >
+              This will also permanently delete {deleteTarget._count?.results} recorded student
+              result(s). This cannot be undone.
+            </p>
+          )}
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "16px" }}>
+            <button
+              type="button"
+              onClick={() => setDeleteTarget(null)}
+              style={{
+                padding: "9px 16px",
+                borderRadius: "8px",
+                border: "1px solid var(--line-strong)",
+                background: "transparent",
+                color: "var(--ink)",
+                cursor: "pointer",
+                fontSize: "0.85rem",
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={doDelete}
+              disabled={isDeleting}
+              style={{
+                padding: "9px 18px",
+                borderRadius: "8px",
+                background: "#dc2626",
+                color: "#fff",
+                fontWeight: "700",
+                fontSize: "0.85rem",
+                border: 0,
+                cursor: isDeleting ? "wait" : "pointer",
+              }}
+            >
+              {isDeleting ? "Deleting…" : "Delete"}
+            </button>
+          </div>
+        </AdminModal>
+      )}
+    </TeacherShell>
+  );
+}

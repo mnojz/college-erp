@@ -9,6 +9,8 @@ import {
   IconPlus,
   IconSearch,
   IconTrash,
+  IconUserCheck,
+  IconUserOff,
   IconX,
 } from "@tabler/icons-react";
 import { AdminShell } from "@/app/components/admin/AdminShell";
@@ -45,6 +47,8 @@ type StudentItem = {
   nationality: string | null;
   religion: string | null;
   category: string | null;
+  // Enrollment lifecycle (ACTIVE / INACTIVE / GRADUATED / SUSPENDED / WITHDRAWN).
+  status: string;
   program: { id: string; name: string; code: string } | null;
   user: {
     id: string;
@@ -71,6 +75,14 @@ type DeleteTarget = {
   identifier: string;
 };
 
+/** Row picked for the deactivate confirmation modal (activation needs no modal). */
+type StatusTarget = {
+  kind: "teacher" | "student";
+  userId: string;
+  name: string;
+  identifier: string;
+};
+
 const teacherEmpty: {
   email: string;
   password: string;
@@ -79,6 +91,7 @@ const teacherEmpty: {
   employeeNo: string;
   profileImageUrl: string;
   subjectIds: string[];
+  status: string;
 } = {
   email: "",
   password: "",
@@ -87,6 +100,7 @@ const teacherEmpty: {
   employeeNo: "",
   profileImageUrl: "",
   subjectIds: [],
+  status: "ACTIVE",
 };
 
 const studentEmpty = {
@@ -101,6 +115,10 @@ const studentEmpty = {
   programId: "",
   currentSemester: "1",
   profileImageUrl: "",
+  // Enrollment lifecycle (badge on the student's profile hero).
+  status: "ACTIVE",
+  // Portal access (User.status) — whether the account can sign in.
+  userStatus: "ACTIVE",
   // Critical personal information — admin-entered only.
   gender: "",
   nationality: "",
@@ -495,6 +513,9 @@ export default function AdminPeoplePage() {
   // Delete Confirmation Modal
   const [deletingTarget, setDeletingTarget] = useState<DeleteTarget | null>(null);
 
+  // Deactivate Confirmation Modal (activation is applied directly, no modal)
+  const [statusTarget, setStatusTarget] = useState<StatusTarget | null>(null);
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -586,6 +607,7 @@ export default function AdminPeoplePage() {
       employeeNo: teacher.employeeNo,
       profileImageUrl: teacher.profileImageUrl || "",
       subjectIds: (teacher.subjectTeachers ?? []).map((st) => st.subject.id),
+      status: teacher.user.status,
     });
   }
 
@@ -606,6 +628,8 @@ export default function AdminPeoplePage() {
       programId: student.programId || "",
       currentSemester: student.currentSemester ? String(student.currentSemester) : "1",
       profileImageUrl: student.profileImageUrl || "",
+      status: student.status || "ACTIVE",
+      userStatus: student.user.status,
       gender: student.gender || "",
       nationality: student.nationality || "",
       religion: student.religion || "",
@@ -660,6 +684,7 @@ export default function AdminPeoplePage() {
         employeeNo: editingTeacher.employeeNo,
         profileImageUrl: editingTeacher.profileImageUrl || undefined,
         subjectIds: editingTeacher.subjectIds,
+        status: editingTeacher.status,
       };
       if (editingTeacher.password) {
         payload.password = editingTeacher.password;
@@ -744,6 +769,8 @@ export default function AdminPeoplePage() {
         nationality: editingStudent.nationality || undefined,
         religion: editingStudent.religion || undefined,
         category: editingStudent.category || undefined,
+        status: editingStudent.status,
+        userStatus: editingStudent.userStatus,
       };
       if (editingStudent.password) {
         payload.password = editingStudent.password;
@@ -796,6 +823,57 @@ export default function AdminPeoplePage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // Handle Account Activation / Deactivation (quick per-row toggle).
+  async function applyAccountStatus(userId: string, next: "ACTIVE" | "INACTIVE"): Promise<boolean> {
+    try {
+      const res = await fetch(`/api/users/${userId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: next }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Failed to update account status");
+        return false;
+      }
+      setTeachers((prev) =>
+        prev.map((t) => (t.user.id === userId ? { ...t, user: { ...t.user, status: next } } : t)),
+      );
+      setStudents((prev) =>
+        prev.map((s) => (s.user.id === userId ? { ...s, user: { ...s.user, status: next } } : s)),
+      );
+      return true;
+    } catch {
+      setError("Unable to update account status");
+      return false;
+    }
+  }
+
+  async function handleActivate(kind: "teacher" | "student", userId: string, name: string) {
+    void kind;
+    setError("");
+    setSaving(true);
+    const ok = await applyAccountStatus(userId, "ACTIVE");
+    if (ok) {
+      setMessage(`${name}'s account was reactivated — they can sign in again.`);
+    }
+    setSaving(false);
+  }
+
+  async function handleConfirmDeactivate() {
+    if (!statusTarget) return;
+    setError("");
+    setSaving(true);
+    const ok = await applyAccountStatus(statusTarget.userId, "INACTIVE");
+    if (ok) {
+      setMessage(
+        `${statusTarget.name}'s account was deactivated — sign-in is blocked until reactivated.`,
+      );
+      setStatusTarget(null);
+    }
+    setSaving(false);
   }
 
   return (
@@ -973,6 +1051,37 @@ export default function AdminPeoplePage() {
                     </td>
                     <td>
                       <div className="table-actions">
+                        {t.user.status === "ACTIVE" ? (
+                          <button
+                            type="button"
+                            className="btn-action-warn"
+                            onClick={() =>
+                              setStatusTarget({
+                                kind: "teacher",
+                                userId: t.user.id,
+                                name: `${t.user.firstName} ${t.user.lastName}`,
+                                identifier: t.employeeNo,
+                              })
+                            }
+                            title="Deactivate Account (blocks sign-in)"
+                            aria-label="Deactivate Faculty Account"
+                          >
+                            <IconUserOff size={15} />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn-action-edit"
+                            disabled={saving}
+                            onClick={() =>
+                              handleActivate("teacher", t.user.id, `${t.user.firstName} ${t.user.lastName}`)
+                            }
+                            title="Activate Account"
+                            aria-label="Activate Faculty Account"
+                          >
+                            <IconUserCheck size={15} />
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="btn-action-edit"
@@ -1099,9 +1208,45 @@ export default function AdminPeoplePage() {
                       <span className={`badge ${s.user.status === "ACTIVE" ? "badge-green" : "badge-slate"}`}>
                         {s.user.status}
                       </span>
+                      {s.status && s.status !== "ACTIVE" && (
+                        <span className="badge badge-amber" style={{ marginLeft: 6 }} title="Enrollment status">
+                          {s.status}
+                        </span>
+                      )}
                     </td>
                     <td>
                       <div className="table-actions">
+                        {s.user.status === "ACTIVE" ? (
+                          <button
+                            type="button"
+                            className="btn-action-warn"
+                            onClick={() =>
+                              setStatusTarget({
+                                kind: "student",
+                                userId: s.user.id,
+                                name: `${s.user.firstName} ${s.user.lastName}`,
+                                identifier: s.enrollmentNumber,
+                              })
+                            }
+                            title="Deactivate Account (blocks sign-in)"
+                            aria-label="Deactivate Student Account"
+                          >
+                            <IconUserOff size={15} />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn-action-edit"
+                            disabled={saving}
+                            onClick={() =>
+                              handleActivate("student", s.user.id, `${s.user.firstName} ${s.user.lastName}`)
+                            }
+                            title="Activate Account"
+                            aria-label="Activate Student Account"
+                          >
+                            <IconUserCheck size={15} />
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="btn-action-edit"
@@ -1302,6 +1447,17 @@ export default function AdminPeoplePage() {
                 value={editingTeacher.password}
                 onChange={(e) => setEditingTeacher({ ...editingTeacher, password: e.target.value })}
               />
+            </label>
+
+            <label>
+              Account Status
+              <select
+                value={editingTeacher.status}
+                onChange={(e) => setEditingTeacher({ ...editingTeacher, status: e.target.value })}
+              >
+                <option value="ACTIVE">Active — can sign in</option>
+                <option value="INACTIVE">Inactive — sign-in blocked</option>
+              </select>
             </label>
 
             <ImageUploadCrop
@@ -1682,6 +1838,32 @@ export default function AdminPeoplePage() {
               </label>
             </div>
 
+            <div className="inline-pair">
+              <label>
+                Enrollment Status
+                <select
+                  value={editingStudent.status}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, status: e.target.value })}
+                >
+                  <option value="ACTIVE">Active</option>
+                  <option value="INACTIVE">Inactive</option>
+                  <option value="GRADUATED">Graduated</option>
+                  <option value="SUSPENDED">Suspended</option>
+                  <option value="WITHDRAWN">Withdrawn</option>
+                </select>
+              </label>
+              <label>
+                Account Access
+                <select
+                  value={editingStudent.userStatus}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, userStatus: e.target.value })}
+                >
+                  <option value="ACTIVE">Active — can sign in</option>
+                  <option value="INACTIVE">Inactive — sign-in blocked</option>
+                </select>
+              </label>
+            </div>
+
             <p className="form-hint" style={{ marginTop: 2 }}>
               Personal information below is critical — only admins can set it, students cannot
               change it later.
@@ -1787,6 +1969,51 @@ export default function AdminPeoplePage() {
                 className="btn-ghost"
                 type="button"
                 onClick={() => setDeletingTarget(null)}
+                disabled={saving}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </AdminModal>
+      )}
+
+      {/* Modal 6: Deactivate Confirmation (activation is applied directly) */}
+      {statusTarget && (
+        <AdminModal title="Deactivate Account" onClose={() => setStatusTarget(null)}>
+          <div className="modal-confirm-box">
+            <p>
+              Deactivate the account for{" "}
+              <strong style={{ color: "var(--foreground, #1e293b)" }}>{statusTarget.name}</strong>{" "}
+              ({statusTarget.identifier})?
+            </p>
+            <p style={{ fontSize: "13px", color: "#b45309", background: "rgba(217, 119, 6, 0.08)", padding: "10px 14px", borderRadius: "8px", display: "flex", alignItems: "center", gap: 8 }}>
+              <IconAlertTriangle size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
+              They will no longer be able to sign in and their profile will be hidden from the
+              directory. All records are preserved, and you can reactivate the account at any time.
+            </p>
+            {statusTarget.kind === "student" && (
+              <p style={{ fontSize: "13px", color: "#64748b", margin: "10px 0 0" }}>
+                Note: this only controls portal access. To change the student&apos;s enrollment
+                status (Active / Graduated / Withdrawn…), use <strong>Edit Student Profile</strong>.
+              </p>
+            )}
+
+            {error && <p style={{ margin: "12px 0 0", fontSize: 13, color: "#b91c1c" }}>{error}</p>}
+
+            <div className="modal-actions" style={{ marginTop: "20px" }}>
+              <button
+                className="btn-danger"
+                type="button"
+                onClick={handleConfirmDeactivate}
+                disabled={saving}
+              >
+                {saving ? "Deactivating…" : "Yes, Deactivate Account"}
+              </button>
+              <button
+                className="btn-ghost"
+                type="button"
+                onClick={() => setStatusTarget(null)}
                 disabled={saving}
               >
                 Cancel

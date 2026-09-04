@@ -69,8 +69,8 @@ export const STUDENT_PROFILE_FIELDS: ProfileFieldDef[] = [
   // Contact — owner decides.
   { key: "phone",            label: "Phone",             section: "contact", control: "USER", defaultVisibility: "PRIVATE", restrictedViewers: [] },
   { key: "email",            label: "Email",             section: "contact", control: "USER", defaultVisibility: "PRIVATE", restrictedViewers: [] },
-  { key: "currentAddress",   label: "Current address",   section: "contact", control: "USER", defaultVisibility: "PRIVATE", restrictedViewers: [] },
-  { key: "permanentAddress", label: "Permanent address", section: "contact", control: "USER", defaultVisibility: "PRIVATE", restrictedViewers: [] },
+  { key: "permProvinceName", label: "Permanent address", section: "contact", control: "USER", defaultVisibility: "PRIVATE", restrictedViewers: [] },
+  { key: "currProvinceName", label: "Current address",   section: "contact", control: "USER", defaultVisibility: "PRIVATE", restrictedViewers: [] },
   { key: "emergencyContact", label: "Emergency contact", section: "contact", control: "USER", defaultVisibility: "PRIVATE", restrictedViewers: [] },
   // Family / guardian — names are optional to share; guardian contact
   // details are institution-controlled.
@@ -135,6 +135,8 @@ export type ProfileSummary = {
   role: RoleName;
   subtitle: string | null;
   photoUrl: string | null;
+  /** Portal access flag (ACTIVE — can sign in, INACTIVE — sign-in blocked). */
+  accountStatus: "ACTIVE" | "INACTIVE" | null;
 };
 
 export type ProfilePayload = {

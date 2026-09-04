@@ -148,9 +148,30 @@ model Student {
 
   // Contact details — set/edited by the student themselves.
   phone            String?
-  currentAddress   String?
-  permanentAddress String?
   emergencyContact String?
+
+  // Structured permanent address (Nepal): cascading geo selectors + free-text tole.
+  permProvinceId     Int?
+  permProvinceName   String?
+  permDistrictId     Int?
+  permDistrictName   String?
+  permLocalLevelId   Int?
+  permLocalLevelName String?
+  permLocalLevelType String?
+  permWard           Int?
+  permTole           String?
+
+  // Current address — either same as permanent (toggle) or independently specified.
+  currSameAsPerm     Boolean  @default(true)
+  currProvinceId     Int?
+  currProvinceName   String?
+  currDistrictId     Int?
+  currDistrictName   String?
+  currLocalLevelId   Int?
+  currLocalLevelName String?
+  currLocalLevelType String?
+  currWard           Int?
+  currTole           String?
 
   // Guardian / parent details — set/edited by the student.
   fatherName       String?
@@ -274,6 +295,7 @@ model AttendanceSession {
   id          String             @id @default(cuid())
   classId     String
   sessionDate DateTime           @db.Date
+  createdAt   DateTime           @default(now())
   class       Class              @relation(fields: [classId], references: [id], onDelete: Cascade)
   records     AttendanceRecord[]
 

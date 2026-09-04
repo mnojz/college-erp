@@ -45,6 +45,8 @@
   --card-hover-border: #38bdf8;
   --table-header-bg: #16243b;
   --table-row-hover: #1a2a44;
+  --violet: #a78bfa;
+  --accent-grad: linear-gradient(135deg, #0369a1 0%, #0284c7 100%);
 }
 
 /* System Dark Mode ONLY when no explicit theme is saved */
@@ -69,6 +71,8 @@
     --card-hover-border: #38bdf8;
     --table-header-bg: #16243b;
     --table-row-hover: #1a2a44;
+    --violet: #a78bfa;
+    --accent-grad: linear-gradient(135deg, #0369a1 0%, #0284c7 100%);
   }
 }
 
@@ -1187,9 +1191,16 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
 
 .admin-metric-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* Fluid track sizing: fits every card in one row on wide screens,
+     wraps to 2×2 / 1-col as the viewport narrows, and adapts to pages
+     with fewer cards (3- or 2-card rows stretch without empty gaps). */
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
+}
+
+.admin-metric-grid > * {
+  min-width: 0;
 }
 
 .admin-metric-card {
@@ -1524,6 +1535,39 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
 :root[data-theme="dark"] .btn-action-delete:hover {
   background: rgba(239, 68, 68, 0.25);
   border-color: #f87171;
+}
+
+.btn-action-warn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(217, 119, 6, 0.1);
+  border: 1px solid rgba(217, 119, 6, 0.25);
+  color: #d97706;
+  cursor: pointer;
+  transition: all 120ms ease;
+  flex-shrink: 0;
+}
+
+.btn-action-warn:hover {
+  background: rgba(217, 119, 6, 0.2);
+  border-color: #d97706;
+  transform: translateY(-1px);
+}
+
+:root[data-theme="dark"] .btn-action-warn {
+  background: rgba(251, 191, 36, 0.14);
+  border-color: rgba(251, 191, 36, 0.3);
+  color: #fbbf24;
+}
+
+:root[data-theme="dark"] .btn-action-warn:hover {
+  background: rgba(251, 191, 36, 0.25);
+  border-color: #fbbf24;
 }
 
 /* ─── Translucent Status Indicators & Badges ─────────────────── */
@@ -4718,3 +4762,70 @@ button:disabled { cursor: not-allowed; opacity: 0.6; }
     padding: 16px;
   }
 }
+
+/* ─── Semantic status colors (theme-aware) ─────────────────────
+   Success / error / info states resolve through these tokens so
+   they adapt to light & dark themes instead of hardcoded hexes. */
+:root,
+:root[data-theme="light"] {
+  --ok: #16a34a;
+  --ok-ink: #15803d;
+  --ok-soft: #dcfce7;
+  --ok-border: #86efac;
+  --ok-faint: rgba(34, 197, 94, 0.07);
+  --danger: #dc2626;
+  --danger-ink: #b91c1c;
+  --danger-soft: #fee2e2;
+  --danger-border: #fecaca;
+  --info-ink: #0369a1;
+  --info-soft: rgba(14, 165, 233, 0.08);
+  --info-border: rgba(14, 165, 233, 0.25);
+}
+
+:root[data-theme="dark"] {
+  --ok: #4ade80;
+  --ok-ink: #86efac;
+  --ok-soft: rgba(74, 222, 128, 0.14);
+  --ok-border: rgba(74, 222, 128, 0.4);
+  --ok-faint: rgba(74, 222, 128, 0.08);
+  --danger: #f87171;
+  --danger-ink: #fca5a5;
+  --danger-soft: rgba(248, 113, 113, 0.14);
+  --danger-border: rgba(248, 113, 113, 0.4);
+  --info-ink: #7dd3fc;
+  --info-soft: rgba(56, 189, 248, 0.1);
+  --info-border: rgba(56, 189, 248, 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    --ok: #4ade80;
+    --ok-ink: #86efac;
+    --ok-soft: rgba(74, 222, 128, 0.14);
+    --ok-border: rgba(74, 222, 128, 0.4);
+    --ok-faint: rgba(74, 222, 128, 0.08);
+    --danger: #f87171;
+    --danger-ink: #fca5a5;
+    --danger-soft: rgba(248, 113, 113, 0.14);
+    --danger-border: rgba(248, 113, 113, 0.4);
+    --info-ink: #7dd3fc;
+    --info-soft: rgba(56, 189, 248, 0.1);
+    --info-border: rgba(56, 189, 248, 0.3);
+  }
+}
+
+/* ─── Responsive layout utility ─────────────────────────────────
+   Dashboard 2-column split that stacks to a single column on mobile.
+   (Metric-card rows use .admin-metric-grid, which is fluid above.) */
+.two-col-split {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 900px) {
+  .two-col-split {
+    grid-template-columns: 1fr;
+  }
+}
+

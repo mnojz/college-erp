@@ -65,7 +65,7 @@ export function ProfileView({
         <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
           <Avatar name={profile.summary.name} photoUrl={profile.summary.photoUrl} size={64} />
           <div style={{ flex: 1, minWidth: 180 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <strong style={{ fontSize: 18 }}>{profile.summary.name}</strong>
               <span
                 style={{
@@ -91,6 +91,20 @@ export function ProfileView({
                   }}
                 >
                   This is you
+                </span>
+              )}
+              {profile.summary.accountStatus === "INACTIVE" && (
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: "3px 10px",
+                    borderRadius: 999,
+                    background: "rgba(145,145,145,0.12)",
+                    color: "#475569",
+                  }}
+                >
+                  Inactive
                 </span>
               )}
             </div>

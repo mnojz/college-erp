@@ -148,7 +148,7 @@ export default function TeacherOverviewPage() {
             style={{
               display: "grid",
               placeItems: "center",
-              background: "linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%)",
+              background: "var(--accent-grad)",
               color: "#fff",
               fontSize: "36px",
               fontWeight: "700",
@@ -167,7 +167,7 @@ export default function TeacherOverviewPage() {
                   width: "8px",
                   height: "8px",
                   borderRadius: "50%",
-                  background: "#10b981",
+                  background: "var(--ok)",
                   display: "inline-block",
                 }}
               />
@@ -235,23 +235,23 @@ export default function TeacherOverviewPage() {
         </article>
         <article className="admin-metric-card">
           <span>Enrolled Students</span>
-          <strong style={{ color: "#0ea5e9" }}>{totalStudents}</strong>
+          <strong style={{ color: "var(--accent)" }}>{totalStudents}</strong>
           <small>Across assigned programs</small>
         </article>
         <article className="admin-metric-card">
           <span>Assessments Held</span>
-          <strong style={{ color: "#8b5cf6" }}>{totalAssessments}</strong>
+          <strong style={{ color: "var(--violet)" }}>{totalAssessments}</strong>
           <small>Quizzes, mid-terms &amp; finals</small>
         </article>
         <article className="admin-metric-card">
           <span>Attendance Sessions</span>
-          <strong style={{ color: "#10b981" }}>{totalSessionsLogged}</strong>
+          <strong style={{ color: "var(--ok)" }}>{totalSessionsLogged}</strong>
           <small>Completed roll-call logs</small>
         </article>
       </section>
 
       {/* Main Grid: Today's Schedule & Assigned Subjects */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "24px" }}>
+      <div className="two-col-split">
         {/* Assigned Classes */}
         <section className="profile-info-card" style={{ padding: "24px" }}>
           <div
@@ -296,8 +296,8 @@ export default function TeacherOverviewPage() {
                         style={{
                           padding: "2px 8px",
                           borderRadius: "4px",
-                          background: "#e0f2fe",
-                          color: "#0284c7",
+                          background: "var(--info-soft)",
+                          color: "var(--info-ink)",
                           fontSize: "0.75rem",
                           fontWeight: "700",
                         }}
@@ -324,7 +324,7 @@ export default function TeacherOverviewPage() {
                       style={{
                         padding: "6px 12px",
                         borderRadius: "6px",
-                        background: "#0ea5e9",
+                        background: "var(--accent)",
                         color: "#fff",
                         fontSize: "0.78rem",
                         fontWeight: "600",
@@ -373,7 +373,7 @@ export default function TeacherOverviewPage() {
             </h2>
             <Link
               href="/teacher/schedule"
-              style={{ fontSize: "0.8rem", color: "#0ea5e9", fontWeight: "600", textDecoration: "none" }}
+              style={{ fontSize: "0.8rem", color: "var(--accent)", fontWeight: "600", textDecoration: "none" }}
             >
               <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
                 Full Timetable <IconArrowRight size={14} strokeWidth={2.25} aria-hidden="true" />
@@ -394,8 +394,8 @@ export default function TeacherOverviewPage() {
                   style={{
                     padding: "14px",
                     borderRadius: "10px",
-                    borderLeft: "4px solid #0ea5e9",
-                    background: "rgba(14, 165, 233, 0.05)",
+                    borderLeft: "4px solid var(--accent)",
+                    background: "var(--info-soft)",
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
@@ -410,7 +410,7 @@ export default function TeacherOverviewPage() {
                     </span>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <span style={{ fontWeight: "700", fontSize: "0.85rem", color: "#0ea5e9" }}>
+                    <span style={{ fontWeight: "700", fontSize: "0.85rem", color: "var(--accent)" }}>
                       {new Date(cls.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </span>
                     <small style={{ display: "block", color: "var(--ink-soft, #64748b)", fontSize: "0.75rem" }}>

@@ -195,11 +195,11 @@ export async function DELETE(request: Request) {
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { searchParams } = new URL(request.url);
-  let id = searchParams.get("id");
+  let id: string | null = searchParams.get("id");
   if (!id) {
     try {
       const body = (await request.json()) as { id?: string };
-      id = body?.id;
+      id = body?.id ?? null;
     } catch {
       /* no body — fall through to validation */
     }

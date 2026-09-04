@@ -374,8 +374,8 @@ export default function TeacherMaterialsPage() {
             <p
               style={{
                 fontSize: "13px",
-                color: "#dc2626",
-                background: "rgba(220, 38, 38, 0.08)",
+                color: "var(--danger)",
+                background: "var(--danger-soft)",
                 padding: "10px 14px",
                 borderRadius: "8px",
               }}
@@ -385,7 +385,7 @@ export default function TeacherMaterialsPage() {
                 Students will immediately lose access to this file, including existing bookmarks.
               </span>
             </p>
-            {formError && <p style={{ margin: "12px 0 0", fontSize: 13, color: "#b91c1c" }}>{formError}</p>}
+            {formError && <p style={{ margin: "12px 0 0", fontSize: 13, color: "var(--danger-ink)" }}>{formError}</p>}
             <div className="modal-actions" style={{ marginTop: "20px" }}>
               <button className="btn-danger" type="button" onClick={handleDelete} disabled={saving}>
                 {saving ? "Deleting…" : "Yes, Delete"}

@@ -109,7 +109,7 @@ export default function StudentAttendancePage() {
               <span>Overall Attendance</span>
               <strong
                 style={{
-                  color: Number(overallPercentage) >= 75 ? "#16a34a" : "#dc2626",
+                  color: Number(overallPercentage) >= 75 ? "var(--ok)" : "var(--danger)",
                 }}
               >
                 {overallPercentage}%
@@ -123,12 +123,12 @@ export default function StudentAttendancePage() {
             </article>
             <article className="admin-metric-card">
               <span>Present</span>
-              <strong style={{ color: "#16a34a" }}>{presentSessions}</strong>
+              <strong style={{ color: "var(--ok)" }}>{presentSessions}</strong>
               <small>Attended classes</small>
             </article>
             <article className="admin-metric-card">
               <span>Absent</span>
-              <strong style={{ color: "#dc2626" }}>{absentSessions}</strong>
+              <strong style={{ color: "var(--danger)" }}>{absentSessions}</strong>
               <small>Missed classes</small>
             </article>
           </section>
@@ -148,7 +148,7 @@ export default function StudentAttendancePage() {
                           <strong>{sub.code}</strong> — {sub.name}
                         </div>
                         <div>
-                          <span style={{ fontWeight: "700", color: isSafe ? "#16a34a" : "#dc2626" }}>
+                          <span style={{ fontWeight: "700", color: isSafe ? "var(--ok)" : "var(--danger)" }}>
                             {pct.toFixed(1)}%
                           </span>{" "}
                           <span style={{ color: "var(--ink-soft)", fontSize: "0.82rem" }}>
@@ -160,7 +160,7 @@ export default function StudentAttendancePage() {
                         style={{
                           height: "8px",
                           width: "100%",
-                          background: "#e2e8f0",
+                          background: "var(--line)",
                           borderRadius: "4px",
                           overflow: "hidden",
                         }}
@@ -169,7 +169,7 @@ export default function StudentAttendancePage() {
                           style={{
                             height: "100%",
                             width: `${pct}%`,
-                            background: isSafe ? "#16a34a" : "#dc2626",
+                            background: isSafe ? "var(--ok)" : "var(--danger)",
                             transition: "width 300ms ease",
                           }}
                         />
@@ -213,7 +213,7 @@ export default function StudentAttendancePage() {
             <div className="profile-info-card" style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.88rem" }}>
                 <thead>
-                  <tr style={{ borderBottom: "1px solid var(--line)", background: "#f8fafc", color: "var(--ink-soft)" }}>
+                  <tr style={{ borderBottom: "1px solid var(--line)", background: "var(--table-header-bg)", color: "var(--ink-soft)" }}>
                     <th style={{ padding: "14px 18px", fontWeight: "600" }}>Date</th>
                     <th style={{ padding: "14px 18px", fontWeight: "600" }}>Subject</th>
                     <th style={{ padding: "14px 18px", fontWeight: "600" }}>Semester</th>
@@ -256,8 +256,8 @@ export default function StudentAttendancePage() {
                               borderRadius: "6px",
                               fontSize: "0.75rem",
                               fontWeight: "700",
-                              background: isPresent ? "#dcfce7" : "#fee2e2",
-                              color: isPresent ? "#15803d" : "#b91c1c",
+                              background: isPresent ? "var(--ok-soft)" : "var(--danger-soft)",
+                              color: isPresent ? "var(--ok-ink)" : "var(--danger-ink)",
                             }}
                           >
                             {isPresent ? "PRESENT" : "ABSENT"}

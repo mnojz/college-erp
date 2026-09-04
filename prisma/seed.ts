@@ -268,7 +268,7 @@ async function main() {
     parallel?: { subj: string; tch: string; group: string }[];
   }> = [
     // Monday
-    { d: dow.Mon, t: "09:00-10:00", subj: "CT 367", tchEmail: null, type: "Lecture" },
+    { d: dow.Mon, t: "09:00-10:00", subj: "CT 367", tchEmail: "pdb@fwu.edu.np", type: "Lecture" },
     { d: dow.Mon, t: "10:00-11:00", subj: "SH 366", tchEmail: "bp@fwu.edu.np", type: "Lecture" },
     { d: dow.Mon, t: "11:00-12:00", subj: "CT 362", tchEmail: "pdb@fwu.edu.np", type: "Lecture" },
     { d: dow.Mon, t: "12:00-13:00", subj: "EX 365", tchEmail: "kl@fwu.edu.np", type: "Lecture" },
@@ -276,14 +276,14 @@ async function main() {
     { d: dow.Mon, t: "14:30-15:30", subj: "CT 361", tchEmail: "bsd@fwu.edu.np", type: "Lecture" },
     { d: dow.Mon, t: "14:30-16:00", subj: "CT 364-P", tchEmail: "rkb@fwu.edu.np", type: "Practical", group: "Gr. B" },
     // Tuesday
-    { d: dow.Tue, t: "09:00-10:00", subj: "CT 367", tchEmail: null, type: "Lecture" },
+    { d: dow.Tue, t: "09:00-10:00", subj: "CT 367", tchEmail: "pdb@fwu.edu.np", type: "Lecture" },
     { d: dow.Tue, t: "10:00-11:00", subj: "SH 366", tchEmail: "bp@fwu.edu.np", type: "Lecture" },
     { d: dow.Tue, t: "11:00-12:00", subj: "CT 362", tchEmail: "pdb@fwu.edu.np", type: "Lecture" },
     { d: dow.Tue, t: "12:00-13:00", subj: "EX 365", tchEmail: "kl@fwu.edu.np", type: "Lecture" },
     { d: dow.Tue, t: "13:30-14:30", subj: "CT 363", tchEmail: "gpl@fwu.edu.np", type: "Lecture" },
     { d: dow.Tue, t: "14:30-15:30", subj: "CT 364", tchEmail: "rkb@fwu.edu.np", type: "Lecture" },
     // Wednesday
-    { d: dow.Wed, t: "09:00-10:00", subj: "CT 367", tchEmail: null, type: "Lecture" },
+    { d: dow.Wed, t: "09:00-10:00", subj: "CT 367", tchEmail: "pdb@fwu.edu.np", type: "Lecture" },
     { d: dow.Wed, t: "10:00-11:00", subj: "CT 364", tchEmail: "rkb@fwu.edu.np", type: "Lecture" },
     { d: dow.Wed, t: "11:00-12:00", subj: "CT 362", tchEmail: "pdb@fwu.edu.np", type: "Lecture" },
     { d: dow.Wed, t: "12:00-13:00", subj: "CT 361", tchEmail: "bsd@fwu.edu.np", type: "Lecture" },
@@ -342,9 +342,9 @@ async function main() {
             startTime: parseTime(start),
             endTime: parseTime(end),
             subjectId: sub(c.subj),
-            // Slots without an assigned instructor (e.g. Minor Project) fall back
-            // to the semester coordinator as a placeholder supervisor.
-            teacherId: tch(c.tchEmail ?? "kl@fwu.edu.np"),
+            // Slots without an assigned instructor (e.g. Minor Project) stay teacher-less
+            // so they don't appear under any teacher's attendance list.
+            teacherId: c.tchEmail ? tch(c.tchEmail) : null,
             type: c.type ?? "Lecture",
             group: c.group ?? null,
           },
@@ -360,8 +360,8 @@ async function main() {
     // schedule keeps resolving instructors automatically.
     const assignments = new Map<string, string>();
     const recordAssignment = (subjCode: string | undefined | null, tchEmail: string | undefined | null) => {
-      if (!subjCode) return;
-      const teacherId = tch(tchEmail ?? "kl@fwu.edu.np");
+      if (!subjCode || !tchEmail) return;
+      const teacherId = tch(tchEmail);
       if (!teacherId) return;
       assignments.set(`${sub(subjCode)}::${teacherId}`, sub(subjCode));
     };

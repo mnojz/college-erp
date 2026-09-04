@@ -23,6 +23,8 @@ type UpdateTeacherBody = {
   employeeNo?: unknown;
   profileImageUrl?: unknown;
   subjectIds?: unknown;
+  // Portal access — ACTIVE users can sign in, INACTIVE are locked out.
+  status?: unknown;
 };
 
 /** Normalise an optional `subjectIds` payload into a de-duplicated list. */
@@ -158,6 +160,10 @@ export async function PUT(request: Request) {
   const profileImageUrl = typeof body.profileImageUrl === "string" ? body.profileImageUrl.trim() : null;
   const subjectIds = parseSubjectIds(body.subjectIds);
 
+  // Portal access — ACTIVE users can sign in, INACTIVE are locked out.
+  const statusRaw = typeof body.status === "string" ? body.status.trim().toUpperCase() : "";
+  const status = statusRaw === "ACTIVE" || statusRaw === "INACTIVE" ? statusRaw : undefined;
+
   if (!id || !email || !firstName || !lastName || !employeeNo) {
     return NextResponse.json(
       { error: "Teacher ID, email, name, and employee number are required" },
@@ -187,6 +193,7 @@ export async function PUT(request: Request) {
         email,
         firstName,
         lastName,
+        ...(status ? { status } : {}),
       };
 
       if (password) {

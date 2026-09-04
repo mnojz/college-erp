@@ -14,6 +14,7 @@ import {
   type ProfileSectionPayload,
   type RoleName,
 } from "@/app/lib/profile-shared";
+import { formatAddressPartial } from "@/app/lib/nepal-geo";
 
 const PROFILE_USER_SELECT = {
   id: true,
@@ -38,8 +39,27 @@ const PROFILE_USER_SELECT = {
       religion: true,
       category: true,
       phone: true,
-      currentAddress: true,
-      permanentAddress: true,
+      // Structured permanent address
+      permProvinceId: true,
+      permProvinceName: true,
+      permDistrictId: true,
+      permDistrictName: true,
+      permLocalLevelId: true,
+      permLocalLevelName: true,
+      permLocalLevelType: true,
+      permWard: true,
+      permTole: true,
+      // Structured current address
+      currSameAsPerm: true,
+      currProvinceId: true,
+      currProvinceName: true,
+      currDistrictId: true,
+      currDistrictName: true,
+      currLocalLevelId: true,
+      currLocalLevelName: true,
+      currLocalLevelType: true,
+      currWard: true,
+      currTole: true,
       emergencyContact: true,
       fatherName: true,
       motherName: true,
@@ -79,7 +99,10 @@ export async function getProfileForViewer(
     select: PROFILE_USER_SELECT,
   });
 
-  if (!target || target.status !== "ACTIVE") return null;
+  if (!target) return null;
+  // Deactivated accounts are hidden from everyone except admins, who keep
+  // audit access (the People page still shows their INACTIVE status badge).
+  if (target.status !== "ACTIVE" && viewer.role !== "ADMIN") return null;
 
   const role = target.role as RoleName;
   const viewerIsAdmin = viewer.role === "ADMIN";
@@ -123,13 +146,14 @@ export async function getProfileForViewer(
     (section): section is ProfileSectionPayload => section !== undefined,
   );
 
-  const profile: ProfileResponse["profile"] = {
+    const profile: ProfileResponse["profile"] = {
     summary: {
       id: target.id,
       name: `${target.firstName} ${target.lastName}`.trim(),
       role,
       subtitle: subtitleFor(target, role),
       photoUrl: target.student?.profileImageUrl ?? target.teacher?.profileImageUrl ?? null,
+      accountStatus: target.status as "ACTIVE" | "INACTIVE" | null,
     },
     isSelf,
     viewerIsAdmin,
@@ -181,8 +205,28 @@ function collectFieldValues(
     values.category = s.category;
     values.phone = s.phone;
     values.email = target.email;
-    values.currentAddress = s.currentAddress;
-    values.permanentAddress = s.permanentAddress;
+    values.currentAddress = formatAddressPartial({
+      provinceId: s.currProvinceId,
+      provinceName: s.currProvinceName,
+      districtId: s.currDistrictId,
+      districtName: s.currDistrictName,
+      localLevelId: s.currLocalLevelId,
+      localLevelName: s.currLocalLevelName,
+      localLevelType: s.currLocalLevelType,
+      ward: s.currWard,
+      tole: s.currTole,
+    });
+    values.permanentAddress = formatAddressPartial({
+      provinceId: s.permProvinceId,
+      provinceName: s.permProvinceName,
+      districtId: s.permDistrictId,
+      districtName: s.permDistrictName,
+      localLevelId: s.permLocalLevelId,
+      localLevelName: s.permLocalLevelName,
+      localLevelType: s.permLocalLevelType,
+      ward: s.permWard,
+      tole: s.permTole,
+    });
     values.emergencyContact = s.emergencyContact;
     values.fatherName = s.fatherName;
     values.motherName = s.motherName;

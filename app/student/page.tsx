@@ -19,6 +19,15 @@ import {
   IconUser,
   IconUsersGroup,
 } from "@tabler/icons-react";
+import {
+  getProvinces,
+  getProvince,
+  getDistrict,
+  getLocalLevel,
+  formatAddressPartial,
+} from "@/app/lib/nepal-geo";
+
+
 
 type Profile = {
   enrollmentNumber: string;
@@ -34,9 +43,28 @@ type Profile = {
   category: string | null;
   // Contact details — editable by the student.
   phone: string | null;
-  currentAddress: string | null;
-  permanentAddress: string | null;
   emergencyContact: string | null;
+  // Structured permanent address
+  permProvinceId: number | null;
+  permProvinceName: string | null;
+  permDistrictId: number | null;
+  permDistrictName: string | null;
+  permLocalLevelId: number | null;
+  permLocalLevelName: string | null;
+  permLocalLevelType: string | null;
+  permWard: number | null;
+  permTole: string | null;
+  // Structured current address
+  currSameAsPerm: boolean;
+  currProvinceId: number | null;
+  currProvinceName: string | null;
+  currDistrictId: number | null;
+  currDistrictName: string | null;
+  currLocalLevelId: number | null;
+  currLocalLevelName: string | null;
+  currLocalLevelType: string | null;
+  currWard: number | null;
+  currTole: string | null;
   // Guardian / parent details — editable by the student.
   fatherName: string | null;
   motherName: string | null;
@@ -58,8 +86,19 @@ type EditFormState = {
   bloodGroup: string;
   email: string;
   phone: string;
-  currentAddress: string;
-  permanentAddress: string;
+  // Permanent address (structured)
+  permProvinceId: number | null;
+  permDistrictId: number | null;
+  permLocalLevelId: number | null;
+  permWard: number | null;
+  permTole: string;
+  // Current address
+  currSameAsPerm: boolean;
+  currProvinceId: number | null;
+  currDistrictId: number | null;
+  currLocalLevelId: number | null;
+  currWard: number | null;
+  currTole: string;
   emergencyContact: string;
   fatherName: string;
   motherName: string;
@@ -151,8 +190,19 @@ export default function StudentPage() {
       bloodGroup: profile.bloodGroup ?? "",
       email: profile.user.email,
       phone: profile.phone ?? "",
-      currentAddress: profile.currentAddress ?? "",
-      permanentAddress: profile.permanentAddress ?? "",
+      // Permanent address
+      permProvinceId: profile.permProvinceId ?? null,
+      permDistrictId: profile.permDistrictId ?? null,
+      permLocalLevelId: profile.permLocalLevelId ?? null,
+      permWard: profile.permWard ?? null,
+      permTole: profile.permTole ?? "",
+      // Current address
+      currSameAsPerm: profile.currSameAsPerm ?? true,
+      currProvinceId: profile.currProvinceId ?? null,
+      currDistrictId: profile.currDistrictId ?? null,
+      currLocalLevelId: profile.currLocalLevelId ?? null,
+      currWard: profile.currWard ?? null,
+      currTole: profile.currTole ?? "",
       emergencyContact: profile.emergencyContact ?? "",
       fatherName: profile.fatherName ?? "",
       motherName: profile.motherName ?? "",
@@ -194,12 +244,23 @@ export default function StudentPage() {
     setSavingProfile(true);
     setEditError("");
 
-    const body: Record<string, string> = {
+    const body: Record<string, unknown> = {
       profileImageUrl: editForm.profileImageUrl,
       bloodGroup: editForm.bloodGroup,
       phone: editForm.phone,
-      currentAddress: editForm.currentAddress,
-      permanentAddress: editForm.permanentAddress,
+      // Permanent address
+      permProvinceId: editForm.permProvinceId,
+      permDistrictId: editForm.permDistrictId,
+      permLocalLevelId: editForm.permLocalLevelId,
+      permWard: editForm.permWard,
+      permTole: editForm.permTole,
+      // Current address
+      currSameAsPerm: editForm.currSameAsPerm,
+      currProvinceId: editForm.currProvinceId,
+      currDistrictId: editForm.currDistrictId,
+      currLocalLevelId: editForm.currLocalLevelId,
+      currWard: editForm.currWard,
+      currTole: editForm.currTole,
       emergencyContact: editForm.emergencyContact,
       fatherName: editForm.fatherName,
       motherName: editForm.motherName,
@@ -309,8 +370,28 @@ export default function StudentPage() {
           rows={[
             ["Email Address", profile.user.email],
             ["Phone Number", profile.phone || "Not provided"],
-            ["Current Address", profile.currentAddress || "Not provided"],
-            ["Permanent Address", profile.permanentAddress || "Not provided"],
+            ["Current Address", formatAddressPartial({
+              provinceId: profile.currProvinceId,
+              provinceName: profile.currProvinceName,
+              districtId: profile.currDistrictId,
+              districtName: profile.currDistrictName,
+              localLevelId: profile.currLocalLevelId,
+              localLevelName: profile.currLocalLevelName,
+              localLevelType: profile.currLocalLevelType,
+              ward: profile.currWard,
+              tole: profile.currTole,
+            }) || (profile.currSameAsPerm ? "Same as permanent address" : "Not provided")],
+            ["Permanent Address", formatAddressPartial({
+              provinceId: profile.permProvinceId,
+              provinceName: profile.permProvinceName,
+              districtId: profile.permDistrictId,
+              districtName: profile.permDistrictName,
+              localLevelId: profile.permLocalLevelId,
+              localLevelName: profile.permLocalLevelName,
+              localLevelType: profile.permLocalLevelType,
+              ward: profile.permWard,
+              tole: profile.permTole,
+            }) || "Not provided"],
             ["Emergency Contact", profile.emergencyContact || "Not provided"],
           ]}
         />
@@ -469,23 +550,276 @@ export default function StudentPage() {
               </label>
             </div>
 
+            <h3
+              style={{
+                margin: "6px 0 0",
+                fontSize: 13,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                color: "var(--ink-soft, #64748b)",
+              }}
+            >
+              Permanent Address
+            </h3>
             <div className="inline-pair">
               <label>
-                Current Address
-                <input
-                  type="text"
-                  placeholder="Where you live now"
-                  value={editForm.currentAddress}
-                  onChange={(e) => setEditForm({ ...editForm, currentAddress: e.target.value })}
-                />
+                Province
+                <select
+                  value={editForm.permProvinceId ?? ""}
+                  onChange={(e) =>
+                    setEditForm({
+                      ...editForm,
+                      permProvinceId: e.target.value ? Number(e.target.value) : null,
+                      permDistrictId: null,
+                      permLocalLevelId: null,
+                    })
+                  }
+                >
+                  <option value="">Select province</option>
+                  {getProvinces().map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
               </label>
               <label>
-                Permanent Address
+                District
+                <select
+                  value={editForm.permDistrictId ?? ""}
+                  onChange={(e) =>
+                    setEditForm({
+                      ...editForm,
+                      permDistrictId: e.target.value ? Number(e.target.value) : null,
+                      permLocalLevelId: null,
+                    })
+                  }
+                  disabled={!editForm.permProvinceId}
+                >
+                  <option value="">Select district</option>
+                  {editForm.permProvinceId &&
+                    getProvince(editForm.permProvinceId)?.districts.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                </select>
+              </label>
+            </div>
+            <div className="inline-pair">
+              <label>
+                Municipality / Rural Municipality
+                <select
+                  value={editForm.permLocalLevelId ?? ""}
+                  onChange={(e) =>
+                    setEditForm({
+                      ...editForm,
+                      permLocalLevelId: e.target.value ? Number(e.target.value) : null,
+                    })
+                  }
+                  disabled={!editForm.permDistrictId}
+                >
+                  <option value="">Select local level</option>
+                  {editForm.permProvinceId &&
+                    editForm.permDistrictId &&
+                    getDistrict(editForm.permProvinceId, editForm.permDistrictId)?.localLevels.map((l) => (
+                      <option key={l.id} value={l.id}>{l.name} ({l.type})</option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                Ward Number
+                <select
+                  value={editForm.permWard ?? ""}
+                  onChange={(e) =>
+                    setEditForm({
+                      ...editForm,
+                      permWard: e.target.value ? Number(e.target.value) : null,
+                    })
+                  }
+                  disabled={!editForm.permLocalLevelId}
+                >
+                  <option value="">Select ward</option>
+                  {editForm.permProvinceId &&
+                    editForm.permDistrictId &&
+                    editForm.permLocalLevelId &&
+                    (() => {
+                      const ll = getLocalLevel(
+                        editForm.permProvinceId,
+                        editForm.permDistrictId,
+                        editForm.permLocalLevelId
+                      );
+                      if (!ll?.totalWard) return null;
+                      return Array.from({ length: ll.totalWard }, (_, i) => (
+                        <option key={i + 1} value={i + 1}>
+                          Ward {i + 1}
+                        </option>
+                      ));
+                    })()}
+                </select>
+              </label>
+            </div>
+            <label>
+              Tole / Street
+              <input
+                type="text"
+                placeholder="Your tole or street name"
+                value={editForm.permTole}
+                onChange={(e) => setEditForm({ ...editForm, permTole: e.target.value })}
+              />
+            </label>
+
+            <h3
+              style={{
+                margin: "6px 0 0",
+                fontSize: 13,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                color: "var(--ink-soft, #64748b)",
+              }}
+            >
+              Current Address
+            </h3>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 13,
+                fontWeight: 500,
+                color: "var(--ink-soft, #64748b)",
+                cursor: "pointer",
+                margin: "4px 0 8px",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={editForm.currSameAsPerm}
+                onChange={(e) =>
+                  setEditForm({
+                    ...editForm,
+                    currSameAsPerm: e.target.checked,
+                    currProvinceId: e.target.checked ? editForm.permProvinceId : null,
+                    currDistrictId: e.target.checked ? editForm.permDistrictId : null,
+                    currLocalLevelId: e.target.checked ? editForm.permLocalLevelId : null,
+                    currWard: e.target.checked ? editForm.permWard : null,
+                    currTole: e.target.checked ? editForm.permTole : "",
+                  })
+                }
+                style={{ width: 16, height: 16, cursor: "pointer" }}
+              />
+              Same as permanent address
+            </label>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+                opacity: editForm.currSameAsPerm ? 0.5 : 1,
+                pointerEvents: editForm.currSameAsPerm ? "none" : "auto",
+              }}
+            >
+              <div className="inline-pair">
+                <label>
+                  Province
+                  <select
+                    value={editForm.currProvinceId ?? ""}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        currProvinceId: e.target.value ? Number(e.target.value) : null,
+                        currDistrictId: null,
+                        currLocalLevelId: null,
+                      })
+                    }
+                    disabled={editForm.currSameAsPerm}
+                  >
+                    <option value="">Select province</option>
+                    {getProvinces().map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  District
+                  <select
+                    value={editForm.currDistrictId ?? ""}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        currDistrictId: e.target.value ? Number(e.target.value) : null,
+                        currLocalLevelId: null,
+                      })
+                    }
+                    disabled={editForm.currSameAsPerm || !editForm.currProvinceId}
+                  >
+                    <option value="">Select district</option>
+                    {editForm.currProvinceId &&
+                      getProvince(editForm.currProvinceId)?.districts.map((d) => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                  </select>
+                </label>
+              </div>
+              <div className="inline-pair">
+                <label>
+                  Municipality / Rural Municipality
+                  <select
+                    value={editForm.currLocalLevelId ?? ""}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        currLocalLevelId: e.target.value ? Number(e.target.value) : null,
+                      })
+                    }
+                    disabled={editForm.currSameAsPerm || !editForm.currDistrictId}
+                  >
+                    <option value="">Select local level</option>
+                    {editForm.currProvinceId &&
+                      editForm.currDistrictId &&
+                      getDistrict(editForm.currProvinceId, editForm.currDistrictId)?.localLevels.map((l) => (
+                        <option key={l.id} value={l.id}>{l.name} ({l.type})</option>
+                      ))}
+                  </select>
+                </label>
+                <label>
+                  Ward Number
+                  <select
+                    value={editForm.currWard ?? ""}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        currWard: e.target.value ? Number(e.target.value) : null,
+                      })
+                    }
+                    disabled={editForm.currSameAsPerm || !editForm.currLocalLevelId}
+                  >
+                    <option value="">Select ward</option>
+                    {editForm.currProvinceId &&
+                      editForm.currDistrictId &&
+                      editForm.currLocalLevelId &&
+                      (() => {
+                        const ll = getLocalLevel(
+                          editForm.currProvinceId,
+                          editForm.currDistrictId,
+                          editForm.currLocalLevelId
+                        );
+                        if (!ll?.totalWard) return null;
+                        return Array.from({ length: ll.totalWard }, (_, i) => (
+                          <option key={i + 1} value={i + 1}>
+                            Ward {i + 1}
+                          </option>
+                        ));
+                      })()}
+                  </select>
+                </label>
+              </div>
+              <label>
+                Tole / Street
                 <input
                   type="text"
-                  placeholder="Your family home address"
-                  value={editForm.permanentAddress}
-                  onChange={(e) => setEditForm({ ...editForm, permanentAddress: e.target.value })}
+                  placeholder="Your tole or street name"
+                  value={editForm.currTole}
+                  onChange={(e) => setEditForm({ ...editForm, currTole: e.target.value })}
+                  disabled={editForm.currSameAsPerm}
                 />
               </label>
             </div>

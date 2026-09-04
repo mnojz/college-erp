@@ -35,12 +35,19 @@ type UpdateStudentBody = {
   admissionDate?: unknown;
   programId?: unknown;
   currentSemester?: unknown;
+  // Enrollment lifecycle (drives the status badge on the student's profile).
+  status?: unknown;
+  // Portal access (User.status) — ACTIVE users can sign in, INACTIVE cannot.
+  userStatus?: unknown;
   // Critical personal information — admin-entered only.
   gender?: unknown;
   nationality?: unknown;
   religion?: unknown;
   category?: unknown;
 };
+
+/** Valid StudentStatus values, for payload validation. */
+const STUDENT_STATUSES = ["ACTIVE", "INACTIVE", "GRADUATED", "SUSPENDED", "WITHDRAWN"] as const;
 
 export async function POST(request: Request) {
   if (!(await requireAdmin())) {
@@ -165,6 +172,16 @@ export async function PUT(request: Request) {
   const religion = typeof body.religion === "string" ? body.religion.trim() || null : null;
   const category = typeof body.category === "string" ? body.category.trim() || null : null;
 
+  // Enrollment lifecycle status (shown as the badge on the student's profile).
+  const statusRaw = typeof body.status === "string" ? body.status.trim().toUpperCase() : "";
+  const status = (STUDENT_STATUSES as readonly string[]).includes(statusRaw)
+    ? (statusRaw as (typeof STUDENT_STATUSES)[number])
+    : undefined;
+
+  // Portal access — ACTIVE users can sign in, INACTIVE are locked out.
+  const userStatusRaw = typeof body.userStatus === "string" ? body.userStatus.trim().toUpperCase() : "";
+  const userStatus = userStatusRaw === "ACTIVE" || userStatusRaw === "INACTIVE" ? userStatusRaw : undefined;
+
   if (!id || !email || !firstName || !lastName || !enrollmentNumber || !registrationId || !admissionDate) {
     return NextResponse.json(
       { error: "Student ID, email, name, enrollment number, registration ID, and admission date are required" },
@@ -208,6 +225,7 @@ export async function PUT(request: Request) {
         email,
         firstName,
         lastName,
+        ...(userStatus ? { status: userStatus } : {}),
       };
 
       if (password) {
@@ -233,9 +251,11 @@ export async function PUT(request: Request) {
           nationality,
           religion,
           category,
+          ...(status ? { status } : {}),
         },
         select: {
           id: true,
+          status: true,
           enrollmentNumber: true,
           registrationId: true,
           rollNumber: true,
@@ -322,7 +342,7 @@ export async function GET() {
       select: {
         id: true, enrollmentNumber: true, registrationId: true, rollNumber: true,
         profileImageUrl: true, admissionDate: true, programId: true, currentSemester: true,
-        gender: true, nationality: true, religion: true, category: true,
+        gender: true, nationality: true, religion: true, category: true, status: true,
         program: { select: { id: true, name: true, code: true } },
         user: { select: { id: true, email: true, firstName: true, lastName: true, status: true } },
       },
