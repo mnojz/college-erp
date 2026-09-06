@@ -9,11 +9,13 @@ import type {
   ProfilePayload,
   RoleName,
 } from "@/app/lib/profile-shared";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-const ROLE_BADGES: Record<RoleName, { label: string; background: string; color: string }> = {
-  STUDENT: { label: "Student", background: "rgba(2,132,199,0.12)", color: "#0369a1" },
-  TEACHER: { label: "Faculty", background: "rgba(16,185,129,0.14)", color: "#047857" },
-  ADMIN: { label: "Admin", background: "rgba(239,68,68,0.12)", color: "#b91c1c" },
+const ROLE_BADGES: Record<RoleName, { label: string; className: string }> = {
+  STUDENT: { label: "Student", className: "bg-sky-500/10 text-sky-700 dark:text-sky-300" },
+  TEACHER: { label: "Faculty", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" },
+  ADMIN: { label: "Admin", className: "bg-red-500/10 text-red-700 dark:text-red-300" },
 };
 
 function VisibilityBadge({
@@ -27,7 +29,7 @@ function VisibilityBadge({
     return (
       <IconLock
         size={12}
-        style={{ color: "var(--ink-soft)", flexShrink: 0 }}
+        className="shrink-0 text-muted-foreground"
         aria-label="Visibility managed by the institution"
       />
     );
@@ -35,18 +37,12 @@ function VisibilityBadge({
   const visibility = settings?.[field.key];
   if (!visibility) return null;
   return visibility === "PUBLIC" ? (
-    <IconEye size={12} style={{ color: "#047857", flexShrink: 0 }} aria-label="Public" />
+    <IconEye size={12} className="shrink-0 text-emerald-600" aria-label="Public" />
   ) : (
-    <IconEyeOff size={12} style={{ color: "var(--ink-soft)", flexShrink: 0 }} aria-label="Private" />
+    <IconEyeOff size={12} className="shrink-0 text-muted-foreground" aria-label="Private" />
   );
 }
 
-/**
- * Renders a (server-masked) profile payload. Sections/fields that the viewer
- * may not see never arrive from the API, so this component simply draws what
- * it receives. Visibility icons are shown only when `settings` is provided
- * (own profile / admin audit view).
- */
 export function ProfileView({
   profile,
   settings,
@@ -60,79 +56,56 @@ export function ProfileView({
   const showBadges = settings !== undefined;
 
   return (
-    <div>
-      <section className="profile-info-card" style={{ marginBottom: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+    <div className="flex flex-col gap-5">
+      <Card className="p-5">
+        <div className="flex flex-wrap items-center gap-4">
           <Avatar name={profile.summary.name} photoUrl={profile.summary.photoUrl} size={64} />
-          <div style={{ flex: 1, minWidth: 180 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <strong style={{ fontSize: 18 }}>{profile.summary.name}</strong>
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  padding: "3px 10px",
-                  borderRadius: 999,
-                  background: badge.background,
-                  color: badge.color,
-                }}
-              >
-                {badge.label}
-              </span>
+          <div className="min-w-[180px] flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <strong className="text-lg font-semibold">{profile.summary.name}</strong>
+              <Badge className={badge.className}>{badge.label}</Badge>
               {profile.isSelf && (
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    padding: "3px 10px",
-                    borderRadius: 999,
-                    background: "var(--mint)",
-                    color: "#047857",
-                  }}
+                <Badge
+                  variant="outline"
+                  className="border-emerald-600/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                 >
                   This is you
-                </span>
+                </Badge>
               )}
               {profile.summary.accountStatus === "INACTIVE" && (
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    padding: "3px 10px",
-                    borderRadius: 999,
-                    background: "rgba(145,145,145,0.12)",
-                    color: "#475569",
-                  }}
-                >
-                  Inactive
-                </span>
+                <Badge variant="secondary">Inactive</Badge>
               )}
             </div>
             {profile.summary.subtitle && (
-              <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--ink-soft)" }}>
-                {profile.summary.subtitle}
-              </p>
+              <p className="mt-1.5 text-sm text-muted-foreground">{profile.summary.subtitle}</p>
             )}
           </div>
           {actions}
         </div>
-      </section>
+      </Card>
 
       {profile.sections.length === 0 ? (
-        <p style={{ color: "var(--ink-soft)", fontSize: 14 }}>
-          No shared profile information to display.
-        </p>
+        <p className="text-sm text-muted-foreground">No shared profile information to display.</p>
       ) : (
-        <div className="profile-card-grid">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {profile.sections.map((section) => (
-            <section key={section.id} className="profile-info-card">
-              <h2>{section.title}</h2>
-              <dl>
-                {section.fields.map((field) => (
-                  <FragmentRow key={field.key} field={field} showBadges={showBadges} settings={settings} />
-                ))}
-              </dl>
-            </section>
+            <Card key={section.id}>
+              <CardHeader>
+                <CardTitle className="text-sm">{section.title}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <dl className="grid grid-cols-[minmax(120px,1.2fr)_1fr] gap-x-4 gap-y-2.5 text-sm">
+                  {section.fields.map((field) => (
+                    <FragmentRow
+                      key={field.key}
+                      field={field}
+                      showBadges={showBadges}
+                      settings={settings}
+                    />
+                  ))}
+                </dl>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
@@ -151,11 +124,11 @@ function FragmentRow({
 }) {
   return (
     <div style={{ display: "contents" }}>
-      <dt style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <dt className="flex items-center gap-1.5 text-muted-foreground">
         {field.label}
         {showBadges && <VisibilityBadge field={field} settings={settings} />}
       </dt>
-      <dd style={{ wordBreak: "break-word" }}>{field.value}</dd>
+      <dd className="font-medium break-words">{field.value}</dd>
     </div>
   );
 }

@@ -10,6 +10,8 @@ import {
   IconFileText,
   IconPaperclip,
 } from "@tabler/icons-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 export type NoticeAttachment = {
   fileName: string;
@@ -43,11 +45,6 @@ export function noticeAttachmentUrl(id: string, inline = false): string {
   return `/api/announcements/${id}/attachment${inline ? "?inline=1" : ""}`;
 }
 
-/**
- * Popup shown when clicking a notice/announcement card: full body plus an
- * attachment preview — images render inline, other formats get open/download
- * actions.
- */
 export function NoticeDetailModal({
   notice,
   onClose,
@@ -61,38 +58,38 @@ export function NoticeDetailModal({
 
   return (
     <AdminModal title={notice.title} onClose={onClose} wide>
-      <div className="notice-detail">
-        <div className="notice-detail-meta">
-          <span className="badge badge-green">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="secondary">
             {new Date(stamp).toLocaleDateString(undefined, {
               year: "numeric",
               month: "short",
               day: "numeric",
             })}
-          </span>
+          </Badge>
           {notice.author && (
-            <span className="notice-detail-author">
+            <span className="text-sm text-muted-foreground">
               Posted by {notice.author.firstName} {notice.author.lastName}
             </span>
           )}
           {notice.scope && (
-            <span className="badge badge-violet" title={notice.scope.subjectName}>
+            <Badge variant="outline" title={notice.scope.subjectName} className="gap-1">
               <IconBook2 size={12} aria-hidden="true" />
               {notice.scope.subjectCode} · {notice.scope.programCode} · Sem {notice.scope.semester}
-            </span>
+            </Badge>
           )}
           {attachment && (
-            <span className="badge badge-blue">
+            <Badge variant="secondary" className="gap-1">
               <IconPaperclip size={12} aria-hidden="true" /> Attachment
-            </span>
+            </Badge>
           )}
         </div>
 
-        <p className="notice-detail-body">{notice.body}</p>
+        <p className="text-[15px] leading-relaxed text-muted-foreground">{notice.body}</p>
 
         {attachment && (
-          <div className="notice-detail-attachment">
-            <span className="notice-detail-attachment-title">
+          <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-3">
+            <span className="flex items-center gap-1.5 text-sm font-medium">
               <IconPaperclip size={14} aria-hidden="true" />
               {isImage ? "Attached image" : "Attached file"}
             </span>
@@ -104,41 +101,38 @@ export function NoticeDetailModal({
                   alt={attachment.fileName}
                   openUrl={noticeAttachmentUrl(notice.id, true)}
                 />
-                <a
-                  className="notice-detail-download"
-                  href={noticeAttachmentUrl(notice.id)}
-                  download={attachment.fileName}
-                >
-                  <IconDownload size={14} aria-hidden="true" />
-                  Download {attachment.fileName} ({formatBytes(attachment.size)})
+                <a href={noticeAttachmentUrl(notice.id)} download={attachment.fileName}>
+                  <Button variant="outline" size="sm" className="gap-1.5">
+                    <IconDownload size={14} aria-hidden="true" />
+                    Download {attachment.fileName} ({formatBytes(attachment.size)})
+                  </Button>
                 </a>
               </>
             ) : (
-              <div className="notice-file-row">
-                <span className="notice-file-row-icon">
+              <div className="flex flex-col-reverse items-start gap-3 sm:flex-row sm:items-center">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
                   <IconFileText size={22} aria-hidden="true" />
                 </span>
-                <span className="notice-file-row-info">
-                  <span className="notice-file-row-name">{attachment.fileName}</span>
-                  <span className="notice-file-row-size">
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-sm font-medium">{attachment.fileName}</span>
+                  <span className="text-xs text-muted-foreground">
                     {formatBytes(attachment.size)}
                   </span>
                 </span>
-                <span className="notice-file-row-actions">
+                <span className="flex shrink-0 gap-2">
                   <a
-                    className="btn-ghost"
                     href={noticeAttachmentUrl(notice.id, true)}
                     target="_blank"
                     rel="noreferrer"
                   >
-                    <IconExternalLink size={15} aria-hidden="true" /> Open
+                    <Button variant="outline" size="sm" className="gap-1.5">
+                      <IconExternalLink size={15} aria-hidden="true" /> Open
+                    </Button>
                   </a>
-                  <a
-                    className="btn-primary"
-                    href={noticeAttachmentUrl(notice.id)}
-                    download={attachment.fileName}
-                  >
-                    <IconDownload size={15} aria-hidden="true" /> Download
+                  <a href={noticeAttachmentUrl(notice.id)} download={attachment.fileName}>
+                    <Button size="sm" className="gap-1.5">
+                      <IconDownload size={15} aria-hidden="true" /> Download
+                    </Button>
                   </a>
                 </span>
               </div>

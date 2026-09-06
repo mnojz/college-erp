@@ -6,17 +6,10 @@ import {
   noticeAttachmentUrl,
   type NoticeDetailData,
 } from "@/app/components/common/NoticeDetailModal";
-import { IconBell, IconBook2, IconFileText, IconZoomIn } from "@tabler/icons-react";
+import { IconBook2, IconFileText, IconZoomIn } from "@tabler/icons-react";
+import { Card } from "@/components/ui/card";
+import { cn } from "cn";
 
-/**
- * Post-style notice card with two sections separated by a fine divider:
- *  - header: poster byline (avatar, name, date, scope chip) with the optional
- *    `actions` slot (edit/delete controls) pinned to the right edge;
- *  - body: notice title, short body text and a small square attachment
- *    preview, vertically centered against the text.
- * Clicking the card opens the detail popup, where the full image is shown
- * with a zoom/pan viewer.
- */
 export function NoticePostCard({
   notice,
   onOpen,
@@ -40,8 +33,7 @@ export function NoticePostCard({
   ).toUpperCase();
 
   return (
-    <article
-      className={`notice-post clickable-card${compact ? " notice-post-compact" : ""}`}
+    <Card
       role="button"
       tabIndex={0}
       onClick={onOpen}
@@ -51,54 +43,58 @@ export function NoticePostCard({
           onOpen();
         }
       }}
+      className={cn(
+        "cursor-pointer overflow-hidden p-0 transition-colors hover:border-ring hover:bg-accent/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        compact && "[&_.notice-body]:line-clamp-2"
+      )}
     >
       {/* Upper section — poster info + edit/delete controls (admin/owner). */}
-      <div className="notice-post-head">
-        <div className="notice-post-byline-group">
-          <span className="notice-post-avatar" aria-hidden="true">
-            {initials ? initials : <IconBell size={18} aria-hidden="true" />}
+      <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary"
+            aria-hidden="true"
+          >
+            {initials || <IconFileText size={16} aria-hidden="true" />}
           </span>
-          <div className="notice-post-byline">
-            <span className="notice-post-author">{authorName}</span>
-            <span className="notice-post-date">
+          <div className="flex min-w-0 flex-col leading-tight">
+            <span className="truncate text-sm font-medium">{authorName}</span>
+            <span className="text-xs text-muted-foreground">
               {new Date(stamp).toLocaleDateString(undefined, {
                 year: "numeric",
                 month: "short",
                 day: "numeric",
               })}
             </span>
-            {notice.scope && (
-              <span
-                className="notice-post-scope"
-                title={`${notice.scope.subjectName} · ${notice.scope.programName} · Semester ${notice.scope.semester}`}
-              >
-                <IconBook2 size={11} aria-hidden="true" />
-                {notice.scope.subjectCode} · {notice.scope.programCode} · Sem {notice.scope.semester}
-              </span>
-            )}
           </div>
+          {notice.scope && (
+            <span
+              className="ml-1 hidden items-center gap-1 rounded-full border bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground sm:inline-flex"
+              title={`${notice.scope.subjectName} · ${notice.scope.programName} · Semester ${notice.scope.semester}`}
+            >
+              <IconBook2 size={11} aria-hidden="true" />
+              {notice.scope.subjectCode} · {notice.scope.programCode} · Sem {notice.scope.semester}
+            </span>
+          )}
         </div>
 
         {actions && (
-          <div
-            className="notice-post-actions"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
             {actions}
           </div>
         )}
       </div>
 
       {/* Lower section — the actual notice content, below the divider. */}
-      <div className="notice-post-main">
-        <div className="notice-post-text">
-          <h3 className="notice-post-title">{notice.title}</h3>
-          <p className="notice-post-body">{notice.body}</p>
+      <div className="flex items-start gap-3 px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="notice-body mb-1 text-sm font-semibold leading-snug">{notice.title}</h3>
+          <p className="line-clamp-3 text-sm text-muted-foreground">{notice.body}</p>
         </div>
 
         {attachment && (
           <div
-            className="notice-post-thumb"
+            className="relative flex size-14 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-md border bg-muted/40"
             aria-hidden="true"
             title={`${attachment.fileName} · ${formatBytes(attachment.size)}`}
           >
@@ -109,21 +105,22 @@ export function NoticePostCard({
                 alt=""
                 loading="lazy"
                 draggable={false}
+                className="size-full object-cover"
               />
             ) : (
-              <span className="notice-post-thumb-file">
-                <IconFileText size={24} aria-hidden="true" />
-                <small>
+              <span className="flex flex-col items-center gap-0.5 text-muted-foreground">
+                <IconFileText size={20} aria-hidden="true" />
+                <small className="text-[9px] font-semibold uppercase">
                   {attachment.fileName.split(".").pop()?.slice(0, 4) ?? "FILE"}
                 </small>
               </span>
             )}
-            <span className="notice-post-thumb-overlay">
+            <span className="absolute inset-0 flex items-center justify-center bg-background/50 text-foreground opacity-0 transition-opacity hover:opacity-100">
               <IconZoomIn size={16} aria-hidden="true" />
             </span>
           </div>
         )}
       </div>
-    </article>
+    </Card>
   );
 }

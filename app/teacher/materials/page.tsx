@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/ui/button";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -17,14 +18,15 @@ import {
 import {
   IconAlertTriangle,
   IconCircleCheck,
+  IconDownload,
   IconLock,
-  IconStarFilled,
+  IconPencil,
+  IconTrash,
   IconUpload,
 } from "@tabler/icons-react";
 
 type TeacherInfo = {
-  firstName: string;
-  lastName: string;
+  user: { firstName: string; lastName: string };
   employeeNo: string;
   profileImageUrl: string | null;
   classes: {
@@ -111,13 +113,11 @@ export default function TeacherMaterialsPage() {
   }, [teacherInfo]);
 
   const totalStorage = useMemo(() => materials.reduce((sum, m) => sum + m.fileSize, 0), [materials]);
-  const totalBookmarks = useMemo(() => materials.reduce((sum, m) => sum + m.bookmarkCount, 0), [materials]);
 
   function buildFormData(values: MaterialSubmitValues): FormData {
     const fd = new FormData();
     fd.set("title", values.title);
     if (values.description) fd.set("description", values.description);
-    if (values.topic) fd.set("topic", values.topic);
     fd.set("materialType", values.materialType);
     fd.set("visibility", values.visibility);
     if (values.departmentName) fd.set("departmentName", values.departmentName);
@@ -202,8 +202,8 @@ export default function TeacherMaterialsPage() {
     }
   }
 
-  if (loadError) return <main className="profile-error">{loadError}</main>;
-  if (loading || !teacherInfo) return <main className="profile-loading">Loading your uploads…</main>;
+  if (loadError) return <main className="grid min-h-[40vh] place-items-center px-6 text-sm font-semibold text-destructive">{loadError}</main>;
+  if (loading || !teacherInfo) return <main className="grid min-h-[40vh] place-items-center text-sm text-muted-foreground">Loading your uploads…</main>;
 
   const typeStyle = (m: StudyMaterialDto) => MATERIAL_TYPE_STYLE[m.materialType] ?? MATERIAL_TYPE_STYLE.OTHER;
 
@@ -212,51 +212,42 @@ export default function TeacherMaterialsPage() {
       active="/teacher/materials"
       title="My Uploads — Notes & Study Material"
       subtitle="Faculty Study Library"
-      teacherName={`${teacherInfo.firstName} ${teacherInfo.lastName}`}
-      employeeNo={teacherInfo.employeeNo}
-      avatarUrl={teacherInfo.profileImageUrl}
+      teacherName={teacherInfo ? `${teacherInfo.user.firstName} ${teacherInfo.user.lastName}` : undefined}
+      employeeNo={teacherInfo?.employeeNo}
+      avatarUrl={teacherInfo?.profileImageUrl}
+      headerActions={
+        <Button
+          type="button"
+          onClick={() => {
+            setFormError("");
+            setShowCreateModal(true);
+          }}
+        >
+          <IconUpload size={16} aria-hidden="true" /> Upload Material
+        </Button>
+      }
     >
-      <section className="admin-metric-grid" style={{ marginBottom: "24px" }}>
-        <article className="admin-metric-card">
+      <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs [&>span]:text-xs [&>span]:font-semibold [&>span]:uppercase [&>span]:tracking-wide [&>span]:text-muted-foreground [&>strong]:my-1 [&>strong]:text-[34px] [&>strong]:font-bold [&>strong]:leading-none [&>strong]:tracking-tight [&>small]:text-xs [&>small]:text-muted-foreground">
           <span>Total Uploads</span>
           <strong>{materials.length}</strong>
           <small>Materials in the library</small>
         </article>
-        <article className="admin-metric-card">
+        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs [&>span]:text-xs [&>span]:font-semibold [&>span]:uppercase [&>span]:tracking-wide [&>span]:text-muted-foreground [&>strong]:my-1 [&>strong]:text-[34px] [&>strong]:font-bold [&>strong]:leading-none [&>strong]:tracking-tight [&>small]:text-xs [&>small]:text-muted-foreground">
           <span>Storage Used</span>
           <strong>{formatBytes(totalStorage)}</strong>
           <small>Across all files</small>
         </article>
-        <article className="admin-metric-card">
-          <span>Bookmarks Received</span>
-          <strong>{totalBookmarks}</strong>
-          <small>Saves by students</small>
-        </article>
-        <article className="admin-metric-card">
-          <span style={{ display: "block", marginBottom: "10px" }}>Share Material</span>
-          <button
-            className="btn-primary"
-            type="button"
-            onClick={() => {
-              setFormError("");
-              setShowCreateModal(true);
-            }}
-          >
-            <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-              <IconUpload size={15} aria-hidden="true" /> Upload Material
-            </span>
-          </button>
-        </article>
       </section>
 
       {message && (
-        <p className="notes-success-banner" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+        <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2.5 text-[13px] text-emerald-600 dark:text-emerald-400" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <IconCircleCheck size={16} aria-hidden="true" style={{ flexShrink: 0 }} /> {message}
         </p>
       )}
 
       {materials.length === 0 ? (
-        <div className="profile-info-card notes-empty">
+        <div className="rounded-xl border bg-card p-5 px-8 py-10 text-center shadow-xs [&>h3]:m-0 [&>h3]:mb-2 [&>h3]:text-base [&>h3]:font-bold [&>p]:text-sm [&>p]:leading-relaxed [&>p]:text-muted-foreground">
           <h3>No uploads yet</h3>
           <p>
             Upload lecture notes, slides, question banks, lab manuals or past papers. Academic metadata you add helps
@@ -264,58 +255,63 @@ export default function TeacherMaterialsPage() {
           </p>
         </div>
       ) : (
-        <div className="notes-upload-list">
+        <div className="grid gap-2">
           {materials.map((m) => {
             const style = typeStyle(m);
             return (
-              <article key={m.id} className="upload-row">
-                <span className="note-monogram" style={{ background: style.bg, color: style.color }}>
+              <article key={m.id} className="flex items-center gap-4 rounded-lg border bg-background px-3.5 py-2.5 transition-colors hover:bg-muted/40 max-sm:flex-col max-sm:items-start">
+                <span className={`inline-grid size-10 shrink-0 place-items-center rounded-[10px] text-[13px] font-extrabold ${style.tint}`}>
                   {style.monogram}
                 </span>
-                <div className="upload-row-main">
-                  <h4>{m.title}</h4>
-                  <div className="note-card-chips">
-                    <span className="type-pill" style={{ background: style.bg, color: style.color }}>
+                <div className="min-w-0 flex-1">
+                  <h4 className="m-0 text-[13px] font-semibold">{m.title}</h4>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    <span className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${style.tint}`}>
                       {materialTypeLabel(m.materialType)}
                     </span>
-                    {m.subject && <span className="chip chip-sky">{m.subject.code}</span>}
-                    {m.topic && <span className="chip">{m.topic}</span>}
-                    {m.semester != null && <span className="chip">Sem {m.semester}</span>}
-                    <span className={`chip chip-visibility-${m.visibility.toLowerCase()}`}>
-                      <IconLock size={12} aria-hidden="true" style={{ verticalAlign: "-2px", marginRight: "4px" }} />
+                    {m.subject && <span className="inline-block rounded-full bg-sky-500/10 px-2.5 py-0.5 text-[11px] font-bold text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">{m.subject.code}</span>}
+                    {m.semester != null && <span className="inline-block rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">Sem {m.semester}</span>}
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${m.visibility === "EVERYONE" ? "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400" : "bg-amber-500/10 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400"}`}>
+                      <IconLock size={12} aria-hidden="true" />
                       {VISIBILITY_LABELS[m.visibility] ?? m.visibility}
                     </span>
                   </div>
-                  <small className="upload-row-meta">
-                    {m.fileName} · {formatBytes(m.fileSize)} · Uploaded {formatDate(m.createdAt)} ·{" "}
-                    <IconStarFilled size={12} aria-hidden="true" style={{ verticalAlign: "-2px" }} />{" "}
-                    {m.bookmarkCount} bookmark{m.bookmarkCount === 1 ? "" : "s"}
+                  <small className="mt-0.5 block text-xs text-muted-foreground">
+                    {m.fileName} · {formatBytes(m.fileSize)} · Uploaded {formatDate(m.createdAt)}
                   </small>
                 </div>
-                <div className="upload-row-actions">
-                  <a className="btn-ghost btn-small" href={`/api/materials/${m.id}/file`}>
-                    Download
-                  </a>
-                  <button
-                    className="btn-ghost btn-small"
+                <div className="ml-auto flex shrink-0 gap-1.5 max-sm:ml-0 max-sm:w-full max-sm:justify-end">
+                  <Button asChild variant="outline" size="icon-sm" title="Download" aria-label={`Download ${m.title}`}>
+                    <a href={`/api/materials/${m.id}/file`}>
+                      <IconDownload size={15} aria-hidden="true" />
+                    </a>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
                     type="button"
+                    title="Edit"
+                    aria-label={`Edit ${m.title}`}
                     onClick={() => {
                       setFormError("");
                       setEditing(m);
                     }}
                   >
-                    Edit
-                  </button>
-                  <button
-                    className="btn-danger-ghost btn-small"
+                    <IconPencil size={15} aria-hidden="true" />
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="icon-sm"
                     type="button"
+                    title="Delete"
+                    aria-label={`Delete ${m.title}`}
                     onClick={() => {
                       setFormError("");
                       setDeleting(m);
                     }}
                   >
-                    Delete
-                  </button>
+                    <IconTrash size={15} aria-hidden="true" />
+                  </Button>
                 </div>
               </article>
             );
@@ -346,7 +342,6 @@ export default function TeacherMaterialsPage() {
             initial={{
               title: editing.title,
               description: editing.description,
-              topic: editing.topic,
               materialType: editing.materialType,
               visibility: editing.visibility,
               departmentName: editing.departmentName,
@@ -367,15 +362,15 @@ export default function TeacherMaterialsPage() {
       {/* Modal 3: Delete confirmation */}
       {deleting && (
         <AdminModal title="Delete Study Material" onClose={() => setDeleting(null)}>
-          <div className="modal-confirm-box">
+          <div className="grid gap-3 text-sm text-muted-foreground">
             <p>
               Are you sure you want to delete <strong>&ldquo;{deleting.title}&rdquo;</strong>?
             </p>
             <p
               style={{
                 fontSize: "13px",
-                color: "var(--danger)",
-                background: "var(--danger-soft)",
+                color: "var(--destructive)",
+                background: "color-mix(in srgb, var(--destructive) 10%, transparent)",
                 padding: "10px 14px",
                 borderRadius: "8px",
               }}
@@ -385,14 +380,14 @@ export default function TeacherMaterialsPage() {
                 Students will immediately lose access to this file, including existing bookmarks.
               </span>
             </p>
-            {formError && <p style={{ margin: "12px 0 0", fontSize: 13, color: "var(--danger-ink)" }}>{formError}</p>}
-            <div className="modal-actions" style={{ marginTop: "20px" }}>
-              <button className="btn-danger" type="button" onClick={handleDelete} disabled={saving}>
+            {formError && <p style={{ margin: "12px 0 0", fontSize: 13, color: "var(--destructive)" }}>{formError}</p>}
+            <div className="flex flex-wrap justify-end gap-2.5" style={{ marginTop: "20px" }}>
+              <Button variant="destructive" type="button" onClick={handleDelete} disabled={saving}>
                 {saving ? "Deleting…" : "Yes, Delete"}
-              </button>
-              <button className="btn-ghost" type="button" onClick={() => setDeleting(null)} disabled={saving}>
+              </Button>
+              <Button variant="outline" type="button" onClick={() => setDeleting(null)} disabled={saving}>
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </AdminModal>

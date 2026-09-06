@@ -9,18 +9,16 @@
 //    tiny gap between them so they never touch.
 //  - More than 2 overlapping blocks (rare) fall back to tighter lane stacking.
 
+// Weekday rows rendered on the timetable grid. Saturday and Sunday are
+// weekends — no classes are ever scheduled on those days, so the grid omits
+// them entirely.
 export const WORK_DAYS = [
-  "SUNDAY",
   "MONDAY",
   "TUESDAY",
   "WEDNESDAY",
   "THURSDAY",
   "FRIDAY",
-  "SATURDAY",
 ] as const;
-
-// Lunch is rendered Monday–Friday only.
-export const LUNCH_DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"] as const;
 
 export const ROW_H = 84; // day-row (= slot) height in px
 export const SLOT_MARGIN = 4; // px between a block and the row edge
@@ -143,17 +141,17 @@ export function layoutDay<T extends { startMin: number; endMin: number }>(
   return result;
 }
 
-/** Week time-window (floored/ceil hour bounds) covering every block + lunch. */
+/** Week time-window (floored/ceil hour bounds) covering every block + break. */
 export function weekRange(
   items: Array<{ startMin: number; endMin: number }>,
-  lunch?: { start: string; end: string } | null,
+  breakWindow?: { start: string; end: string } | null,
 ) {
   const starts: number[] = items.map((i) => i.startMin);
   const ends: number[] = items.map((i) => i.endMin);
-  const ls = lunch ? timeToMinutes(lunch.start) : null;
-  const le = lunch ? timeToMinutes(lunch.end) : null;
-  if (ls !== null) starts.push(ls);
-  if (le !== null) ends.push(le);
+  const bs = breakWindow ? timeToMinutes(breakWindow.start) : null;
+  const be = breakWindow ? timeToMinutes(breakWindow.end) : null;
+  if (bs !== null) starts.push(bs);
+  if (be !== null) ends.push(be);
 
   const dayStart = starts.length === 0 ? FALLBACK_START : Math.floor(Math.min(...starts) / 60) * 60;
   const dayEnd = ends.length === 0 ? FALLBACK_END : Math.ceil(Math.max(...ends) / 60) * 60;

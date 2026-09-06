@@ -119,6 +119,7 @@ model Program {
   students       Student[]
   subjects       Subject[]
   classes        Class[]
+  breaks         Break[]
   assessments    Assessment[]
   curriculum     Curriculum?
   studyMaterials StudyMaterial[]
@@ -272,13 +273,13 @@ model Notification {
 model Class {
   id        String               @id @default(cuid())
   subjectId String
-  teacherId String? // null only for the special lunch-break slot
+  teacherId String? // nullable for legacy rows; scheduled slots always have a teacher
   programId String
   semester  Int                  @default(1)
   dayOfWeek DayOfWeek
   startTime DateTime             @db.Time
   endTime   DateTime             @db.Time
-  type      String               @default("Lecture") // "Lecture" | "Practical" | "Lunch"
+  type      String               @default("Lecture") // "Lecture" | "Practical"
   group     String? // e.g. "Gr. A" — allows parallel practical groups
   subject   Subject              @relation(fields: [subjectId], references: [id], onDelete: Restrict)
   teacher   Teacher?             @relation(fields: [teacherId], references: [id], onDelete: SetNull)
@@ -288,6 +289,23 @@ model Class {
 
   @@unique([subjectId, teacherId, programId, semester, dayOfWeek, startTime, endTime])
   @@index([teacherId, semester, dayOfWeek])
+}
+
+// ─── Timetable break window (per program+semester) ─────────────
+// A daily reserved time window (e.g. 13:00–13:30). It is NOT a class and NOT
+// a subject: it exists only for the class schedule, and no class slot on ANY
+// weekday may overlap it (enforced in /api/classes). Rendered as the hatched
+// "Break" band across Mon–Fri on the weekly grid.
+model Break {
+  id        String   @id @default(cuid())
+  programId String
+  semester  Int      @default(1)
+  startTime DateTime @db.Time
+  endTime   DateTime @db.Time
+  program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@unique([programId, semester])
+  @@index([programId])
 }
 
 model AttendanceSession {

@@ -3,6 +3,25 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { StudentShell } from "@/app/components/student/StudentShell";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 type Profile = {
   enrollmentNumber: string;
@@ -67,7 +86,6 @@ export default function StudentResultsPage() {
         ]);
 
         if (!profileRes.ok) {
-          // Bad session/profile is not recoverable here — back to dashboard.
           router.replace("/dashboard");
           return;
         }
@@ -94,15 +112,26 @@ export default function StudentResultsPage() {
     loadData();
   }, [router, page, filterSubject, filterSemester]);
 
-  if (error) return <main className="profile-error">{error}</main>;
-  if (loading || !profile) return <main className="profile-loading">Loading results...</main>;
+  if (error) {
+    return (
+      <StudentShell title="Examination & Assessment Results" active="/student/results">
+        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </p>
+      </StudentShell>
+    );
+  }
+  if (loading || !profile) {
+    return (
+      <StudentShell title="Examination & Assessment Results" active="/student/results">
+        <Skeleton className="h-40 w-full" />
+      </StudentShell>
+    );
+  }
 
   const fullName = `${profile.user.firstName} ${profile.user.lastName}`;
   const studentId = profile.rollNumber || profile.enrollmentNumber;
 
-  // Subject list comes from the API (computed across the FULL result set, so a
-  // selected filter never disappears from the dropdown); fall back to whatever
-  // subjects are visible on the current page.
   const subjectOptions: SubjectOption[] =
     subjects.length > 0
       ? subjects
@@ -115,11 +144,8 @@ export default function StudentResultsPage() {
           ).values(),
         ).sort((a, b) => a.code.localeCompare(b.code));
 
-  // Rows are filtered, sorted and paginated server-side.
   const pageResults = results;
 
-  // Header stats cover ALL of the student's results (server-computed), not
-  // just the current page.
   const totalAssessments = summary?.totalAssessments ?? pagination?.total ?? results.length;
   const avgPercentage =
     summary?.averagePercentage ??
@@ -143,100 +169,94 @@ export default function StudentResultsPage() {
       title="Examination & Assessment Results"
       subtitle="Academic Performance"
     >
+      <div className="flex flex-col gap-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Card>
+            <CardContent className="p-5">
+              <p className="text-xs font-medium text-muted-foreground">Assessments Taken</p>
+              <p className="mt-1 text-3xl font-bold">{totalAssessments}</p>
+              <small className="text-xs text-muted-foreground">Recorded tests &amp; exams</small>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-5">
+              <p className="text-xs font-medium text-muted-foreground">Average Score</p>
+              <p className="mt-1 text-3xl font-bold">{avgPercentage}%</p>
+              <small className="text-xs text-muted-foreground">Across all subjects</small>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-5">
+              <p className="text-xs font-medium text-muted-foreground">Program</p>
+              <p className="mt-1 truncate text-xl font-bold">{profile.program?.code ?? "N/A"}</p>
+              <small className="line-clamp-1 text-xs text-muted-foreground">
+                {profile.program?.name ?? "Enrolled Program"}
+              </small>
+            </CardContent>
+          </Card>
+        </div>
 
-          <section className="admin-metric-grid" style={{ marginBottom: "24px" }}>
-            <article className="admin-metric-card">
-              <span>Assessments Taken</span>
-              <strong>{totalAssessments}</strong>
-              <small>Recorded tests &amp; exams</small>
-            </article>
-            <article className="admin-metric-card">
-              <span>Average Score</span>
-              <strong>{avgPercentage}%</strong>
-              <small>Across all subjects</small>
-            </article>
-            <article className="admin-metric-card">
-              <span>Program</span>
-              <strong style={{ fontSize: "1.4rem" }}>{profile.program?.code ?? "N/A"}</strong>
-              <small>{profile.program?.name ?? "Enrolled Program"}</small>
-            </article>
-          </section>
-
-          {subjectOptions.length > 0 && (
-            <div
-              style={{
-                marginBottom: "18px",
-                display: "flex",
-                gap: "12px",
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              {subjectOptions.length > 1 && (
-                <>
-                  <label style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
-                    Filter by Subject:
-                  </label>
-                  <select
-                    value={filterSubject}
-                    onChange={(e) => {
-                      setFilterSubject(e.target.value);
-                      setPage(1);
-                    }}
-                    style={{ width: "auto", minWidth: "220px", padding: "8px 12px" }}
-                  >
-                    <option value="ALL">All Subjects</option>
-                    {subjectOptions.map((sub) => (
-                      <option key={sub.code} value={sub.code}>
-                        {sub.code} - {sub.name}
-                      </option>
-                    ))}
-                  </select>
-                </>
-              )}
-              <label style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
-                Filter by Semester:
-              </label>
-              <select
-                value={filterSemester}
-                onChange={(e) => {
-                  setFilterSemester(e.target.value);
-                  setPage(1);
-                }}
-                style={{ width: "auto", minWidth: "140px", padding: "8px 12px" }}
-              >
-                <option value="ALL">All Semesters</option>
-                {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
-                  <option key={sem} value={String(sem)}>
-                    Semester {sem}
-                  </option>
-                ))}
-              </select>
+        <div className="flex flex-wrap items-center gap-3">
+          {subjectOptions.length > 1 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Filter by Subject:</span>
+              <Select value={filterSubject} onValueChange={(value) => { setFilterSubject(value); setPage(1); }}>
+                <SelectTrigger className="min-w-56">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Subjects</SelectItem>
+                  {subjectOptions.map((sub) => (
+                    <SelectItem key={sub.code} value={sub.code}>
+                      {sub.code} — {sub.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 
-          {pageResults.length === 0 ? (
-            <div className="profile-info-card" style={{ padding: "32px", textAlign: "center" }}>
-              <p style={{ margin: 0, color: "var(--ink-soft)" }}>
-                {totalAssessments > 0
-                  ? "No results match the selected filters."
-                  : "No published assessment results found yet."}
-              </p>
-            </div>
-          ) : (
-            <div className="profile-info-card" style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.88rem" }}>
-                <thead>
-                  <tr style={{ borderBottom: "1px solid var(--line)", background: "#f8fafc", color: "var(--ink-soft)" }}>
-                    <th style={{ padding: "14px 18px", fontWeight: "600" }}>Subject</th>
-                    <th style={{ padding: "14px 18px", fontWeight: "600" }}>Assessment</th>
-                    <th style={{ padding: "14px 18px", fontWeight: "600" }}>Date</th>
-                    <th style={{ padding: "14px 18px", fontWeight: "600" }}>Marks Obtained</th>
-                    <th style={{ padding: "14px 18px", fontWeight: "600" }}>Percentage</th>
-                    <th style={{ padding: "14px 18px", fontWeight: "600" }}>Grade</th>
-                  </tr>
-                </thead>
-                <tbody>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Semester:</span>
+            <Select value={filterSemester} onValueChange={(value) => { setFilterSemester(value); setPage(1); }}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Semesters</SelectItem>
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
+                  <SelectItem key={sem} value={String(sem)}>
+                    Semester {sem}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {pageResults.length === 0 ? (
+          <div className="rounded-md border bg-muted/40 px-4 py-12 text-center">
+            <p className="text-sm text-muted-foreground">
+              {totalAssessments > 0
+                ? "No results match the selected filters."
+                : "No published assessment results found yet."}
+            </p>
+          </div>
+        ) : (
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Assessment</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Marks Obtained</TableHead>
+                    <TableHead>Percentage</TableHead>
+                    <TableHead>Grade</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {pageResults.map((item) => {
                     const marks = Number(item.marks);
                     const maxMarks = Number(item.assessment.maxMarks);
@@ -244,115 +264,68 @@ export default function StudentResultsPage() {
                     const isPassing = marks >= maxMarks * 0.4;
 
                     return (
-                      <tr
-                        key={item.id}
-                        style={{
-                          borderBottom: "1px solid var(--line)",
-                          transition: "background 120ms ease",
-                        }}
-                      >
-                        <td style={{ padding: "14px 18px" }}>
+                      <TableRow key={item.id}>
+                        <TableCell>
                           <strong>{item.assessment.subject.code}</strong>
-                          <div style={{ color: "var(--ink-soft)", fontSize: "0.78rem" }}>
-                            {item.assessment.subject.name}
-                          </div>
-                        </td>
-                        <td style={{ padding: "14px 18px", fontWeight: "500" }}>
-                          {item.assessment.name}
-                        </td>
-                        <td style={{ padding: "14px 18px", color: "var(--ink-soft)" }}>
+                          <div className="text-xs text-muted-foreground">{item.assessment.subject.name}</div>
+                        </TableCell>
+                        <TableCell className="font-medium">{item.assessment.name}</TableCell>
+                        <TableCell className="text-muted-foreground">
                           {item.assessment.assessmentDate
                             ? new Date(item.assessment.assessmentDate).toLocaleDateString()
                             : "N/A"}
-                        </td>
-                        <td style={{ padding: "14px 18px", fontWeight: "600" }}>
+                        </TableCell>
+                        <TableCell className="font-semibold">
                           {marks} / {maxMarks}
-                        </td>
-                        <td style={{ padding: "14px 18px" }}>
-                          <span
-                            style={{
-                              color: isPassing ? "#16a34a" : "#dc2626",
-                              fontWeight: "600",
-                            }}
-                          >
+                        </TableCell>
+                        <TableCell>
+                          <span className={isPassing ? "font-semibold text-emerald-600 dark:text-emerald-400" : "font-semibold text-destructive"}>
                             {pct}%
                           </span>
-                        </td>
-                        <td style={{ padding: "14px 18px" }}>
-                          <span
-                            style={{
-                              display: "inline-block",
-                              padding: "3px 8px",
-                              borderRadius: "6px",
-                              fontSize: "0.75rem",
-                              fontWeight: "700",
-                              background: isPassing ? "#dcfce7" : "#fee2e2",
-                              color: isPassing ? "#15803d" : "#b91c1c",
-                            }}
-                          >
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={isPassing ? "default" : "destructive"}>
                             {item.grade || (isPassing ? "PASS" : "FAIL")}
-                          </span>
-                        </td>
-                      </tr>
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
                     );
                   })}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
-          )}
+          </Card>
+        )}
 
-          {pagination && pagination.totalPages > 1 && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "12px",
-                marginTop: "16px",
-              }}
-            >
-              <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
-                Showing {pageResults.length} of {pagination.total} results
+        {pagination && pagination.totalPages > 1 && (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-sm text-muted-foreground">
+              Showing {pageResults.length} of {pagination.total} results
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {pagination.page} of {pagination.totalPages}
               </span>
-              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                  style={{
-                    padding: "8px 14px",
-                    borderRadius: "8px",
-                    border: "1px solid var(--line)",
-                    background: "transparent",
-                    color: "var(--ink)",
-                    cursor: page <= 1 ? "default" : "pointer",
-                    opacity: page <= 1 ? 0.5 : 1,
-                    fontSize: "0.8rem",
-                  }}
-                >
-                  Previous
-                </button>
-                <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
-                  Page {pagination.page} of {pagination.totalPages}
-                </span>
-                <button
-                  onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
-                  disabled={!pagination.hasMore}
-                  style={{
-                    padding: "8px 14px",
-                    borderRadius: "8px",
-                    border: "1px solid var(--line)",
-                    background: "transparent",
-                    color: "var(--ink)",
-                    cursor: pagination.hasMore ? "pointer" : "default",
-                    opacity: pagination.hasMore ? 1 : 0.5,
-                    fontSize: "0.8rem",
-                  }}
-                >
-                  Next
-                </button>
-              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+                disabled={!pagination.hasMore}
+              >
+                Next
+              </Button>
             </div>
-          )}
+          </div>
+        )}
+      </div>
     </StudentShell>
   );
 }

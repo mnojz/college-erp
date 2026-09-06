@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -438,7 +440,7 @@ export default function TeacherAttendancePage() {
       avatarUrl={teacherInfo?.profileImageUrl}
     >
       {/* Attendance Control Card */}
-      <section className="profile-info-card" style={{ padding: "22px", marginBottom: "20px" }}>
+      <section className="rounded-xl border bg-card p-5 shadow-xs" style={{ padding: "22px", marginBottom: "20px" }}>
         {/* Filter bar: Program → Semester → Class → Clear. The JSX source order
             is kept, so each column sets a CSS grid `order` for visual order. */}
         <div
@@ -451,7 +453,7 @@ export default function TeacherAttendancePage() {
           }}
         >
           <div style={{ order: 3 }}>
-            <label style={{ display: "block", marginBottom: "6px", fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+            <label style={{ display: "block", marginBottom: "6px", fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
               Select Class / Subject
             </label>
             <select
@@ -462,8 +464,8 @@ export default function TeacherAttendancePage() {
                 width: "100%",
                 padding: "10px 12px",
                 borderRadius: "8px",
-                border: "1px solid var(--line, #e2e8f0)",
-                background: "var(--panel, #fff)",
+                border: "1px solid var(--border)",
+                background: "var(--card)",
                 color: "inherit",
               }}
             >
@@ -505,7 +507,7 @@ export default function TeacherAttendancePage() {
           </div>
 
           <div style={{ order: 1 }}>
-            <label style={{ display: "block", marginBottom: "6px", fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+            <label style={{ display: "block", marginBottom: "6px", fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
               Program
             </label>
             <select
@@ -516,8 +518,8 @@ export default function TeacherAttendancePage() {
                 width: "100%",
                 padding: "10px 12px",
                 borderRadius: "8px",
-                border: "1px solid var(--line, #e2e8f0)",
-                background: "var(--panel, #fff)",
+                border: "1px solid var(--border)",
+                background: "var(--card)",
                 color: "inherit",
               }}
             >
@@ -531,7 +533,7 @@ export default function TeacherAttendancePage() {
           </div>
 
           <div style={{ order: 2 }}>
-            <label style={{ display: "block", marginBottom: "6px", fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+            <label style={{ display: "block", marginBottom: "6px", fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
               Semester
             </label>
             <select
@@ -542,8 +544,8 @@ export default function TeacherAttendancePage() {
                 width: "100%",
                 padding: "10px 12px",
                 borderRadius: "8px",
-                border: "1px solid var(--line, #e2e8f0)",
-                background: "var(--panel, #fff)",
+                border: "1px solid var(--border)",
+                background: "var(--card)",
                 color: "inherit",
               }}
             >
@@ -557,31 +559,33 @@ export default function TeacherAttendancePage() {
           </div>
 
           <div style={{ order: 4 }}>
-            <button
+            <label
+              style={{
+                display: "block",
+                marginBottom: "6px",
+                fontSize: "0.8rem",
+                visibility: "hidden",
+              }}
+            >
+              Clear
+            </label>
+            <Button
               type="button"
+              variant="outline"
               onClick={resetFilters}
               disabled={selectedProgram === "ALL" && selectedSemester === "ALL"}
               title="Reset the program and semester filters"
+              className="w-full"
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "6px",
-                width: "100%",
+                height: "auto",
                 padding: "10px 14px",
+                fontSize: "0.85rem",
                 borderRadius: "8px",
-                border: "1px solid var(--line, #e2e8f0)",
-                background: "var(--panel, #fff)",
-                color: "var(--ink, #1e293b)",
-                fontSize: "0.8rem",
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "background 0.15s ease, border-color 0.15s ease",
               }}
             >
               <IconFilterOff size={14} />
               Clear Filters
-            </button>
+            </Button>
           </div>
         </div>
         {/* Date is read-only info — attendance can only ever be taken today. */}
@@ -592,7 +596,7 @@ export default function TeacherAttendancePage() {
             justifyContent: "space-between",
             flexWrap: "wrap",
             gap: "12px",
-            borderTop: "1px solid var(--line, #e2e8f0)",
+            borderTop: "1px solid var(--border)",
             paddingTop: "12px",
           }}
         >
@@ -603,11 +607,11 @@ export default function TeacherAttendancePage() {
               gap: "7px",
               padding: "7px 12px",
               borderRadius: "8px",
-              background: "var(--info-soft)",
-              border: "1px solid var(--info-border)",
+              background: "var(--secondary)",
+              border: "1px solid var(--border)",
               fontSize: "0.8rem",
               fontWeight: 600,
-              color: "var(--info-ink)",
+              color: "var(--primary)",
             }}
             title="Attendance is recorded for today only — there is no date picker by design"
           >
@@ -619,23 +623,23 @@ export default function TeacherAttendancePage() {
       </section>
 
       {/* Metrics Row */}
-      <section className="admin-metric-grid" style={{ marginBottom: "20px" }}>
-        <article className="admin-metric-card">
+      <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" style={{ marginBottom: "20px" }}>
+        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs [&>span]:text-xs [&>span]:font-semibold [&>span]:uppercase [&>span]:tracking-wide [&>span]:text-muted-foreground [&>strong]:my-1 [&>strong]:text-[34px] [&>strong]:font-bold [&>strong]:leading-none [&>strong]:tracking-tight [&>small]:text-xs [&>small]:text-muted-foreground">
           <span>Enrolled Students</span>
           <strong>{totalStudents}</strong>
           <small>Total in {selectedClass?.program.code ?? "class"}</small>
         </article>
-        <article className="admin-metric-card">
+        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs [&>span]:text-xs [&>span]:font-semibold [&>span]:uppercase [&>span]:tracking-wide [&>span]:text-muted-foreground [&>strong]:my-1 [&>strong]:text-[34px] [&>strong]:font-bold [&>strong]:leading-none [&>strong]:tracking-tight [&>small]:text-xs [&>small]:text-muted-foreground">
           <span>Marked Present</span>
-          <strong style={{ color: "var(--ok)" }}>{presentCount}</strong>
+          <strong className="text-emerald-600 dark:text-emerald-400">{presentCount}</strong>
           <small>In-person attendance</small>
         </article>
-        <article className="admin-metric-card">
+        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs [&>span]:text-xs [&>span]:font-semibold [&>span]:uppercase [&>span]:tracking-wide [&>span]:text-muted-foreground [&>strong]:my-1 [&>strong]:text-[34px] [&>strong]:font-bold [&>strong]:leading-none [&>strong]:tracking-tight [&>small]:text-xs [&>small]:text-muted-foreground">
           <span>Marked Absent</span>
-          <strong style={{ color: "var(--danger)" }}>{absentCount}</strong>
+          <strong className="text-red-600 dark:text-red-400">{absentCount}</strong>
           <small>Absentee students</small>
         </article>
-        <article className="admin-metric-card">
+        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs [&>span]:text-xs [&>span]:font-semibold [&>span]:uppercase [&>span]:tracking-wide [&>span]:text-muted-foreground [&>strong]:my-1 [&>strong]:text-[34px] [&>strong]:font-bold [&>strong]:leading-none [&>strong]:tracking-tight [&>small]:text-xs [&>small]:text-muted-foreground">
           <span>Attendance Rate</span>
           <strong style={{ color: "var(--accent)" }}>{attendanceRate}%</strong>
           <small>Current session</small>
@@ -648,9 +652,9 @@ export default function TeacherAttendancePage() {
           style={{
             padding: "12px 16px",
             borderRadius: "8px",
-            background: "var(--danger-soft)",
-            color: "var(--danger-ink)",
-            border: "1px solid var(--danger-border)",
+            background: "color-mix(in srgb, var(--destructive) 10%, transparent)",
+            color: "var(--destructive)",
+            border: "1px solid color-mix(in srgb, var(--destructive) 25%, transparent)",
             marginBottom: "16px",
             fontSize: "0.88rem",
           }}
@@ -664,9 +668,9 @@ export default function TeacherAttendancePage() {
           style={{
             padding: "12px 16px",
             borderRadius: "8px",
-            background: "var(--ok-soft)",
-            color: "var(--ok-ink)",
-            border: "1px solid var(--ok-border)",
+            background: "color-mix(in srgb, #10b981 14%, transparent)",
+            color: "#059669",
+            border: "1px solid color-mix(in srgb, #10b981 30%, transparent)",
             marginBottom: "16px",
             fontSize: "0.88rem",
           }}
@@ -677,7 +681,7 @@ export default function TeacherAttendancePage() {
       )}
 
       {/* Roster & Roll Call Card */}
-      <section className="profile-info-card" style={{ padding: "24px" }}>
+      <section className="rounded-xl border bg-card p-5 shadow-xs" style={{ padding: "24px" }}>
         <div
           style={{
             display: "flex",
@@ -686,14 +690,14 @@ export default function TeacherAttendancePage() {
             flexWrap: "wrap",
             gap: "12px",
             paddingBottom: "16px",
-            borderBottom: "1px solid var(--line, #e2e8f0)",
+            borderBottom: "1px solid var(--border)",
           }}
         >
           <div>
             <h2 style={{ margin: 0, padding: 0, fontSize: "1.15rem", fontWeight: "700" }}>
               Student Roll Call Checklist
             </h2>
-            <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+            <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
               {selectedClass ? `${selectedClass.subject.code}: ${selectedClass.subject.name}` : "Select a class"}
             </span>
           </div>
@@ -708,21 +712,21 @@ export default function TeacherAttendancePage() {
                 width: "200px",
                 padding: "6px 12px",
                 borderRadius: "6px",
-                border: "1px solid var(--line, #e2e8f0)",
+                border: "1px solid var(--border)",
                 fontSize: "0.82rem",
-                background: "var(--panel, #fff)",
+                background: "var(--card)",
                 color: "inherit",
               }}
             />
-            <button
+            <Button
               type="button"
               onClick={selectAll}
               disabled={!selectedClass || totalStudents === 0}
               style={{
                 padding: "6px 12px",
                 borderRadius: "6px",
-                border: "1px solid var(--line, #e2e8f0)",
-                background: "var(--panel, #fff)",
+                border: "1px solid var(--border)",
+                background: "var(--card)",
                 color: "inherit",
                 fontSize: "0.8rem",
                 fontWeight: "600",
@@ -730,16 +734,16 @@ export default function TeacherAttendancePage() {
               }}
             >
               Mark All Present
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={clearAll}
               disabled={!selectedClass || totalStudents === 0}
               style={{
                 padding: "6px 12px",
                 borderRadius: "6px",
-                border: "1px solid var(--line, #e2e8f0)",
-                background: "var(--panel, #fff)",
+                border: "1px solid var(--border)",
+                background: "var(--card)",
                 color: "inherit",
                 fontSize: "0.8rem",
                 fontWeight: "600",
@@ -747,20 +751,20 @@ export default function TeacherAttendancePage() {
               }}
             >
               Clear All
-            </button>
+            </Button>
           </div>
         </div>
 
         {isLoading ? (
-          <p className="empty-state" style={{ textAlign: "center", padding: "40px 0" }}>
+          <p className="text-center text-sm text-muted-foreground" style={{ textAlign: "center", padding: "40px 0" }}>
             Loading student roster...
           </p>
         ) : !selectedClass || totalStudents === 0 ? (
-          <p className="empty-state" style={{ textAlign: "center", padding: "40px 0" }}>
+          <p className="text-center text-sm text-muted-foreground" style={{ textAlign: "center", padding: "40px 0" }}>
             No enrolled students in this class program yet.
           </p>
         ) : filteredStudents.length === 0 ? (
-          <p className="empty-state" style={{ textAlign: "center", padding: "40px 0" }}>
+          <p className="text-center text-sm text-muted-foreground" style={{ textAlign: "center", padding: "40px 0" }}>
             No students matching &quot;{searchQuery}&quot;
           </p>
         ) : (
@@ -777,8 +781,8 @@ export default function TeacherAttendancePage() {
                     justifyContent: "space-between",
                     padding: "12px 16px",
                     borderRadius: "10px",
-                    border: `1px solid ${isPresent ? "var(--ok-border)" : "var(--line, #e2e8f0)"}`,
-                    background: isPresent ? "var(--ok-faint)" : "var(--panel, #fff)",
+                    border: `1px solid ${isPresent ? "color-mix(in srgb, #10b981 30%, transparent)" : "var(--border)"}`,
+                    background: isPresent ? "color-mix(in srgb, #10b981 7%, transparent)" : "var(--card)",
                     cursor: "pointer",
                     transition: "all 120ms ease",
                   }}
@@ -789,8 +793,8 @@ export default function TeacherAttendancePage() {
                         width: "38px",
                         height: "38px",
                         borderRadius: "50%",
-                        background: isPresent ? "var(--ok-soft)" : "var(--line-faint, #f1f5f9)",
-                        color: isPresent ? "var(--ok-ink)" : "var(--ink-soft)",
+                        background: isPresent ? "color-mix(in srgb, #10b981 14%, transparent)" : "var(--muted)",
+                        color: isPresent ? "#059669" : "var(--muted-foreground)",
                         display: "grid",
                         placeItems: "center",
                         fontSize: "0.85rem",
@@ -804,7 +808,7 @@ export default function TeacherAttendancePage() {
                       <strong style={{ display: "block", fontSize: "0.92rem" }}>
                         {student.user.firstName} {student.user.lastName}
                       </strong>
-                      <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
+                      <span style={{ fontSize: "0.78rem", color: "var(--muted-foreground)" }}>
                         Roll: {student.rollNumber || "N/A"} · Enrollment: {student.enrollmentNumber}
                       </span>
                     </div>
@@ -812,28 +816,20 @@ export default function TeacherAttendancePage() {
 
                   <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
                     <span
-                      style={{
-                        padding: "4px 10px",
-                        borderRadius: "6px",
-                        fontSize: "0.75rem",
-                        fontWeight: "700",
-                        background: isPresent ? "var(--ok-soft)" : "var(--danger-soft)",
-                        color: isPresent ? "var(--ok-ink)" : "var(--danger-ink)",
-                      }}
+                      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-bold tracking-wide ${
+                        isPresent
+                          ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:border-emerald-400/30 dark:bg-emerald-400/15 dark:text-emerald-400"
+                          : "border-destructive/25 bg-destructive/10 text-destructive dark:border-destructive/40 dark:bg-destructive/20"
+                      }`}
                     >
                       {isPresent ? "PRESENT" : "ABSENT"}
                     </span>
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={isPresent}
-                      onChange={() => toggleStudent(student.id)}
+                      onCheckedChange={() => toggleStudent(student.id)}
                       onClick={(e) => e.stopPropagation()}
-                      style={{
-                        width: "18px",
-                        height: "18px",
-                        cursor: "pointer",
-                        accentColor: "var(--accent)",
-                      }}
+                      aria-label={`Mark ${student.user.firstName} ${student.user.lastName} ${isPresent ? "absent" : "present"}`}
+                      className="size-5 cursor-pointer rounded-[6px]"
                     />
                   </div>
                 </div>
@@ -847,7 +843,7 @@ export default function TeacherAttendancePage() {
           style={{
             marginTop: "24px",
             paddingTop: "16px",
-            borderTop: "1px solid var(--line, #e2e8f0)",
+            borderTop: "1px solid var(--border)",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
@@ -855,7 +851,7 @@ export default function TeacherAttendancePage() {
             gap: "12px",
           }}
         >
-          <span style={{ fontSize: "0.82rem", color: "var(--ink-soft)" }}>
+          <span style={{ fontSize: "0.82rem", color: "var(--muted-foreground)" }}>
             Unchecked students are marked Absent automatically.
             {sessionStatus !== "idle" && !isLocked && editWindowEndsAt && (
               <>
@@ -864,7 +860,7 @@ export default function TeacherAttendancePage() {
               </>
             )}
           </span>
-          <button
+          <Button
             className="primary-button"
             type="button"
             onClick={() => {
@@ -881,7 +877,7 @@ export default function TeacherAttendancePage() {
             style={{
               padding: "10px 24px",
               borderRadius: "8px",
-              background: isLocked ? "var(--line-strong)" : "var(--accent)",
+              background: isLocked ? "var(--border)" : "var(--accent)",
               color: "#fff",
               fontWeight: "700",
               fontSize: "0.85rem",
@@ -913,7 +909,7 @@ export default function TeacherAttendancePage() {
             ) : (
               `Save Attendance (${presentCount} Present)`
             )}
-          </button>
+          </Button>
         </div>
       </section>
     </TeacherShell>

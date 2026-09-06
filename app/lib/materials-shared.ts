@@ -23,16 +23,16 @@ export function materialTypeLabel(value: string): string {
   return MATERIAL_TYPES.find((t) => t.value === value)?.label ?? value;
 }
 
-/** Short monogram + accent color per type (matches the dashboard sky-blue family). */
-export const MATERIAL_TYPE_STYLE: Record<string, { monogram: string; bg: string; color: string }> = {
-  LECTURE_NOTES: { monogram: "LN", bg: "#e0f2fe", color: "#0369a1" },
-  SLIDES: { monogram: "SL", bg: "#ede9fe", color: "#6d28d9" },
-  QUESTION_BANK: { monogram: "QB", bg: "#fef3c7", color: "#b45309" },
-  LAB_MANUAL: { monogram: "LB", bg: "#dcfce7", color: "#15803d" },
-  ASSIGNMENT: { monogram: "AS", bg: "#ffe4e6", color: "#be123c" },
-  REFERENCE_MATERIAL: { monogram: "RF", bg: "#ccfbf1", color: "#0f766e" },
-  PAST_PAPER: { monogram: "PP", bg: "#f1f5f9", color: "#475569" },
-  OTHER: { monogram: "OT", bg: "#e2e8f0", color: "#334155" },
+/** Short monogram + accent tint per type. Tint is a Tailwind class pair (light/dark) so chips stay legible in both themes. */
+export const MATERIAL_TYPE_STYLE: Record<string, { monogram: string; bg: string; color: string; tint: string }> = {
+  LECTURE_NOTES: { monogram: "LN", bg: "#e0f2fe", color: "#0369a1", tint: "bg-sky-500/10 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300" },
+  SLIDES: { monogram: "SL", bg: "#ede9fe", color: "#6d28d9", tint: "bg-violet-500/10 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300" },
+  QUESTION_BANK: { monogram: "QB", bg: "#fef3c7", color: "#b45309", tint: "bg-amber-500/10 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300" },
+  LAB_MANUAL: { monogram: "LB", bg: "#dcfce7", color: "#15803d", tint: "bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" },
+  ASSIGNMENT: { monogram: "AS", bg: "#ffe4e6", color: "#be123c", tint: "bg-rose-500/10 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300" },
+  REFERENCE_MATERIAL: { monogram: "RF", bg: "#ccfbf1", color: "#0f766e", tint: "bg-teal-500/10 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300" },
+  PAST_PAPER: { monogram: "PP", bg: "#f1f5f9", color: "#475569", tint: "bg-slate-500/10 text-slate-700 dark:bg-slate-500/20 dark:text-slate-300" },
+  OTHER: { monogram: "OT", bg: "#e2e8f0", color: "#334155", tint: "bg-muted text-muted-foreground" },
 };
 
 export const VISIBILITY_OPTIONS = [

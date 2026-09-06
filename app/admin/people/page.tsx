@@ -2,6 +2,27 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   IconAlertTriangle,
   IconCircleCheck,
@@ -16,6 +37,7 @@ import {
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { AdminModal } from "@/app/components/admin/AdminModal";
 import { ImageUploadCrop } from "@/app/components/common/ImageUploadCrop";
+import { cn } from "cn";
 
 type TeacherItem = {
   id: string;
@@ -83,23 +105,14 @@ type StatusTarget = {
   identifier: string;
 };
 
-const teacherEmpty: {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  employeeNo: string;
-  profileImageUrl: string;
-  subjectIds: string[];
-  status: string;
-} = {
+const teacherEmpty = {
   email: "",
   password: "",
   firstName: "",
   lastName: "",
   employeeNo: "",
   profileImageUrl: "",
-  subjectIds: [],
+  subjectIds: [] as string[],
   status: "ACTIVE",
 };
 
@@ -126,12 +139,31 @@ const studentEmpty = {
   category: "",
 };
 
+/** Dark-mode-safe initials for the shadcn Avatar fallback. */
+function initialsOf(firstName: string, lastName: string) {
+  return `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
+}
+
+/** "ACTIVE" → "Active" — plain labels for the neutral status badges. */
+function titleCaseStatus(status: string) {
+  return status.charAt(0) + status.slice(1).toLowerCase();
+}
+
+/** Neutral account-status badge (replaces the old unstyled .badge classes). */
+function AccountStatusBadge({ status }: { status: string }) {
+  return status === "ACTIVE" ? (
+    <Badge variant="secondary">Active</Badge>
+  ) : (
+    <Badge variant="outline">Inactive</Badge>
+  );
+}
+
 /**
  * Subject-assignment picker for the faculty create/edit modals.
  *
  * Shows only the subjects already assigned to the teacher as removable chips,
  * plus a dedicated "Assign Subject" button. Clicking it expands a searchable
- * catalog of ALL subjects — assigned ones appear disabled ("✓ Assigned"),
+ * catalog of ALL subjects — assigned ones appear disabled ("Assigned"),
  * unassigned ones are added on click. The parent's assignedIds drives both
  * lists, so assigning/removing instantly updates the chips.
  */
@@ -189,58 +221,48 @@ function SubjectAssigner({
     .filter(Boolean)
     .join(" · ");
 
-  const chipStyle = {
-    padding: "5px 10px",
-    fontWeight: 600,
-  };
-
   return (
-    <div style={{ display: "grid", gap: "8px", marginTop: "4px" }}>
-      <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--ink-soft)" }}>
-        Assigned Subjects
-        <span style={{ fontWeight: 400 }}> — drives automatic class scheduling</span>
-      </span>
+    <div className="grid gap-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <Label>Assigned subjects</Label>
+        <span className="text-xs text-muted-foreground">
+          Drives automatic class scheduling
+        </span>
+      </div>
 
       {assigned.length === 0 ? (
-        <p className="form-hint" style={{ margin: 0 }}>
+        <p className="text-xs text-muted-foreground">
           No subjects assigned yet. Click “Assign Subject” below to add one.
         </p>
       ) : (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        <div className="flex flex-wrap gap-1.5">
           {assigned.map((s) => (
-            <span key={s.id} className="badge badge-violet" style={chipStyle}>
-              <strong style={{ fontWeight: 800 }}>{s.code}</strong>
-              <span style={{ fontWeight: 500 }}>{s.name}</span>
-              <span style={{ opacity: 0.8, fontWeight: 500 }}>Sem {s.semester}</span>
-              {s.program && <span style={{ opacity: 0.8, fontWeight: 500 }}>{s.program.code}</span>}
+            <Badge key={s.id} variant="secondary" className="h-auto gap-1.5 py-1 pr-1 font-normal">
+              <span className="font-semibold">{s.code}</span>
+              <span className="text-muted-foreground">{s.name}</span>
+              <span className="text-muted-foreground/70">
+                · Sem {s.semester}
+                {s.program ? ` · ${s.program.code}` : ""}
+              </span>
               <button
                 type="button"
                 title={`Remove ${s.code} from this teacher`}
                 aria-label={`Remove ${s.code}`}
                 onClick={() => onChange(assignedIds.filter((id) => id !== s.id))}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "inherit",
-                  opacity: 0.7,
-                  fontSize: 14,
-                  lineHeight: 1,
-                  padding: 0,
-                  display: "inline-flex",
-                }}
+                className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-foreground/10"
               >
-                <IconX size={13} aria-hidden="true" />
+                <IconX size={12} aria-hidden="true" />
               </button>
-            </span>
+            </Badge>
           ))}
         </div>
       )}
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <button
+      <div className="flex items-center gap-2.5">
+        <Button
           type="button"
-          className={pickerOpen ? "btn-ghost" : "btn-add"}
+          variant={pickerOpen ? "secondary" : "outline"}
+          size="sm"
           onClick={() => setPickerOpen((v) => !v)}
         >
           {pickerOpen ? (
@@ -251,238 +273,145 @@ function SubjectAssigner({
               Assign Subject
             </>
           )}
-        </button>
+        </Button>
         {assigned.length > 0 && (
-          <span className="form-hint" style={{ margin: 0 }}>
-            {assigned.length} of {subjects.length} subjects
+          <span className="text-xs text-muted-foreground">
+            {assigned.length} of {subjects.length} assigned
           </span>
         )}
       </div>
 
       {pickerOpen && (
-        <div
-          style={{
-            border: "1px solid var(--line)",
-            borderRadius: 10,
-            padding: "10px",
-            background: "var(--panel)",
-            display: "grid",
-            gap: "8px",
-          }}
-        >
-          <div style={{ display: "grid", gap: 10 }}>
-            {/* Row 1 — full-width search */}
-            <div style={{ position: "relative" }}>
-              <IconSearch
-                size={15}
-                aria-hidden="true"
-                style={{
-                  position: "absolute",
-                  left: 12,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "var(--ink-soft)",
-                  pointerEvents: "none",
-                  zIndex: 1,
-                }}
-              />
-              <input
-                type="search"
-                placeholder="Search subjects by code, name, or program…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                autoFocus
-                style={{ paddingLeft: 36 }}
-              />
-            </div>
-
-            {/* Row 2 — filters */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr auto",
-                gap: 10,
-                alignItems: "end",
-              }}
-            >
-              <label style={{ display: "grid", gap: 5 }}>
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: "var(--ink-soft)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.04em",
-                  }}
-                >
-                  Program
-                </span>
-                <select
-                  value={programFilter}
-                  onChange={(e) => setProgramFilter(e.target.value)}
-                >
-                  <option value="ALL">All programs</option>
-                  {programs.map((p) => (
-                    <option key={p.code} value={p.code}>
-                      {p.code} — {p.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label style={{ display: "grid", gap: 5 }}>
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: "var(--ink-soft)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.04em",
-                  }}
-                >
-                  Semester
-                </span>
-                <select
-                  value={semesterFilter}
-                  onChange={(e) => setSemesterFilter(e.target.value)}
-                >
-                  <option value="ALL">All semesters</option>
-                  {semesters.map((n) => (
-                    <option key={n} value={String(n)}>
-                      Semester {n}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              {filtersActive && (
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={() => {
-                    setProgramFilter("ALL");
-                    setSemesterFilter("ALL");
-                  }}
-                  title="Clear filters"
-                  style={{
-                    whiteSpace: "nowrap",
-                    padding: "10px 14px",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    justifyContent: "center",
-                  }}
-                >
-                  <IconX size={13} aria-hidden="true" />
-                  Clear
-                </button>
-              )}
-            </div>
+        <div className="grid gap-2.5 rounded-lg border bg-card p-3">
+          {/* Full-width search */}
+          <div className="relative">
+            <IconSearch
+              size={15}
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 left-2.5 z-[1] -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              type="text"
+              placeholder="Search by code, name, or program…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="pl-8"
+            />
           </div>
 
-          <div>
-            {/* List header */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: "0 2px 4px",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: "var(--ink-soft)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em",
+          {/* Program + semester filters */}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]">
+            <div className="grid gap-1">
+              <Label className="text-xs text-muted-foreground">Program</Label>
+              <Select value={programFilter} onValueChange={setProgramFilter}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  <SelectItem value="ALL">All programs</SelectItem>
+                  {programs.map((p) => (
+                    <SelectItem key={p.code} value={p.code}>
+                      {p.code} — {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-1">
+              <Label className="text-xs text-muted-foreground">Semester</Label>
+              <Select value={semesterFilter} onValueChange={setSemesterFilter}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  <SelectItem value="ALL">All semesters</SelectItem>
+                  {semesters.map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      Semester {n}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {filtersActive && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setProgramFilter("ALL");
+                  setSemesterFilter("ALL");
                 }}
+                title="Clear filters"
+                className="self-end"
               >
+                <IconX size={13} aria-hidden="true" />
+                Clear
+              </Button>
+            )}
+          </div>
+
+          {/* Catalog list */}
+          <div>
+            <div className="flex items-center justify-between pb-1">
+              <span className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                 Subjects
               </span>
-              <span style={{ fontSize: 11, color: "var(--ink-soft)" }}>
+              <span className="text-[11px] text-muted-foreground">
                 {visible.length} of {subjects.length}
               </span>
             </div>
-
-            <div style={{ maxHeight: 220, overflowY: "auto", display: "grid", gap: "2px" }}>
-            {visible.length === 0 ? (
-              <span style={{ color: "var(--ink-soft)", fontSize: 13, padding: "2px 4px" }}>
-                {subjects.length === 0
-                  ? "No subjects yet — publish a curriculum first."
-                  : `No subjects match: ${activeFilterLabel || "current filters"}.`}
-              </span>
-            ) : (
-              visible.map((s) => {
-                const isAssigned = assignedIds.includes(s.id);
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    disabled={isAssigned}
-                    onClick={() => onChange([...assignedIds, s.id])}
-                    title={isAssigned ? "Already assigned" : `Assign ${s.code} · ${s.name}`}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 10,
-                      width: "100%",
-                      padding: "7px 9px",
-                      border: "none",
-                      borderRadius: 7,
-                      background: "transparent",
-                      color: "inherit",
-                      cursor: isAssigned ? "default" : "pointer",
-                      fontSize: 13,
-                      textAlign: "left",
-                      opacity: isAssigned ? 0.55 : 1,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isAssigned) e.currentTarget.style.background = "var(--line)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "transparent";
-                    }}
-                  >
-                    <span>
-                      <strong>{s.code}</strong> · {s.name}
-                      <span style={{ color: "var(--ink-soft)" }}>
-                        {" "}
-                        — {s.program?.code ?? ""} · Sem {s.semester}
+            <div className="grid max-h-56 gap-0.5 overflow-y-auto">
+              {visible.length === 0 ? (
+                <p className="px-1 py-2 text-[13px] text-muted-foreground">
+                  {subjects.length === 0
+                    ? "No subjects yet — publish a curriculum first."
+                    : `No subjects match: ${activeFilterLabel || "current filters"}.`}
+                </p>
+              ) : (
+                visible.map((s) => {
+                  const isAssigned = assignedIds.includes(s.id);
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      disabled={isAssigned}
+                      onClick={() => onChange([...assignedIds, s.id])}
+                      title={isAssigned ? "Already assigned" : `Assign ${s.code} · ${s.name}`}
+                      className={cn(
+                        "flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
+                        isAssigned ? "cursor-default opacity-55" : "hover:bg-accent",
+                      )}
+                    >
+                      <span className="min-w-0 truncate">
+                        <span className="font-semibold">{s.code}</span> · {s.name}
+                        <span className="text-muted-foreground">
+                          {" "}
+                          — {s.program?.code ?? ""} · Sem {s.semester}
+                        </span>
                       </span>
-                    </span>
-                    {isAssigned ? (
-                      <span
-                        style={{
-                          color: "#059669",
-                          flexShrink: 0,
-                          fontWeight: 600,
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 5,
-                        }}
-                      >
-                        <IconCircleCheck size={15} aria-hidden="true" />
-                        Assigned
-                      </span>
-                    ) : (
-                      <IconPlus
-                        size={15}
-                        style={{ color: "#059669", flexShrink: 0 }}
-                        aria-hidden="true"
-                      />
-                    )}
-                  </button>
-                );
-              })
-            )}
+                      {isAssigned ? (
+                        <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-muted-foreground">
+                          <IconCircleCheck size={15} aria-hidden="true" />
+                          Assigned
+                        </span>
+                      ) : (
+                        <IconPlus
+                          size={15}
+                          className="shrink-0 text-muted-foreground"
+                          aria-hidden="true"
+                        />
+                      )}
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }
@@ -803,7 +732,10 @@ export default function AdminPeoplePage() {
     if (!deletingTarget) return;
     setError("");
     setSaving(true);
-    const endpoint = deletingTarget.type === "teacher" ? `/api/teachers?id=${deletingTarget.id}` : `/api/students?id=${deletingTarget.id}`;
+    const endpoint =
+      deletingTarget.type === "teacher"
+        ? `/api/teachers?id=${deletingTarget.id}`
+        : `/api/students?id=${deletingTarget.id}`;
     try {
       const res = await fetch(endpoint, { method: "DELETE" });
       const data = await res.json();
@@ -878,1150 +810,1238 @@ export default function AdminPeoplePage() {
 
   return (
     <AdminShell title="People & Accounts" subtitle="Teachers & Student Directory" active="/admin/people">
-      {/* Top action bar */}
-      <div className="admin-topbar">
-        <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
-          {/* Program filter for Students tab */}
-          {activeTab === "students" && (
-            <select
-              value={selectedProgramFilter}
-              onChange={(e) => setSelectedProgramFilter(e.target.value)}
-              style={{
-                padding: "9px 14px",
-                borderRadius: "8px",
-                border: "1px solid #e2e8f0",
-                fontSize: "13px",
-                background: "var(--panel, #fff)",
-                color: "inherit",
-                width: "auto",
-                cursor: "pointer",
-              }}
-            >
-              <option value="ALL">All Programs</option>
-              {programs.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.code} · {p.name}
-                </option>
-              ))}
-            </select>
-          )}
+      <div className="flex flex-col gap-5">
+        {/* Toolbar: tabs + tab-scoped action, then search / program filter */}
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "teachers" | "students")}>
+              <TabsList>
+                <TabsTrigger value="teachers">Teachers ({teachers.length})</TabsTrigger>
+                <TabsTrigger value="students">Enrolled Students ({students.length})</TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-          {/* Search input */}
-          <input
-            type="text"
-            placeholder={activeTab === "teachers" ? "Search teacher name, emp #, email..." : "Search student, roll, reg #..."}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              padding: "9px 14px",
-              borderRadius: "8px",
-              border: "1px solid var(--input-border)",
-              fontSize: "13px",
-              background: "var(--input-bg)",
-              color: "var(--input-color)",
-              width: "260px",
-            }}
-          />
+            {activeTab === "teachers" ? (
+              <Button
+                size="sm"
+                type="button"
+                onClick={() => {
+                  setShowTeacherModal(true);
+                  setError("");
+                }}
+              >
+                <IconPlus size={15} aria-hidden="true" />
+                Add Teacher
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                type="button"
+                onClick={() => {
+                  setShowStudentModal(true);
+                  setError("");
+                }}
+              >
+                <IconPlus size={15} aria-hidden="true" />
+                Add Student
+              </Button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            {activeTab === "students" && (
+              <Select
+                value={selectedProgramFilter}
+                onValueChange={setSelectedProgramFilter}
+              >
+                <SelectTrigger className="w-full sm:w-56">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  <SelectItem value="ALL">All Programs</SelectItem>
+                  {programs.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.code} · {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            <div className="relative w-full sm:w-64">
+              <IconSearch
+                size={15}
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1/2 left-2.5 z-[1] -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                type="text"
+                placeholder={
+                  activeTab === "teachers"
+                    ? "Search teacher name, emp #, email…"
+                    : "Search student, roll, reg #…"
+                }
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+          </div>
         </div>
 
-        <div className="admin-topbar-actions">
-          <button
-            className="btn-add"
-            type="button"
-            onClick={() => {
-              setShowTeacherModal(true);
-              setError("");
-            }}
-          >
-            <IconPlus size={15} aria-hidden="true" />
-            Add Teacher
-          </button>
-          <button
-            className="btn-add"
-            type="button"
-            style={{ background: "#2563eb" }}
-            onClick={() => {
-              setShowStudentModal(true);
-              setError("");
-            }}
-          >
-            <IconPlus size={15} aria-hidden="true" />
-            Add Student
-          </button>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="admin-tabs">
-        <button
-          type="button"
-          className={`admin-tab ${activeTab === "teachers" ? "active" : ""}`}
-          onClick={() => setActiveTab("teachers")}
-        >
-          Teachers ({teachers.length})
-        </button>
-        <button
-          type="button"
-          className={`admin-tab ${activeTab === "students" ? "active" : ""}`}
-          onClick={() => setActiveTab("students")}
-        >
-          Enrolled Students ({students.length})
-        </button>
-      </div>
-
-      {/* Tab 1: Faculty Table */}
-      {activeTab === "teachers" && (
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Faculty Member</th>
-                <th>Employee Number</th>
-                <th>Email Address</th>
-                <th>Status</th>
-                <th>Assigned Subjects</th>
-                <th style={{ textAlign: "right" }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredTeachers.length === 0 && !loading ? (
-                <tr>
-                  <td colSpan={6} className="admin-table-empty">
-                    No faculty records found. Click <strong>+ Add Faculty</strong> to create an account.
-                  </td>
-                </tr>
-              ) : (
-                filteredTeachers.map((t) => (
-                  <tr key={t.id}>
-                    <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                        {t.profileImageUrl ? (
-                          <img
-                            src={t.profileImageUrl}
-                            alt=""
-                            style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }}
-                          />
+        {/* Tab 1: Faculty table */}
+        {activeTab === "teachers" && (
+          <div className="overflow-hidden rounded-xl border">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead>Faculty member</TableHead>
+                  <TableHead>Employee #</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Assigned subjects</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                      Loading directory…
+                    </TableCell>
+                  </TableRow>
+                ) : filteredTeachers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                      No faculty records found. Click <strong className="font-medium text-foreground">Add Teacher</strong> to create an account.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredTeachers.map((t) => (
+                    <TableRow key={t.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="size-9">
+                            {t.profileImageUrl ? (
+                              <AvatarImage
+                                src={t.profileImageUrl}
+                                alt={`${t.user.firstName} ${t.user.lastName}`}
+                              />
+                            ) : null}
+                            <AvatarFallback className="text-xs font-semibold">
+                              {initialsOf(t.user.firstName, t.user.lastName)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0">
+                            <div className="truncate font-medium">
+                              {t.user.firstName} {t.user.lastName}
+                            </div>
+                            <div className="text-xs text-muted-foreground">Instructor / Faculty</div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-mono text-[13px] text-muted-foreground">{t.employeeNo}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="block max-w-52 truncate text-[13px] text-muted-foreground">
+                          {t.user.email}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <AccountStatusBadge status={t.user.status} />
+                      </TableCell>
+                      <TableCell>
+                        {(t.subjectTeachers ?? []).length > 0 ? (
+                          <div className="flex max-w-56 flex-wrap gap-1">
+                            {(t.subjectTeachers ?? []).map((st) => (
+                              <Badge key={st.id} variant="secondary" className="font-medium">
+                                {st.subject.code}
+                              </Badge>
+                            ))}
+                          </div>
                         ) : (
-                          <div
-                            style={{
-                              width: 36,
-                              height: 36,
-                              borderRadius: "50%",
-                              background: "#e0f2fe",
-                              color: "#0284c7",
-                              display: "grid",
-                              placeItems: "center",
-                              fontWeight: 700,
-                              fontSize: "13px",
-                            }}
-                          >
-                            {t.user.firstName[0]}
-                            {t.user.lastName[0]}
-                          </div>
+                          <span className="text-muted-foreground">None</span>
                         )}
-                        <div>
-                          <div style={{ fontWeight: 600 }}>
-                            {t.user.firstName} {t.user.lastName}
-                          </div>
-                          <small style={{ color: "#64748b" }}>Instructor / Faculty</small>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="badge badge-blue">{t.employeeNo}</span>
-                    </td>
-                    <td style={{ color: "#64748b" }}>{t.user.email}</td>
-                    <td>
-                      <span className={`badge ${t.user.status === "ACTIVE" ? "badge-green" : "badge-slate"}`}>
-                        {t.user.status}
-                      </span>
-                    </td>
-                    <td>
-                      {(t.subjectTeachers ?? []).length > 0 ? (
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, maxWidth: 220 }}>
-                          {(t.subjectTeachers ?? []).map((st) => (
-                            <span key={st.id} className="badge badge-violet">
-                              {st.subject.code}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span style={{ color: "#94a3b8" }}>None</span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="table-actions">
-                        {t.user.status === "ACTIVE" ? (
-                          <button
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-0.5">
+                          {t.user.status === "ACTIVE" ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              disabled={saving}
+                              onClick={() =>
+                                setStatusTarget({
+                                  kind: "teacher",
+                                  userId: t.user.id,
+                                  name: `${t.user.firstName} ${t.user.lastName}`,
+                                  identifier: t.employeeNo,
+                                })
+                              }
+                              title="Deactivate Account (blocks sign-in)"
+                              aria-label="Deactivate Faculty Account"
+                            >
+                              <IconUserOff size={15} />
+                            </Button>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              disabled={saving}
+                              onClick={() =>
+                                handleActivate("teacher", t.user.id, `${t.user.firstName} ${t.user.lastName}`)
+                              }
+                              title="Activate Account"
+                              aria-label="Activate Faculty Account"
+                            >
+                              <IconUserCheck size={15} />
+                            </Button>
+                          )}
+                          <Button
                             type="button"
-                            className="btn-action-warn"
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => openEditTeacher(t)}
+                            title="Edit Faculty Profile"
+                            aria-label="Edit Faculty Profile"
+                          >
+                            <IconPencil size={15} />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                             onClick={() =>
-                              setStatusTarget({
-                                kind: "teacher",
-                                userId: t.user.id,
+                              setDeletingTarget({
+                                type: "teacher",
+                                id: t.id,
                                 name: `${t.user.firstName} ${t.user.lastName}`,
                                 identifier: t.employeeNo,
                               })
                             }
-                            title="Deactivate Account (blocks sign-in)"
-                            aria-label="Deactivate Faculty Account"
+                            title="Delete Faculty Account"
+                            aria-label="Delete Faculty Account"
                           >
-                            <IconUserOff size={15} />
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="btn-action-edit"
-                            disabled={saving}
-                            onClick={() =>
-                              handleActivate("teacher", t.user.id, `${t.user.firstName} ${t.user.lastName}`)
-                            }
-                            title="Activate Account"
-                            aria-label="Activate Faculty Account"
-                          >
-                            <IconUserCheck size={15} />
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          className="btn-action-edit"
-                          onClick={() => openEditTeacher(t)}
-                          title="Edit Faculty Profile"
-                          aria-label="Edit Faculty Profile"
-                        >
-                          <IconPencil size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-action-delete"
-                          onClick={() =>
-                            setDeletingTarget({
-                              type: "teacher",
-                              id: t.id,
-                              name: `${t.user.firstName} ${t.user.lastName}`,
-                              identifier: t.employeeNo,
-                            })
-                          }
-                          title="Delete Faculty Account"
-                          aria-label="Delete Faculty Account"
-                        >
-                          <IconTrash size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Tab 2: Students Table */}
-      {activeTab === "students" && (
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Student</th>
-                <th>Roll No</th>
-                <th>Enrollment & Reg ID</th>
-                <th>Program & Semester</th>
-                <th>Admission Date</th>
-                <th>Status</th>
-                <th style={{ textAlign: "right" }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredStudents.length === 0 && !loading ? (
-                <tr>
-                  <td colSpan={7} className="admin-table-empty">
-                    No student records found. Click <strong>+ Add Student</strong> to enroll students.
-                  </td>
-                </tr>
-              ) : (
-                filteredStudents.map((s) => (
-                  <tr key={s.id}>
-                    <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                        {s.profileImageUrl ? (
-                          <img
-                            src={s.profileImageUrl}
-                            alt=""
-                            style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }}
-                          />
-                        ) : (
-                          <div
-                            style={{
-                              width: 36,
-                              height: 36,
-                              borderRadius: "50%",
-                              background: "#dcfce7",
-                              color: "#16a34a",
-                              display: "grid",
-                              placeItems: "center",
-                              fontWeight: 700,
-                              fontSize: "13px",
-                            }}
-                          >
-                            {s.user.firstName[0]}
-                            {s.user.lastName[0]}
-                          </div>
-                        )}
-                        <div>
-                          <div style={{ fontWeight: 600 }}>
-                            {s.user.firstName} {s.user.lastName}
-                          </div>
-                          <small style={{ color: "#64748b" }}>{s.user.email}</small>
+                            <IconTrash size={15} />
+                          </Button>
                         </div>
-                      </div>
-                    </td>
-                    <td>
-                      {s.rollNumber ? (
-                        <span className="badge badge-amber">#{s.rollNumber}</span>
-                      ) : (
-                        <span style={{ color: "#94a3b8" }}>—</span>
-                      )}
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 500 }}>{s.enrollmentNumber}</div>
-                      <small style={{ color: "#64748b" }}>{s.registrationId}</small>
-                    </td>
-                    <td>
-                      {s.program ? (
-                        <div>
-                          <strong style={{ fontSize: "13px" }}>{s.program.code}</strong>
-                          {s.currentSemester && (
-                            <span style={{ marginLeft: "6px" }} className="badge badge-slate">
-                              Sem {s.currentSemester}
-                            </span>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {/* Tab 2: Students table */}
+        {activeTab === "students" && (
+          <div className="overflow-hidden rounded-xl border">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead>Student</TableHead>
+                  <TableHead>Roll no</TableHead>
+                  <TableHead>Enrollment & Reg ID</TableHead>
+                  <TableHead>Program · Semester</TableHead>
+                  <TableHead>Admission date</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                      Loading directory…
+                    </TableCell>
+                  </TableRow>
+                ) : filteredStudents.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                      No student records found. Click <strong className="font-medium text-foreground">Add Student</strong> to enroll students.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredStudents.map((s) => (
+                    <TableRow key={s.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="size-9">
+                            {s.profileImageUrl ? (
+                              <AvatarImage
+                                src={s.profileImageUrl}
+                                alt={`${s.user.firstName} ${s.user.lastName}`}
+                              />
+                            ) : null}
+                            <AvatarFallback className="text-xs font-semibold">
+                              {initialsOf(s.user.firstName, s.user.lastName)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0">
+                            <div className="truncate font-medium">
+                              {s.user.firstName} {s.user.lastName}
+                            </div>
+                            <div className="max-w-52 truncate text-xs text-muted-foreground">
+                              {s.user.email}
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {s.rollNumber ? (
+                          <span className="font-mono text-[13px] text-muted-foreground">
+                            #{s.rollNumber}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium">{s.enrollmentNumber}</div>
+                        <div className="font-mono text-xs text-muted-foreground">{s.registrationId}</div>
+                      </TableCell>
+                      <TableCell>
+                        {s.program ? (
+                          <div className="text-[13px]">
+                            <span className="font-medium">{s.program.code}</span>
+                            {s.currentSemester && (
+                              <span className="text-muted-foreground"> · Sem {s.currentSemester}</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Unassigned</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-[13px] text-muted-foreground">
+                          {new Date(s.admissionDate).toLocaleDateString()}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5">
+                          <AccountStatusBadge status={s.user.status} />
+                          {s.status && s.status !== "ACTIVE" && (
+                            <Badge variant="outline" title="Enrollment status">
+                              {titleCaseStatus(s.status)}
+                            </Badge>
                           )}
                         </div>
-                      ) : (
-                        <span style={{ color: "#94a3b8" }}>Unassigned</span>
-                      )}
-                    </td>
-                    <td style={{ color: "#64748b" }}>
-                      {new Date(s.admissionDate).toLocaleDateString()}
-                    </td>
-                    <td>
-                      <span className={`badge ${s.user.status === "ACTIVE" ? "badge-green" : "badge-slate"}`}>
-                        {s.user.status}
-                      </span>
-                      {s.status && s.status !== "ACTIVE" && (
-                        <span className="badge badge-amber" style={{ marginLeft: 6 }} title="Enrollment status">
-                          {s.status}
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="table-actions">
-                        {s.user.status === "ACTIVE" ? (
-                          <button
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-0.5">
+                          {s.user.status === "ACTIVE" ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              disabled={saving}
+                              onClick={() =>
+                                setStatusTarget({
+                                  kind: "student",
+                                  userId: s.user.id,
+                                  name: `${s.user.firstName} ${s.user.lastName}`,
+                                  identifier: s.enrollmentNumber,
+                                })
+                              }
+                              title="Deactivate Account (blocks sign-in)"
+                              aria-label="Deactivate Student Account"
+                            >
+                              <IconUserOff size={15} />
+                            </Button>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              disabled={saving}
+                              onClick={() =>
+                                handleActivate("student", s.user.id, `${s.user.firstName} ${s.user.lastName}`)
+                              }
+                              title="Activate Account"
+                              aria-label="Activate Student Account"
+                            >
+                              <IconUserCheck size={15} />
+                            </Button>
+                          )}
+                          <Button
                             type="button"
-                            className="btn-action-warn"
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => openEditStudent(s)}
+                            title="Edit Student Profile"
+                            aria-label="Edit Student Profile"
+                          >
+                            <IconPencil size={15} />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                             onClick={() =>
-                              setStatusTarget({
-                                kind: "student",
-                                userId: s.user.id,
+                              setDeletingTarget({
+                                type: "student",
+                                id: s.id,
                                 name: `${s.user.firstName} ${s.user.lastName}`,
                                 identifier: s.enrollmentNumber,
                               })
                             }
-                            title="Deactivate Account (blocks sign-in)"
-                            aria-label="Deactivate Student Account"
+                            title="Delete Student Account"
+                            aria-label="Delete Student Account"
                           >
-                            <IconUserOff size={15} />
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="btn-action-edit"
-                            disabled={saving}
-                            onClick={() =>
-                              handleActivate("student", s.user.id, `${s.user.firstName} ${s.user.lastName}`)
-                            }
-                            title="Activate Account"
-                            aria-label="Activate Student Account"
-                          >
-                            <IconUserCheck size={15} />
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          className="btn-action-edit"
-                          onClick={() => openEditStudent(s)}
-                          title="Edit Student Profile"
-                          aria-label="Edit Student Profile"
-                        >
-                          <IconPencil size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-action-delete"
-                          onClick={() =>
-                            setDeletingTarget({
-                              type: "student",
-                              id: s.id,
-                              name: `${s.user.firstName} ${s.user.lastName}`,
-                              identifier: s.enrollmentNumber,
-                            })
-                          }
-                          title="Delete Student Account"
-                          aria-label="Delete Student Account"
-                        >
-                          <IconTrash size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {error && <p className="admin-message error">{error}</p>}
-      {message && <p className="admin-message success">{message}</p>}
-
-      {/* Modal 1: Create Faculty */}
-      {showTeacherModal && (
-        <AdminModal
-          title="Create Faculty / Teacher Account"
-          onClose={() => {
-            setShowTeacherModal(false);
-            setTeacherForm(teacherEmpty);
-          }}
-        >
-          <form className="modal-form" onSubmit={handleCreateTeacher}>
-            <div className="inline-pair">
-              <label>
-                First Name
-                <input
-                  type="text"
-                  placeholder="e.g. Ramesh"
-                  value={teacherForm.firstName}
-                  onChange={(e) => setTeacherForm({ ...teacherForm, firstName: e.target.value })}
-                  required
-                />
-              </label>
-              <label>
-                Last Name
-                <input
-                  type="text"
-                  placeholder="e.g. Sharma"
-                  value={teacherForm.lastName}
-                  onChange={(e) => setTeacherForm({ ...teacherForm, lastName: e.target.value })}
-                  required
-                />
-              </label>
-            </div>
-
-            <div className="inline-pair">
-              <label>
-                Employee ID Number
-                <input
-                  type="text"
-                  placeholder="e.g. FWU-EMP-101"
-                  value={teacherForm.employeeNo}
-                  onChange={(e) => setTeacherForm({ ...teacherForm, employeeNo: e.target.value })}
-                  required
-                />
-              </label>
-              <label>
-                Email Address
-                <input
-                  type="email"
-                  placeholder="faculty@fwu.edu.np"
-                  value={teacherForm.email}
-                  onChange={(e) => setTeacherForm({ ...teacherForm, email: e.target.value })}
-                  required
-                />
-              </label>
-            </div>
-
-            <label>
-              Account Password
-              <input
-                type="password"
-                placeholder="At least 8 characters"
-                value={teacherForm.password}
-                onChange={(e) => setTeacherForm({ ...teacherForm, password: e.target.value })}
-                required
-              />
-            </label>
-
-            <ImageUploadCrop
-              label="Profile Photo (Crop to Square)"
-              value={teacherForm.profileImageUrl || ""}
-              onChange={(val) => setTeacherForm({ ...teacherForm, profileImageUrl: val })}
-            />
-
-            <SubjectAssigner
-              subjects={subjects}
-              assignedIds={teacherForm.subjectIds}
-              onChange={(next) => setTeacherForm((f) => ({ ...f, subjectIds: next }))}
-            />
-
-            {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
-
-            <div className="modal-actions">
-              <button className="btn-primary" type="submit" disabled={saving}>
-                {saving ? "Creating…" : (
-                  <>
-                    <IconPlus size={15} aria-hidden="true" />
-                    Create Faculty Account
-                  </>
+                            <IconTrash size={15} />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
                 )}
-              </button>
-              <button
-                className="btn-ghost"
-                type="button"
-                onClick={() => {
-                  setShowTeacherModal(false);
-                  setTeacherForm(teacherEmpty);
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </AdminModal>
-      )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
 
-      {/* Modal 2: Edit Faculty */}
-      {editingTeacher && (
-        <AdminModal
-          title={`Edit Faculty: ${editingTeacher.firstName} ${editingTeacher.lastName}`}
-          onClose={() => setEditingTeacher(null)}
-        >
-          <form className="modal-form" onSubmit={handleUpdateTeacher}>
-            <div className="inline-pair">
-              <label>
-                First Name
-                <input
-                  type="text"
-                  value={editingTeacher.firstName}
-                  onChange={(e) => setEditingTeacher({ ...editingTeacher, firstName: e.target.value })}
-                  required
-                />
-              </label>
-              <label>
-                Last Name
-                <input
-                  type="text"
-                  value={editingTeacher.lastName}
-                  onChange={(e) => setEditingTeacher({ ...editingTeacher, lastName: e.target.value })}
-                  required
-                />
-              </label>
-            </div>
+        {error && (
+          <p className="rounded-lg border border-destructive/20 bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive">
+            {error}
+          </p>
+        )}
+        {message && (
+          <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2.5 text-[13px] text-emerald-600 dark:text-emerald-400">
+            {message}
+          </p>
+        )}
 
-            <div className="inline-pair">
-              <label>
-                Employee ID Number
-                <input
-                  type="text"
-                  value={editingTeacher.employeeNo}
-                  onChange={(e) => setEditingTeacher({ ...editingTeacher, employeeNo: e.target.value })}
-                  required
-                />
-              </label>
-              <label>
-                Email Address
-                <input
-                  type="email"
-                  value={editingTeacher.email}
-                  onChange={(e) => setEditingTeacher({ ...editingTeacher, email: e.target.value })}
-                  required
-                />
-              </label>
-            </div>
+        {/* Modal 1: Create Faculty */}
+        {showTeacherModal && (
+          <AdminModal
+            title="Create Faculty / Teacher Account"
+            wide
+            onClose={() => {
+              setShowTeacherModal(false);
+              setTeacherForm(teacherEmpty);
+            }}
+          >
+            <form className="grid gap-4" onSubmit={handleCreateTeacher}>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="tf-first">First name</Label>
+                  <Input
+                    id="tf-first"
+                    type="text"
+                    placeholder="e.g. Ramesh"
+                    value={teacherForm.firstName}
+                    onChange={(e) => setTeacherForm({ ...teacherForm, firstName: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="tf-last">Last name</Label>
+                  <Input
+                    id="tf-last"
+                    type="text"
+                    placeholder="e.g. Sharma"
+                    value={teacherForm.lastName}
+                    onChange={(e) => setTeacherForm({ ...teacherForm, lastName: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
 
-            <label>
-              Change Password (Optional)
-              <input
-                type="password"
-                placeholder="Leave blank to keep existing password"
-                value={editingTeacher.password}
-                onChange={(e) => setEditingTeacher({ ...editingTeacher, password: e.target.value })}
-              />
-            </label>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="tf-emp">Employee ID number</Label>
+                  <Input
+                    id="tf-emp"
+                    type="text"
+                    placeholder="e.g. FWU-EMP-101"
+                    value={teacherForm.employeeNo}
+                    onChange={(e) => setTeacherForm({ ...teacherForm, employeeNo: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="tf-email">Email address</Label>
+                  <Input
+                    id="tf-email"
+                    type="email"
+                    placeholder="faculty@fwu.edu.np"
+                    value={teacherForm.email}
+                    onChange={(e) => setTeacherForm({ ...teacherForm, email: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
 
-            <label>
-              Account Status
-              <select
-                value={editingTeacher.status}
-                onChange={(e) => setEditingTeacher({ ...editingTeacher, status: e.target.value })}
-              >
-                <option value="ACTIVE">Active — can sign in</option>
-                <option value="INACTIVE">Inactive — sign-in blocked</option>
-              </select>
-            </label>
-
-            <ImageUploadCrop
-              label="Profile Photo (Crop to Square)"
-              value={editingTeacher.profileImageUrl || ""}
-              onChange={(val) => setEditingTeacher({ ...editingTeacher, profileImageUrl: val })}
-            />
-
-            <SubjectAssigner
-              subjects={subjects}
-              assignedIds={editingTeacher.subjectIds}
-              onChange={(next) =>
-                setEditingTeacher((t) => (t ? { ...t, subjectIds: next } : t))
-              }
-            />
-
-            {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
-
-            <div className="modal-actions">
-              <button className="btn-primary" type="submit" disabled={saving}>
-                {saving ? "Saving Changes…" : "Save Changes"}
-              </button>
-              <button
-                className="btn-ghost"
-                type="button"
-                onClick={() => setEditingTeacher(null)}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </AdminModal>
-      )}
-
-      {/* Modal 3: Create Student */}
-      {showStudentModal && (
-        <AdminModal
-          title="Create Student Account"
-          onClose={() => {
-            setShowStudentModal(false);
-            setStudentForm(studentEmpty);
-          }}
-        >
-          <form className="modal-form" onSubmit={handleCreateStudent}>
-            <div className="inline-pair">
-              <label>
-                First Name
-                <input
-                  type="text"
-                  placeholder="e.g. Aayush"
-                  value={studentForm.firstName}
-                  onChange={(e) => setStudentForm({ ...studentForm, firstName: e.target.value })}
-                  required
-                />
-              </label>
-              <label>
-                Last Name
-                <input
-                  type="text"
-                  placeholder="e.g. Adhikari"
-                  value={studentForm.lastName}
-                  onChange={(e) => setStudentForm({ ...studentForm, lastName: e.target.value })}
-                  required
-                />
-              </label>
-            </div>
-
-            <div className="inline-pair">
-              <label>
-                Email Address
-                <input
-                  type="email"
-                  placeholder="student@fwu.edu.np"
-                  value={studentForm.email}
-                  onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })}
-                  required
-                />
-              </label>
-              <label>
-                Account Password
-                <input
+              <div className="grid gap-1.5">
+                <Label htmlFor="tf-password">Account password</Label>
+                <Input
+                  id="tf-password"
                   type="password"
                   placeholder="At least 8 characters"
-                  value={studentForm.password}
-                  onChange={(e) => setStudentForm({ ...studentForm, password: e.target.value })}
+                  value={teacherForm.password}
+                  onChange={(e) => setTeacherForm({ ...teacherForm, password: e.target.value })}
                   required
                 />
-              </label>
-            </div>
+              </div>
 
-            <div className="inline-pair">
-              <label>
-                Enrollment Number
-                <input
-                  type="text"
-                  placeholder="e.g. 2024-BCT-01"
-                  value={studentForm.enrollmentNumber}
-                  onChange={(e) => setStudentForm({ ...studentForm, enrollmentNumber: e.target.value })}
-                  required
-                />
-              </label>
-              <label>
-                Registration ID
-                <input
-                  type="text"
-                  placeholder="e.g. REG-2024-001"
-                  value={studentForm.registrationId}
-                  onChange={(e) => setStudentForm({ ...studentForm, registrationId: e.target.value })}
-                  required
-                />
-              </label>
-            </div>
+              <ImageUploadCrop
+                label="Profile Photo (Crop to Square)"
+                value={teacherForm.profileImageUrl || ""}
+                onChange={(val) => setTeacherForm({ ...teacherForm, profileImageUrl: val })}
+              />
 
-            <div className="inline-pair">
-              <label>
-                Roll Number (Optional)
-                <input
-                  type="text"
-                  placeholder="e.g. 01"
-                  value={studentForm.rollNumber}
-                  onChange={(e) => setStudentForm({ ...studentForm, rollNumber: e.target.value })}
-                />
-              </label>
-              <label>
-                Admission Date
-                <input
-                  type="date"
-                  value={studentForm.admissionDate}
-                  onChange={(e) => setStudentForm({ ...studentForm, admissionDate: e.target.value })}
-                  required
-                />
-              </label>
-            </div>
+              <SubjectAssigner
+                subjects={subjects}
+                assignedIds={teacherForm.subjectIds}
+                onChange={(next) => setTeacherForm((f) => ({ ...f, subjectIds: next }))}
+              />
 
-            <div className="inline-pair">
-              <label>
-                Academic Program
-                <select
-                  value={studentForm.programId}
-                  onChange={(e) =>
-                    setStudentForm({ ...studentForm, programId: e.target.value, currentSemester: "1" })
-                  }
+              {error && <p className="text-[13px] text-destructive">{error}</p>}
+
+              <div className="flex flex-wrap justify-end gap-2.5">
+                <Button type="submit" disabled={saving}>
+                  {saving ? (
+                    "Creating…"
+                  ) : (
+                    <>
+                      <IconPlus size={15} aria-hidden="true" />
+                      Create Faculty Account
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => {
+                    setShowTeacherModal(false);
+                    setTeacherForm(teacherEmpty);
+                  }}
                 >
-                  <option value="">No program assigned yet</option>
-                  {programs.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.code} — {p.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </AdminModal>
+        )}
 
-              <label>
-                Current Semester
-                <select
-                  value={studentForm.currentSemester}
-                  onChange={(e) => setStudentForm({ ...studentForm, currentSemester: e.target.value })}
-                  disabled={!studentForm.programId}
-                >
-                  <option value="">
-                    {studentForm.programId ? "Select Semester" : "Pick Program first"}
-                  </option>
-                  {Array.from({ length: createStudentSemestersCount }, (_, i) => i + 1).map((n) => (
-                    <option key={n} value={String(n)}>
-                      Semester {n}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
+        {/* Modal 2: Edit Faculty */}
+        {editingTeacher && (
+          <AdminModal
+            title={`Edit Faculty: ${editingTeacher.firstName} ${editingTeacher.lastName}`}
+            wide
+            onClose={() => setEditingTeacher(null)}
+          >
+            <form className="grid gap-4" onSubmit={handleUpdateTeacher}>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="te-first">First name</Label>
+                  <Input
+                    id="te-first"
+                    type="text"
+                    value={editingTeacher.firstName}
+                    onChange={(e) => setEditingTeacher({ ...editingTeacher, firstName: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="te-last">Last name</Label>
+                  <Input
+                    id="te-last"
+                    type="text"
+                    value={editingTeacher.lastName}
+                    onChange={(e) => setEditingTeacher({ ...editingTeacher, lastName: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
 
-            <p className="form-hint" style={{ marginTop: 2 }}>
-              Personal information below is critical — only admins can set it, students cannot
-              change it later. Contact &amp; guardian details are filled in by the student from
-              their own profile.
-            </p>
-            <div className="inline-pair">
-              <label>
-                Gender
-                <select
-                  value={studentForm.gender}
-                  onChange={(e) => setStudentForm({ ...studentForm, gender: e.target.value })}
-                >
-                  <option value="">Not specified</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                </select>
-              </label>
-              <label>
-                Category
-                <input
-                  type="text"
-                  placeholder="e.g. Open, Reserved"
-                  value={studentForm.category}
-                  onChange={(e) => setStudentForm({ ...studentForm, category: e.target.value })}
-                />
-              </label>
-            </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="te-emp">Employee ID number</Label>
+                  <Input
+                    id="te-emp"
+                    type="text"
+                    value={editingTeacher.employeeNo}
+                    onChange={(e) => setEditingTeacher({ ...editingTeacher, employeeNo: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="te-email">Email address</Label>
+                  <Input
+                    id="te-email"
+                    type="email"
+                    value={editingTeacher.email}
+                    onChange={(e) => setEditingTeacher({ ...editingTeacher, email: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
 
-            <div className="inline-pair">
-              <label>
-                Nationality
-                <input
-                  type="text"
-                  placeholder="e.g. Nepali"
-                  value={studentForm.nationality}
-                  onChange={(e) => setStudentForm({ ...studentForm, nationality: e.target.value })}
-                />
-              </label>
-              <label>
-                Religion
-                <input
-                  type="text"
-                  placeholder="e.g. Hindu"
-                  value={studentForm.religion}
-                  onChange={(e) => setStudentForm({ ...studentForm, religion: e.target.value })}
-                />
-              </label>
-            </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="te-password">Change password (optional)</Label>
+                  <Input
+                    id="te-password"
+                    type="password"
+                    placeholder="Leave blank to keep existing password"
+                    value={editingTeacher.password}
+                    onChange={(e) => setEditingTeacher({ ...editingTeacher, password: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="te-status">Account status</Label>
+                  <Select
+                    value={editingTeacher.status}
+                    onValueChange={(status) => setEditingTeacher({ ...editingTeacher, status })}
+                  >
+                    <SelectTrigger id="te-status" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      <SelectItem value="ACTIVE">Active — can sign in</SelectItem>
+                      <SelectItem value="INACTIVE">Inactive — sign-in blocked</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-            <ImageUploadCrop
-              label="Profile Photo (Crop to Square)"
-              value={studentForm.profileImageUrl || ""}
-              onChange={(val) => setStudentForm({ ...studentForm, profileImageUrl: val })}
-            />
+              <ImageUploadCrop
+                label="Profile Photo (Crop to Square)"
+                value={editingTeacher.profileImageUrl || ""}
+                onChange={(val) => setEditingTeacher({ ...editingTeacher, profileImageUrl: val })}
+              />
 
-            {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
+              <SubjectAssigner
+                subjects={subjects}
+                assignedIds={editingTeacher.subjectIds}
+                onChange={(next) =>
+                  setEditingTeacher((t) => (t ? { ...t, subjectIds: next } : t))
+                }
+              />
 
-            <div className="modal-actions">
-              <button className="btn-primary" type="submit" disabled={saving}>
-                {saving ? "Creating…" : (
-                  <>
-                    <IconPlus size={15} aria-hidden="true" />
-                    Create Student Account
-                  </>
-                )}
-              </button>
-              <button
-                className="btn-ghost"
-                type="button"
-                onClick={() => {
-                  setShowStudentModal(false);
-                  setStudentForm(studentEmpty);
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </AdminModal>
-      )}
+              {error && <p className="text-[13px] text-destructive">{error}</p>}
 
-      {/* Modal 4: Edit Student */}
-      {editingStudent && (
-        <AdminModal
-          title={`Edit Student: ${editingStudent.firstName} ${editingStudent.lastName}`}
-          onClose={() => setEditingStudent(null)}
-        >
-          <form className="modal-form" onSubmit={handleUpdateStudent}>
-            <div className="inline-pair">
-              <label>
-                First Name
-                <input
-                  type="text"
-                  value={editingStudent.firstName}
-                  onChange={(e) => setEditingStudent({ ...editingStudent, firstName: e.target.value })}
-                  required
-                />
-              </label>
-              <label>
-                Last Name
-                <input
-                  type="text"
-                  value={editingStudent.lastName}
-                  onChange={(e) => setEditingStudent({ ...editingStudent, lastName: e.target.value })}
-                  required
-                />
-              </label>
-            </div>
+              <div className="flex flex-wrap justify-end gap-2.5">
+                <Button type="submit" disabled={saving}>
+                  {saving ? "Saving Changes…" : "Save Changes"}
+                </Button>
+                <Button variant="outline" type="button" onClick={() => setEditingTeacher(null)}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </AdminModal>
+        )}
 
-            <div className="inline-pair">
-              <label>
-                Email Address
-                <input
-                  type="email"
-                  value={editingStudent.email}
-                  onChange={(e) => setEditingStudent({ ...editingStudent, email: e.target.value })}
-                  required
-                />
-              </label>
-              <label>
-                Change Password (Optional)
-                <input
-                  type="password"
-                  placeholder="Leave blank to keep existing"
-                  value={editingStudent.password}
-                  onChange={(e) => setEditingStudent({ ...editingStudent, password: e.target.value })}
-                />
-              </label>
-            </div>
+        {/* Modal 3: Create Student */}
+        {showStudentModal && (
+          <AdminModal
+            title="Enroll New Student"
+            wide
+            onClose={() => {
+              setShowStudentModal(false);
+              setStudentForm(studentEmpty);
+            }}
+          >
+            <form className="grid gap-4" onSubmit={handleCreateStudent}>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sf-first">First name</Label>
+                  <Input
+                    id="sf-first"
+                    type="text"
+                    placeholder="e.g. Aarav"
+                    value={studentForm.firstName}
+                    onChange={(e) => setStudentForm({ ...studentForm, firstName: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sf-last">Last name</Label>
+                  <Input
+                    id="sf-last"
+                    type="text"
+                    placeholder="e.g. Adhikari"
+                    value={studentForm.lastName}
+                    onChange={(e) => setStudentForm({ ...studentForm, lastName: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
 
-            <div className="inline-pair">
-              <label>
-                Enrollment Number
-                <input
-                  type="text"
-                  value={editingStudent.enrollmentNumber}
-                  onChange={(e) => setEditingStudent({ ...editingStudent, enrollmentNumber: e.target.value })}
-                  required
-                />
-              </label>
-              <label>
-                Registration ID
-                <input
-                  type="text"
-                  value={editingStudent.registrationId}
-                  onChange={(e) => setEditingStudent({ ...editingStudent, registrationId: e.target.value })}
-                  required
-                />
-              </label>
-            </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sf-email">Email address</Label>
+                  <Input
+                    id="sf-email"
+                    type="email"
+                    placeholder="student@fwu.edu.np"
+                    value={studentForm.email}
+                    onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sf-password">Account password</Label>
+                  <Input
+                    id="sf-password"
+                    type="password"
+                    placeholder="At least 8 characters"
+                    value={studentForm.password}
+                    onChange={(e) => setStudentForm({ ...studentForm, password: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
 
-            <div className="inline-pair">
-              <label>
-                Roll Number (Optional)
-                <input
-                  type="text"
-                  value={editingStudent.rollNumber}
-                  onChange={(e) => setEditingStudent({ ...editingStudent, rollNumber: e.target.value })}
-                />
-              </label>
-              <label>
-                Admission Date
-                <input
-                  type="date"
-                  value={editingStudent.admissionDate}
-                  onChange={(e) => setEditingStudent({ ...editingStudent, admissionDate: e.target.value })}
-                  required
-                />
-              </label>
-            </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sf-enrollment">Enrollment number</Label>
+                  <Input
+                    id="sf-enrollment"
+                    type="text"
+                    placeholder="e.g. 2024-BCT-01"
+                    value={studentForm.enrollmentNumber}
+                    onChange={(e) => setStudentForm({ ...studentForm, enrollmentNumber: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sf-registration">Registration ID</Label>
+                  <Input
+                    id="sf-registration"
+                    type="text"
+                    placeholder="e.g. REG-2024-001"
+                    value={studentForm.registrationId}
+                    onChange={(e) => setStudentForm({ ...studentForm, registrationId: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
 
-            <div className="inline-pair">
-              <label>
-                Academic Program
-                <select
-                  value={editingStudent.programId}
-                  onChange={(e) =>
-                    setEditingStudent({ ...editingStudent, programId: e.target.value, currentSemester: "1" })
-                  }
-                >
-                  <option value="">No program assigned yet</option>
-                  {programs.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.code} — {p.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sf-roll">Roll number (optional)</Label>
+                  <Input
+                    id="sf-roll"
+                    type="text"
+                    placeholder="e.g. 01"
+                    value={studentForm.rollNumber}
+                    onChange={(e) => setStudentForm({ ...studentForm, rollNumber: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sf-admission">Admission date</Label>
+                  <Input
+                    id="sf-admission"
+                    type="date"
+                    value={studentForm.admissionDate}
+                    onChange={(e) => setStudentForm({ ...studentForm, admissionDate: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
 
-              <label>
-                Current Semester
-                <select
-                  value={editingStudent.currentSemester}
-                  onChange={(e) => setEditingStudent({ ...editingStudent, currentSemester: e.target.value })}
-                  disabled={!editingStudent.programId}
-                >
-                  <option value="">
-                    {editingStudent.programId ? "Select Semester" : "Pick Program first"}
-                  </option>
-                  {Array.from({ length: editStudentSemestersCount }, (_, i) => i + 1).map((n) => (
-                    <option key={n} value={String(n)}>
-                      Semester {n}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sf-program">Academic program</Label>
+                  <Select
+                    value={studentForm.programId || undefined}
+                    onValueChange={(programId) =>
+                      setStudentForm({ ...studentForm, programId, currentSemester: "1" })
+                    }
+                  >
+                    <SelectTrigger id="sf-program" className="w-full">
+                      <SelectValue placeholder="No program assigned yet" />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      {programs.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.code} — {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <div className="inline-pair">
-              <label>
-                Enrollment Status
-                <select
-                  value={editingStudent.status}
-                  onChange={(e) => setEditingStudent({ ...editingStudent, status: e.target.value })}
-                >
-                  <option value="ACTIVE">Active</option>
-                  <option value="INACTIVE">Inactive</option>
-                  <option value="GRADUATED">Graduated</option>
-                  <option value="SUSPENDED">Suspended</option>
-                  <option value="WITHDRAWN">Withdrawn</option>
-                </select>
-              </label>
-              <label>
-                Account Access
-                <select
-                  value={editingStudent.userStatus}
-                  onChange={(e) => setEditingStudent({ ...editingStudent, userStatus: e.target.value })}
-                >
-                  <option value="ACTIVE">Active — can sign in</option>
-                  <option value="INACTIVE">Inactive — sign-in blocked</option>
-                </select>
-              </label>
-            </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sf-semester">Current semester</Label>
+                  <Select
+                    value={studentForm.currentSemester || undefined}
+                    onValueChange={(currentSemester) =>
+                      setStudentForm({ ...studentForm, currentSemester })
+                    }
+                    disabled={!studentForm.programId}
+                  >
+                    <SelectTrigger id="sf-semester" className="w-full">
+                      <SelectValue
+                        placeholder={
+                          studentForm.programId ? "Select semester" : "Pick program first"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      {Array.from({ length: createStudentSemestersCount }, (_, i) => i + 1).map((n) => (
+                        <SelectItem key={n} value={String(n)}>
+                          Semester {n}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-            <p className="form-hint" style={{ marginTop: 2 }}>
-              Personal information below is critical — only admins can set it, students cannot
-              change it later.
-            </p>
-            <div className="inline-pair">
-              <label>
-                Gender
-                <select
-                  value={editingStudent.gender}
-                  onChange={(e) => setEditingStudent({ ...editingStudent, gender: e.target.value })}
-                >
-                  <option value="">Not specified</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                </select>
-              </label>
-              <label>
-                Category
-                <input
-                  type="text"
-                  placeholder="e.g. Open, Reserved"
-                  value={editingStudent.category}
-                  onChange={(e) => setEditingStudent({ ...editingStudent, category: e.target.value })}
-                />
-              </label>
-            </div>
-
-            <div className="inline-pair">
-              <label>
-                Nationality
-                <input
-                  type="text"
-                  placeholder="e.g. Nepali"
-                  value={editingStudent.nationality}
-                  onChange={(e) => setEditingStudent({ ...editingStudent, nationality: e.target.value })}
-                />
-              </label>
-              <label>
-                Religion
-                <input
-                  type="text"
-                  placeholder="e.g. Hindu"
-                  value={editingStudent.religion}
-                  onChange={(e) => setEditingStudent({ ...editingStudent, religion: e.target.value })}
-                />
-              </label>
-            </div>
-
-            <ImageUploadCrop
-              label="Profile Photo (Crop to Square)"
-              value={editingStudent.profileImageUrl || ""}
-              onChange={(val) => setEditingStudent({ ...editingStudent, profileImageUrl: val })}
-            />
-
-            {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
-
-            <div className="modal-actions">
-              <button className="btn-primary" type="submit" disabled={saving}>
-                {saving ? "Saving Changes…" : "Save Changes"}
-              </button>
-              <button
-                className="btn-ghost"
-                type="button"
-                onClick={() => setEditingStudent(null)}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </AdminModal>
-      )}
-
-      {/* Modal 5: Delete Confirmation Modal */}
-      {deletingTarget && (
-        <AdminModal
-          title={`Delete ${deletingTarget.type === "teacher" ? "Faculty" : "Student"} Account`}
-          onClose={() => setDeletingTarget(null)}
-        >
-          <div className="modal-confirm-box">
-            <p>
-              Are you sure you want to permanently delete the account for{" "}
-              <strong style={{ color: "var(--foreground, #1e293b)" }}>{deletingTarget.name}</strong>{" "}
-              ({deletingTarget.identifier})?
-            </p>
-            <p style={{ fontSize: "13px", color: "#dc2626", background: "rgba(220, 38, 38, 0.08)", padding: "10px 14px", borderRadius: "8px", display: "flex", alignItems: "center", gap: 8 }}>
-              <IconAlertTriangle size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
-              This action cannot be undone. All associated records, enrollments, attendance, and credentials will be removed.
-            </p>
-
-            {error && <p style={{ margin: "12px 0 0", fontSize: 13, color: "#b91c1c" }}>{error}</p>}
-
-            <div className="modal-actions" style={{ marginTop: "20px" }}>
-              <button
-                className="btn-danger"
-                type="button"
-                onClick={handleConfirmDelete}
-                disabled={saving}
-              >
-                {saving ? "Deleting…" : "Yes, Delete Account"}
-              </button>
-              <button
-                className="btn-ghost"
-                type="button"
-                onClick={() => setDeletingTarget(null)}
-                disabled={saving}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </AdminModal>
-      )}
-
-      {/* Modal 6: Deactivate Confirmation (activation is applied directly) */}
-      {statusTarget && (
-        <AdminModal title="Deactivate Account" onClose={() => setStatusTarget(null)}>
-          <div className="modal-confirm-box">
-            <p>
-              Deactivate the account for{" "}
-              <strong style={{ color: "var(--foreground, #1e293b)" }}>{statusTarget.name}</strong>{" "}
-              ({statusTarget.identifier})?
-            </p>
-            <p style={{ fontSize: "13px", color: "#b45309", background: "rgba(217, 119, 6, 0.08)", padding: "10px 14px", borderRadius: "8px", display: "flex", alignItems: "center", gap: 8 }}>
-              <IconAlertTriangle size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
-              They will no longer be able to sign in and their profile will be hidden from the
-              directory. All records are preserved, and you can reactivate the account at any time.
-            </p>
-            {statusTarget.kind === "student" && (
-              <p style={{ fontSize: "13px", color: "#64748b", margin: "10px 0 0" }}>
-                Note: this only controls portal access. To change the student&apos;s enrollment
-                status (Active / Graduated / Withdrawn…), use <strong>Edit Student Profile</strong>.
+              <p className="text-xs text-muted-foreground">
+                Personal information below is critical — only admins can set it, students cannot
+                change it later. Contact &amp; guardian details are filled in by the student from
+                their own profile.
               </p>
-            )}
 
-            {error && <p style={{ margin: "12px 0 0", fontSize: 13, color: "#b91c1c" }}>{error}</p>}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sf-gender">Gender</Label>
+                  <Select
+                    value={studentForm.gender || "UNSPECIFIED"}
+                    onValueChange={(v) =>
+                      setStudentForm({ ...studentForm, gender: v === "UNSPECIFIED" ? "" : v })
+                    }
+                  >
+                    <SelectTrigger id="sf-gender" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      <SelectItem value="UNSPECIFIED">Not specified</SelectItem>
+                      <SelectItem value="Male">Male</SelectItem>
+                      <SelectItem value="Female">Female</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sf-category">Category</Label>
+                  <Input
+                    id="sf-category"
+                    type="text"
+                    placeholder="e.g. Open, Reserved"
+                    value={studentForm.category}
+                    onChange={(e) => setStudentForm({ ...studentForm, category: e.target.value })}
+                  />
+                </div>
+              </div>
 
-            <div className="modal-actions" style={{ marginTop: "20px" }}>
-              <button
-                className="btn-danger"
-                type="button"
-                onClick={handleConfirmDeactivate}
-                disabled={saving}
-              >
-                {saving ? "Deactivating…" : "Yes, Deactivate Account"}
-              </button>
-              <button
-                className="btn-ghost"
-                type="button"
-                onClick={() => setStatusTarget(null)}
-                disabled={saving}
-              >
-                Cancel
-              </button>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sf-nationality">Nationality</Label>
+                  <Input
+                    id="sf-nationality"
+                    type="text"
+                    placeholder="e.g. Nepali"
+                    value={studentForm.nationality}
+                    onChange={(e) => setStudentForm({ ...studentForm, nationality: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="sf-religion">Religion</Label>
+                  <Input
+                    id="sf-religion"
+                    type="text"
+                    placeholder="e.g. Hindu"
+                    value={studentForm.religion}
+                    onChange={(e) => setStudentForm({ ...studentForm, religion: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <ImageUploadCrop
+                label="Profile Photo (Crop to Square)"
+                value={studentForm.profileImageUrl || ""}
+                onChange={(val) => setStudentForm({ ...studentForm, profileImageUrl: val })}
+              />
+
+              {error && <p className="text-[13px] text-destructive">{error}</p>}
+
+              <div className="flex flex-wrap justify-end gap-2.5">
+                <Button type="submit" disabled={saving}>
+                  {saving ? (
+                    "Creating…"
+                  ) : (
+                    <>
+                      <IconPlus size={15} aria-hidden="true" />
+                      Create Student Account
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => {
+                    setShowStudentModal(false);
+                    setStudentForm(studentEmpty);
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </AdminModal>
+        )}
+
+        {/* Modal 4: Edit Student */}
+        {editingStudent && (
+          <AdminModal
+            title={`Edit Student: ${editingStudent.firstName} ${editingStudent.lastName}`}
+            wide
+            onClose={() => setEditingStudent(null)}
+          >
+            <form className="grid gap-4" onSubmit={handleUpdateStudent}>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="se-first">First name</Label>
+                  <Input
+                    id="se-first"
+                    type="text"
+                    value={editingStudent.firstName}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, firstName: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="se-last">Last name</Label>
+                  <Input
+                    id="se-last"
+                    type="text"
+                    value={editingStudent.lastName}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, lastName: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="se-email">Email address</Label>
+                  <Input
+                    id="se-email"
+                    type="email"
+                    value={editingStudent.email}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, email: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="se-password">Change password (optional)</Label>
+                  <Input
+                    id="se-password"
+                    type="password"
+                    placeholder="Leave blank to keep existing"
+                    value={editingStudent.password}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, password: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="se-enrollment">Enrollment number</Label>
+                  <Input
+                    id="se-enrollment"
+                    type="text"
+                    value={editingStudent.enrollmentNumber}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, enrollmentNumber: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="se-registration">Registration ID</Label>
+                  <Input
+                    id="se-registration"
+                    type="text"
+                    value={editingStudent.registrationId}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, registrationId: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="se-roll">Roll number (optional)</Label>
+                  <Input
+                    id="se-roll"
+                    type="text"
+                    value={editingStudent.rollNumber}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, rollNumber: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="se-admission">Admission date</Label>
+                  <Input
+                    id="se-admission"
+                    type="date"
+                    value={editingStudent.admissionDate}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, admissionDate: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="se-program">Academic program</Label>
+                  <Select
+                    value={editingStudent.programId || undefined}
+                    onValueChange={(programId) =>
+                      setEditingStudent({ ...editingStudent, programId, currentSemester: "1" })
+                    }
+                  >
+                    <SelectTrigger id="se-program" className="w-full">
+                      <SelectValue placeholder="No program assigned yet" />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      {programs.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.code} — {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="se-semester">Current semester</Label>
+                  <Select
+                    value={editingStudent.currentSemester || undefined}
+                    onValueChange={(currentSemester) =>
+                      setEditingStudent({ ...editingStudent, currentSemester })
+                    }
+                    disabled={!editingStudent.programId}
+                  >
+                    <SelectTrigger id="se-semester" className="w-full">
+                      <SelectValue
+                        placeholder={
+                          editingStudent.programId ? "Select semester" : "Pick program first"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      {Array.from({ length: editStudentSemestersCount }, (_, i) => i + 1).map((n) => (
+                        <SelectItem key={n} value={String(n)}>
+                          Semester {n}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="se-status">Enrollment status</Label>
+                  <Select
+                    value={editingStudent.status}
+                    onValueChange={(status) => setEditingStudent({ ...editingStudent, status })}
+                  >
+                    <SelectTrigger id="se-status" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      <SelectItem value="ACTIVE">Active</SelectItem>
+                      <SelectItem value="INACTIVE">Inactive</SelectItem>
+                      <SelectItem value="GRADUATED">Graduated</SelectItem>
+                      <SelectItem value="SUSPENDED">Suspended</SelectItem>
+                      <SelectItem value="WITHDRAWN">Withdrawn</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="se-access">Account access</Label>
+                  <Select
+                    value={editingStudent.userStatus}
+                    onValueChange={(userStatus) =>
+                      setEditingStudent({ ...editingStudent, userStatus })
+                    }
+                  >
+                    <SelectTrigger id="se-access" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      <SelectItem value="ACTIVE">Active — can sign in</SelectItem>
+                      <SelectItem value="INACTIVE">Inactive — sign-in blocked</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Personal information below is critical — only admins can set it, students cannot
+                change it later.
+              </p>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="se-gender">Gender</Label>
+                  <Select
+                    value={editingStudent.gender || "UNSPECIFIED"}
+                    onValueChange={(v) =>
+                      setEditingStudent({ ...editingStudent, gender: v === "UNSPECIFIED" ? "" : v })
+                    }
+                  >
+                    <SelectTrigger id="se-gender" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      <SelectItem value="UNSPECIFIED">Not specified</SelectItem>
+                      <SelectItem value="Male">Male</SelectItem>
+                      <SelectItem value="Female">Female</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="se-category">Category</Label>
+                  <Input
+                    id="se-category"
+                    type="text"
+                    placeholder="e.g. Open, Reserved"
+                    value={editingStudent.category}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, category: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="se-nationality">Nationality</Label>
+                  <Input
+                    id="se-nationality"
+                    type="text"
+                    placeholder="e.g. Nepali"
+                    value={editingStudent.nationality}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, nationality: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="se-religion">Religion</Label>
+                  <Input
+                    id="se-religion"
+                    type="text"
+                    placeholder="e.g. Hindu"
+                    value={editingStudent.religion}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, religion: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <ImageUploadCrop
+                label="Profile Photo (Crop to Square)"
+                value={editingStudent.profileImageUrl || ""}
+                onChange={(val) => setEditingStudent({ ...editingStudent, profileImageUrl: val })}
+              />
+
+              {error && <p className="text-[13px] text-destructive">{error}</p>}
+
+              <div className="flex flex-wrap justify-end gap-2.5">
+                <Button type="submit" disabled={saving}>
+                  {saving ? "Saving Changes…" : "Save Changes"}
+                </Button>
+                <Button variant="outline" type="button" onClick={() => setEditingStudent(null)}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </AdminModal>
+        )}
+
+        {/* Modal 5: Delete Confirmation */}
+        {deletingTarget && (
+          <AdminModal
+            title={`Delete ${deletingTarget.type === "teacher" ? "Faculty" : "Student"} Account`}
+            onClose={() => setDeletingTarget(null)}
+          >
+            <div className="grid gap-3 text-sm text-muted-foreground">
+              <p>
+                Are you sure you want to permanently delete the account for{" "}
+                <strong className="text-foreground">{deletingTarget.name}</strong>{" "}
+                ({deletingTarget.identifier})?
+              </p>
+              <p className="flex items-center gap-2 rounded-lg border border-destructive/25 bg-destructive/10 px-3.5 py-2.5 text-[13px] font-medium text-destructive dark:border-destructive/40 dark:bg-destructive/20">
+                <IconAlertTriangle size={16} aria-hidden="true" className="shrink-0" />
+                This action cannot be undone. All associated records, enrollments, attendance, and
+                credentials will be removed.
+              </p>
+
+              {error && <p className="text-[13px] text-destructive">{error}</p>}
+
+              <div className="mt-2 flex flex-wrap justify-end gap-2.5">
+                <Button variant="destructive" type="button" onClick={handleConfirmDelete} disabled={saving}>
+                  {saving ? "Deleting…" : "Yes, Delete Account"}
+                </Button>
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => setDeletingTarget(null)}
+                  disabled={saving}
+                >
+                  Cancel
+                </Button>
+              </div>
             </div>
-          </div>
-        </AdminModal>
-      )}
+          </AdminModal>
+        )}
+
+        {/* Modal 6: Deactivate Confirmation (activation is applied directly) */}
+        {statusTarget && (
+          <AdminModal title="Deactivate Account" onClose={() => setStatusTarget(null)}>
+            <div className="grid gap-3 text-sm text-muted-foreground">
+              <p>
+                Deactivate the account for{" "}
+                <strong className="text-foreground">{statusTarget.name}</strong>{" "}
+                ({statusTarget.identifier})?
+              </p>
+              <p className="flex items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3.5 py-2.5 text-[13px] font-medium text-amber-600 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-400">
+                <IconAlertTriangle size={16} aria-hidden="true" className="shrink-0" />
+                They will no longer be able to sign in and their profile will be hidden from the
+                directory. All records are preserved, and you can reactivate the account at any
+                time.
+              </p>
+              {statusTarget.kind === "student" && (
+                <p className="text-[13px]">
+                  Note: this only controls portal access. To change the student&apos;s enrollment
+                  status (Active / Graduated / Withdrawn…), use <strong className="font-medium text-foreground">Edit Student Profile</strong>.
+                </p>
+              )}
+
+              {error && <p className="text-[13px] text-destructive">{error}</p>}
+
+              <div className="mt-2 flex flex-wrap justify-end gap-2.5">
+                <Button
+                  variant="destructive"
+                  type="button"
+                  onClick={handleConfirmDeactivate}
+                  disabled={saving}
+                >
+                  {saving ? "Deactivating…" : "Yes, Deactivate Account"}
+                </Button>
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => setStatusTarget(null)}
+                  disabled={saving}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </AdminModal>
+        )}
+      </div>
     </AdminShell>
   );
 }

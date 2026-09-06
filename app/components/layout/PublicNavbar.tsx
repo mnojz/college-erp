@@ -1,50 +1,120 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { IconLogin, IconSchool } from "@tabler/icons-react";
+import { usePathname } from "next/navigation";
+import { IconLogin } from "@tabler/icons-react";
+import { Menu, X } from "lucide-react";
 import { ThemeToggle } from "@/app/components/common/ThemeToggle";
+import { Logo } from "@/app/components/common/Logo";
+import { Button } from "@/components/ui/button";
+import { cn } from "cn";
+
+const NAV_LINKS = [
+  { label: "Curriculum", href: "/public/course-structure" },
+  { label: "Fees", href: "/public/fee-structure" },
+  { label: "Syllabus", href: "/public/syllabus" },
+  { label: "Notices", href: "/public/notices" },
+] as const;
 
 export function PublicNavbar({
   onSignInClick,
-}: { onSignInClick: () => void }) {
+}: {
+  onSignInClick: () => void;
+}) {
+  const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   return (
-    <header className="home-nav">
-      <div className="home-nav-container">
-        <Link href="/" className="home-nav-brand">
-          <span className="home-brand-icon">
-            <IconSchool size={22} />
+    <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+        <Link href="/" className="flex items-center gap-2.5">
+          <Logo className="size-8 text-foreground" />
+          <span className="flex flex-col leading-tight">
+            <strong className="text-sm font-semibold">College-ERP</strong>
+            <small className="hidden text-xs text-muted-foreground sm:block">
+              Far Western University
+            </small>
           </span>
-          <div className="home-brand-text">
-            <strong>College-ERP</strong>
-            <small>Far Western University</small>
-          </div>
         </Link>
 
-        <nav className="home-nav-links">
-          <Link href="/public/course-structure" className="home-nav-link">
-            Curriculum
-          </Link>
-          <Link href="/public/fee-structure" className="home-nav-link">
-            Fees
-          </Link>
-          <Link href="/public/syllabus" className="home-nav-link">
-            Syllabus
-          </Link>
-          <Link href="/public/notices" className="home-nav-link">
-            Notices
-          </Link>
+        <nav className="hidden items-center gap-1 md:flex" aria-label="Primary">
+          {NAV_LINKS.map((link) => (
+            <Button key={link.href} variant="ghost" size="sm" asChild>
+              <Link
+                href={link.href}
+                className={cn(
+                  pathname === link.href && "bg-accent text-accent-foreground"
+                )}
+              >
+                {link.label}
+              </Link>
+            </Button>
+          ))}
         </nav>
 
-        <div className="home-nav-actions">
+        <div className="flex items-center gap-1.5">
           <ThemeToggle />
-          <button
+          <Button
             type="button"
-            className="home-btn-signin"
+            className="hidden sm:inline-flex"
             onClick={onSignInClick}
           >
-            <IconLogin size={16} />
-            <span>Sign In</span>
-          </button>
+            <IconLogin size={16} aria-hidden="true" />
+            Sign In
+          </Button>
+          <Button
+            type="button"
+            className="sm:hidden"
+            size="icon"
+            variant="outline"
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileOpen}
+            onClick={() => setMobileOpen((value) => !value)}
+          >
+            {mobileOpen ? (
+              <X className="size-4" aria-hidden="true" />
+            ) : (
+              <Menu className="size-4" aria-hidden="true" />
+            )}
+          </Button>
         </div>
       </div>
+
+      {/* Mobile menu */}
+      {mobileOpen && (
+        <nav
+          className="border-t bg-background px-4 py-3 md:hidden"
+          aria-label="Mobile"
+        >
+          <div className="flex flex-col gap-1">
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  "rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                  pathname === link.href && "bg-accent font-semibold text-accent-foreground"
+                )}
+              >
+                {link.label}
+              </Link>
+            ))}
+            <Button
+              type="button"
+              className="mt-2 sm:hidden"
+              onClick={() => {
+                setMobileOpen(false);
+                onSignInClick();
+              }}
+            >
+              <IconLogin size={16} aria-hidden="true" />
+              Sign In
+            </Button>
+          </div>
+        </nav>
+      )}
     </header>
   );
 }

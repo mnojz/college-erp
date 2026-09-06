@@ -1,8 +1,18 @@
 "use client";
 
-import { useRef, useState, type FormEvent, type ChangeEvent, type DragEvent } from "react";
-import { SEMESTERS, formatBytes, type SyllabusMeta } from "@/app/lib/syllabi-shared";
-import { IconUpload, IconFileText, IconX } from "@tabler/icons-react";
+import { useState, type FormEvent } from "react";
+import { SEMESTERS, type SyllabusMeta } from "@/app/lib/syllabi-shared";
+import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { FileDropzone } from "@/app/components/common/FileDropzone";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export type SyllabusSubmitValues = {
   title: string; // optional at submission (trimmed); empty => server derives from file
@@ -41,27 +51,11 @@ export function SyllabusForm({
     ...emptyValues,
     ...(initial ?? {}),
   });
-  const [dragOver, setDragOver] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const programs = meta.programs ?? [];
 
   function applyFile(f: File | null) {
     setValues((v) => ({ ...v, file: f }));
-  }
-
-  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
-    applyFile(e.target.files?.[0] ?? null);
-  }
-
-  function handleDrop(e: DragEvent<HTMLDivElement>) {
-    e.preventDefault();
-    setDragOver(false);
-    applyFile(e.dataTransfer.files?.[0] ?? null);
-  }
-
-  function openPicker() {
-    if (!submitting) fileRef.current?.click();
   }
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -80,145 +74,90 @@ export function SyllabusForm({
     (mode === "edit" ? true : !!values.file);
 
   return (
-    <form className="modal-form" onSubmit={handleSubmit}>
-      {error && <p className="notes-form-error">{error}</p>}
+    <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+      {error && (
+        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </p>
+      )}
 
-      <label htmlFor="syllabus-title">
-        Title (optional)
-        <input
-          id="syllabus-title"
-          type="text"
-          value={values.title}
-          onChange={(e) => setValues({ ...values, title: e.target.value })}
-          placeholder="Leave blank to use the file name"
-          disabled={submitting}
-        />
-      </label>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="flex flex-col gap-2 sm:col-span-2">
+          <Label htmlFor="syllabus-program">Program *</Label>
+          <Select
+            value={values.programId || undefined}
+            onValueChange={(value) => setValues({ ...values, programId: value })}
+            disabled={submitting || programs.length === 0}
+          >
+            <SelectTrigger id="syllabus-program" aria-label="Program" className="w-full">
+              <SelectValue placeholder="Select a program" />
+            </SelectTrigger>
+            <SelectContent>
+              {programs.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.code} — {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <label htmlFor="syllabus-program">
-        Program *
-        <select
-          id="syllabus-program"
-          value={values.programId}
-          onChange={(e) => setValues({ ...values, programId: e.target.value })}
-          disabled={submitting || programs.length === 0}
-        >
-          <option value="">Select a program</option>
-          {programs.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.code} — {p.name}
-            </option>
-          ))}
-        </select>
-      </label>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="syllabus-semester">Semester *</Label>
+          <Select
+            value={values.semester || undefined}
+            onValueChange={(value) => setValues({ ...values, semester: value })}
+            disabled={submitting}
+          >
+            <SelectTrigger id="syllabus-semester" aria-label="Semester" className="w-full">
+              <SelectValue placeholder="Select a semester" />
+            </SelectTrigger>
+            <SelectContent>
+              {SEMESTERS.map((s) => (
+                <SelectItem key={s} value={String(s)}>
+                  Semester {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
-      <label htmlFor="syllabus-semester">
-        Semester *
-        <select
-          id="syllabus-semester"
-          value={values.semester}
-          onChange={(e) => setValues({ ...values, semester: e.target.value })}
-          disabled={submitting}
-        >
-          <option value="">Select a semester</option>
-          {SEMESTERS.map((s) => (
-            <option key={s} value={String(s)}>
-              Semester {s}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      {/* PDF dropzone */}
-      <div className="notes-field-group">
-        <span className="notes-field-caption">
+      <div className="flex flex-col gap-2">
+        <span className="text-sm font-medium">
           PDF File {mode === "create" ? "*" : "(leave empty to keep current)"}
         </span>
-        <div
-          className={`syllabus-dropzone${dragOver ? " drag" : ""}${
-            values.file ? " has-file" : ""
-          }`}
-          role="button"
-          tabIndex={0}
-          onClick={openPicker}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              openPicker();
-            }
-          }}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
-        >
-          <input
-            id="syllabus-file"
-            ref={fileRef}
-            type="file"
-            accept="application/pdf"
-            onChange={handleFileChange}
-            disabled={submitting}
-            className="syllabus-dropzone-input"
-          />
-          {values.file ? (
-            <>
-              <span className="syllabus-dropzone-icon">
-                <IconFileText size={26} aria-hidden="true" />
-              </span>
-              <strong className="syllabus-dropzone-name">{values.file.name}</strong>
-              <small className="syllabus-dropzone-hint">
-                {formatBytes(values.file.size)} · click or drop to replace
-              </small>
-              <button
-                type="button"
-                className="syllabus-dropzone-remove"
-                aria-label="Remove selected file"
-                title="Remove file"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  applyFile(null);
-                }}
-                disabled={submitting}
-              >
-                <IconX size={16} aria-hidden="true" />
-              </button>
-            </>
-          ) : (
-            <>
-              <span className="syllabus-dropzone-icon">
-                <IconUpload size={26} aria-hidden="true" />
-              </span>
-              <strong className="syllabus-dropzone-name">
-                {dragOver ? "Drop the PDF here" : "Drag & drop your PDF here"}
-              </strong>
-              <small className="syllabus-dropzone-hint">
-                or click to browse — PDF only, up to 50 MB
-              </small>
-            </>
-          )}
-        </div>
+        <FileDropzone
+          id="syllabus-file"
+          accept="application/pdf"
+          file={values.file}
+          onFileChange={applyFile}
+          disabled={submitting}
+          label="Drag & drop your PDF here"
+          dropLabel="Drop the PDF here"
+          hint="or click to browse — PDF only, up to 50 MB"
+        />
         {mode === "edit" && !values.file && (
-          <span className="notes-file-chosen muted" style={{ display: "block" }}>
+          <span className="text-xs text-muted-foreground">
             No new file selected — the existing PDF will be kept.
           </span>
         )}
       </div>
 
-      <div className="modal-actions">
-        <button type="submit" className="btn-primary" disabled={!canSubmit}>
-          {submitting ? mode === "create" ? "Uploading…" : "Saving…" : mode === "create" ? "Upload Syllabus" : "Save Changes"}
-        </button>
-        <button
-          type="button"
-          className="btn-ghost"
-          onClick={onCancel}
-          disabled={submitting}
-        >
+      <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
+        <Button type="button" variant="ghost" onClick={onCancel} disabled={submitting}>
           Cancel
-        </button>
+        </Button>
+        <Button type="submit" disabled={!canSubmit}>
+          {submitting && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+          {submitting
+            ? mode === "create"
+              ? "Uploading…"
+              : "Saving…"
+            : mode === "create"
+              ? "Upload Syllabus"
+              : "Save Changes"}
+        </Button>
       </div>
     </form>
   );

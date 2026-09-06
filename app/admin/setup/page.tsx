@@ -2,8 +2,10 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { AdminModal } from "@/app/components/admin/AdminModal";
+import { Badge } from "@/components/ui/badge";
 import { IconAlertTriangle, IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
 
 type Department = {
@@ -171,69 +173,57 @@ export default function AdminSetupPage() {
   return (
     <AdminShell title="Department & Programs" subtitle="Academic Structure" active="/admin/setup">
       {/* Top bar */}
-      <div className="admin-topbar">
-        <p style={{ margin: 0, color: "var(--ink-soft)", fontSize: 13, fontFamily: "Arial, sans-serif" }}>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+        <p className="m-0 text-[13px] text-muted-foreground">
           {loading
             ? "Loading…"
             : `${department ? department.code : "Department not set yet"} · ${programs.length} program${programs.length !== 1 ? "s" : ""} registered`}
         </p>
-        <div className="admin-topbar-actions">
+        <div className="flex flex-wrap gap-2.5">
           {!department && (
-            <button
-              className="btn-add"
+            <Button
+              size="sm"
               type="button"
               onClick={() => { setDeptForm({ name: "", code: "" }); setShowSetDept(true); setError(""); }}
             >
               <IconPlus size={15} aria-hidden="true" />
               Set Department
-            </button>
+            </Button>
           )}
-          <button
-            className="btn-add"
+          <Button
+            size="sm"
             type="button"
-            style={{ background: "#2563eb" }}
             onClick={() => { setShowCreateProgram(true); setError(""); }}
           >
             <IconPlus size={15} aria-hidden="true" />
             Add Program
-          </button>
+          </Button>
         </div>
       </div>
 
-      {error && <p className="admin-message error">{error}</p>}
-      {message && <p className="admin-message success">{message}</p>}
+      {error && <p className="mt-3.5 rounded-lg border border-destructive/20 bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive">{error}</p>}
+      {message && <p className="mt-3.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2.5 text-[13px] text-emerald-600 dark:text-emerald-400">{message}</p>}
 
       {/* Department card (single, one-time setup) */}
       {department ? (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 14,
-            background: "var(--panel, #fff)",
-            border: "1px solid var(--line, #e2e8f0)",
-            borderRadius: 14,
-            padding: "16px 18px",
-            marginBottom: 28,
-          }}
-        >
-          <span className="badge badge-violet" style={{ fontSize: 13, padding: "5px 10px" }}>
-            {department.code}
-          </span>
+        <div className="mb-7 flex flex-wrap items-center gap-3.5 rounded-[14px] border bg-card px-4.5 py-4">
+          <Badge variant="secondary">
+              {department.code}
+            </Badge>
           <div>
-            <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: "var(--ink)" }}>
+            <p className="m-0 text-[15px] font-semibold text-foreground">
               {department.name} Department
             </p>
-            <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--ink-soft)" }}>
+            <p className="m-0 mt-0.5 text-xs text-muted-foreground">
               Your department. All programs, subjects, classes and users are assigned to it automatically.
             </p>
           </div>
-          <button
+          <Button
             type="button"
-            className="btn-action-edit"
+            variant="outline" size="icon-sm"
+            className="ml-auto"
             title="Edit Department"
             aria-label="Edit Department"
-            style={{ marginLeft: "auto", width: 34, height: 34, borderRadius: 8, flexShrink: 0 }}
             onClick={() => {
               setDeptForm({ name: department.name, code: department.code });
               setError("");
@@ -241,41 +231,28 @@ export default function AdminSetupPage() {
             }}
           >
             <IconPencil size={15} />
-          </button>
+          </Button>
         </div>
       ) : (
-        <div
-          style={{
-            background: "var(--panel, #fff)",
-            border: "1px dashed var(--line, #e2e8f0)",
-            borderRadius: 14,
-            padding: "18px 20px",
-            marginBottom: 28,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            flexWrap: "wrap",
-          }}
-        >
+        <div className="mb-7 flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-dashed bg-card px-5 py-4.5">
           <div>
-            <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: "var(--ink)" }}>
+            <p className="m-0 text-[15px] font-semibold text-foreground">
               Set up your department once
             </p>
-            <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--ink-soft)" }}>
+            <p className="m-0 mt-0.5 text-xs text-muted-foreground">
               Enter your department name and code — this is used across the entire system.
             </p>
           </div>
-          <button className="btn-add" type="button" onClick={() => { setDeptForm({ name: "", code: "" }); setShowSetDept(true); setError(""); }}>
+          <Button size="sm" type="button" onClick={() => { setDeptForm({ name: "", code: "" }); setShowSetDept(true); setError(""); }}>
             <IconPlus size={15} aria-hidden="true" />
             Set Department
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Programs table */}
-      <div className="admin-table-wrap" style={{ marginTop: "28px" }}>
-        <table className="admin-table">
+      <div className="mt-7 w-full overflow-x-auto rounded-lg border">
+        <table className="w-full text-sm [&_th]:h-10 [&_th]:whitespace-nowrap [&_th]:px-3 [&_th]:text-left [&_th]:align-middle [&_th]:font-medium [&_th]:text-muted-foreground [&_td]:px-3 [&_td]:py-2.5 [&_td]:align-middle [&_tbody_tr]:border-b [&_tbody_tr:last-child]:border-0 [&_tbody_tr:hover]:bg-muted/40">
           <thead>
             <tr>
               <th>Code</th>
@@ -283,13 +260,13 @@ export default function AdminSetupPage() {
               <th>Department</th>
               <th>Duration</th>
               <th>Semesters</th>
-              <th style={{ textAlign: "right" }}>Actions</th>
+              <th className="text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {programs.length === 0 && !loading ? (
               <tr>
-                <td colSpan={6} className="admin-table-empty">
+                <td colSpan={6} className="px-3 py-10 text-center text-sm text-muted-foreground">
                   No programs yet. Click <strong>Add Program</strong> to create one.
                 </td>
               </tr>
@@ -297,19 +274,19 @@ export default function AdminSetupPage() {
               programs.map((p) => (
                 <tr key={p.id}>
                   <td>
-                    <span className="badge badge-blue">{p.code}</span>
+                    <Badge variant="secondary">{p.code}</Badge>
                   </td>
-                  <td style={{ fontWeight: 600 }}>{p.name}</td>
-                  <td style={{ color: "var(--ink-soft)" }}>{p.departmentName}</td>
+                  <td className="font-semibold">{p.name}</td>
+                  <td style={{ color: "var(--muted-foreground)" }}>{p.departmentName}</td>
                   <td>{p.durationYears} years</td>
                   <td>
-                    <span className="badge badge-slate">{p.durationYears * 2} semesters</span>
+                    <Badge variant="outline">{p.durationYears * 2} semesters</Badge>
                   </td>
                   <td>
-                    <div className="table-actions" style={{ justifyContent: "flex-end" }}>
-                      <button
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
                         type="button"
-                        className="btn-action-edit"
+                        variant="outline" size="icon-sm"
                         title="Edit Program"
                         aria-label="Edit Program"
                         onClick={() => {
@@ -318,10 +295,10 @@ export default function AdminSetupPage() {
                         }}
                       >
                         <IconPencil size={15} />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className="btn-action-delete"
+                        variant="outline" size="icon-sm" className="border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
                         title="Delete Program"
                         aria-label="Delete Program"
                         onClick={() => {
@@ -330,7 +307,7 @@ export default function AdminSetupPage() {
                         }}
                       >
                         <IconTrash size={15} />
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -343,10 +320,11 @@ export default function AdminSetupPage() {
       {/* Modal 1: Set Department (one-time) */}
       {showSetDept && (
         <AdminModal title={department ? "Edit Department" : "Set Your Department"} onClose={() => setShowSetDept(false)}>
-          <form className="modal-form" onSubmit={handleSetDept}>
-            <label>
+          <form className="grid gap-4" onSubmit={handleSetDept}>
+            <label className="form-field">
               Department Name
               <input
+                className="form-control"
                 type="text"
                 placeholder="e.g. Engineering"
                 value={deptForm.name}
@@ -360,9 +338,10 @@ export default function AdminSetupPage() {
                 required
               />
             </label>
-            <label>
+            <label className="form-field">
               Department Code
               <input
+                className="form-control"
                 type="text"
                 placeholder="e.g. ENG"
                 value={deptForm.code}
@@ -370,18 +349,18 @@ export default function AdminSetupPage() {
                 required
               />
             </label>
-            <p style={{ margin: 0, fontSize: 12, color: "var(--ink-soft)", fontFamily: "Arial, sans-serif" }}>
+            <p className="m-0 text-xs text-muted-foreground">
               This is your institution&apos;s single department. It is assigned to every program, subject,
               class and user automatically. You can update the name or code later from the department card.
             </p>
-            {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
-            <div className="modal-actions">
-              <button className="btn-primary" type="submit" disabled={saving}>
+            {error && <p className="m-0 text-[13px] text-destructive">{error}</p>}
+            <div className="flex flex-wrap justify-end gap-2.5">
+              <Button type="submit" disabled={saving}>
                 {saving ? (department ? "Saving…" : "Setting…") : department ? "Save Changes" : "Set Department"}
-              </button>
-              <button className="btn-ghost" type="button" onClick={() => setShowSetDept(false)}>
+              </Button>
+              <Button variant="outline" type="button" onClick={() => setShowSetDept(false)}>
                 Cancel
-              </button>
+              </Button>
             </div>
           </form>
         </AdminModal>
@@ -390,10 +369,11 @@ export default function AdminSetupPage() {
       {/* Modal 2: Add Program */}
       {showCreateProgram && (
         <AdminModal title="Add New Program" onClose={() => setShowCreateProgram(false)}>
-          <form className="modal-form" onSubmit={handleCreateProgram}>
-            <label>
+          <form className="grid gap-4" onSubmit={handleCreateProgram}>
+            <label className="form-field">
               Program Name
               <input
+                className="form-control"
                 type="text"
                 placeholder="e.g. B.E. Degree in Computer Engineering"
                 value={programForm.name}
@@ -401,9 +381,10 @@ export default function AdminSetupPage() {
                 required
               />
             </label>
-            <label>
+            <label className="form-field">
               Program Code (e.g. BCT)
               <input
+                className="form-control"
                 type="text"
                 placeholder="BCT"
                 value={programForm.code}
@@ -411,9 +392,10 @@ export default function AdminSetupPage() {
                 required
               />
             </label>
-            <label>
+            <label className="form-field">
               Duration (Years)
               <input
+                className="form-control"
                 type="number"
                 min={1}
                 max={6}
@@ -422,17 +404,17 @@ export default function AdminSetupPage() {
                 required
               />
             </label>
-            <p style={{ margin: 0, fontSize: 12, color: "var(--ink-soft)", fontFamily: "Arial, sans-serif" }}>
+            <p className="m-0 text-xs text-muted-foreground">
               Total Semesters = duration × 2 (auto-calculated)
             </p>
-            {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
-            <div className="modal-actions">
-              <button className="btn-primary" type="submit" disabled={saving}>
+            {error && <p className="m-0 text-[13px] text-destructive">{error}</p>}
+            <div className="flex flex-wrap justify-end gap-2.5">
+              <Button type="submit" disabled={saving}>
                 {saving ? "Creating…" : "Create Program"}
-              </button>
-              <button className="btn-ghost" type="button" onClick={() => setShowCreateProgram(false)}>
+              </Button>
+              <Button variant="outline" type="button" onClick={() => setShowCreateProgram(false)}>
                 Cancel
-              </button>
+              </Button>
             </div>
           </form>
         </AdminModal>
@@ -441,28 +423,31 @@ export default function AdminSetupPage() {
       {/* Modal 5: Edit Program */}
       {editingProgram && (
         <AdminModal title={`Edit Program: ${editingProgram.code}`} onClose={() => setEditingProgram(null)}>
-          <form className="modal-form" onSubmit={handleUpdateProgram}>
-            <label>
+          <form className="grid gap-4" onSubmit={handleUpdateProgram}>
+            <label className="form-field">
               Program Name
               <input
+                className="form-control"
                 type="text"
                 value={editingProgram.name}
                 onChange={(e) => setEditingProgram({ ...editingProgram, name: e.target.value })}
                 required
               />
             </label>
-            <label>
+            <label className="form-field">
               Program Code
               <input
+                className="form-control"
                 type="text"
                 value={editingProgram.code}
                 onChange={(e) => setEditingProgram({ ...editingProgram, code: e.target.value.toUpperCase() })}
                 required
               />
             </label>
-            <label>
+            <label className="form-field">
               Duration (Years)
               <input
+                className="form-control"
                 type="number"
                 min={1}
                 max={6}
@@ -471,14 +456,14 @@ export default function AdminSetupPage() {
                 required
               />
             </label>
-            {error && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>}
-            <div className="modal-actions">
-              <button className="btn-primary" type="submit" disabled={saving}>
+            {error && <p className="m-0 text-[13px] text-destructive">{error}</p>}
+            <div className="flex flex-wrap justify-end gap-2.5">
+              <Button type="submit" disabled={saving}>
                 {saving ? "Saving Changes…" : "Save Changes"}
-              </button>
-              <button className="btn-ghost" type="button" onClick={() => setEditingProgram(null)}>
+              </Button>
+              <Button variant="outline" type="button" onClick={() => setEditingProgram(null)}>
                 Cancel
-              </button>
+              </Button>
             </div>
           </form>
         </AdminModal>
@@ -487,34 +472,22 @@ export default function AdminSetupPage() {
       {/* Modal 6: Delete Program Confirmation */}
       {deletingProgram && (
         <AdminModal title={`Delete Program: ${deletingProgram.code}`} onClose={() => setDeletingProgram(null)}>
-          <div className="modal-confirm-box">
+          <div className="grid gap-3 text-sm text-muted-foreground">
             <p>
               Are you sure you want to delete the program <strong>{deletingProgram.name} ({deletingProgram.code})</strong>?
             </p>
-            <p
-              style={{
-                fontSize: "13px",
-                color: "#dc2626",
-                background: "rgba(220, 38, 38, 0.08)",
-                padding: "10px 14px",
-                borderRadius: "8px",
-                display: "flex",
-                alignItems: "flex-start",
-                gap: "8px",
-                margin: 0,
-              }}
-            >
+            <p className="m-0 flex items-start gap-2 rounded-lg bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive">
               <IconAlertTriangle size={15} aria-hidden="true" style={{ flexShrink: 0, marginTop: "2px" }} />
               <span>Deleting this program will remove all affiliated subjects, scheduled classes, assessments, and unassign enrolled students.</span>
             </p>
-            {error && <p style={{ margin: "12px 0 0", fontSize: 13, color: "#b91c1c" }}>{error}</p>}
-            <div className="modal-actions" style={{ marginTop: "20px" }}>
-              <button className="btn-danger" type="button" onClick={handleDeleteProgram} disabled={saving}>
+            {error && <p className="m-0 text-[13px] text-destructive">{error}</p>}
+            <div className="mt-5 flex flex-wrap justify-end gap-2.5">
+              <Button variant="destructive" type="button" onClick={handleDeleteProgram} disabled={saving}>
                 {saving ? "Deleting…" : "Yes, Delete Program"}
-              </button>
-              <button className="btn-ghost" type="button" onClick={() => setDeletingProgram(null)} disabled={saving}>
+              </Button>
+              <Button variant="outline" type="button" onClick={() => setDeletingProgram(null)} disabled={saving}>
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </AdminModal>

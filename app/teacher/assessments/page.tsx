@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/ui/button";
 
 import { FormEvent, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
@@ -27,7 +28,6 @@ type AssessmentItem = {
   id: string;
   name: string;
   maxMarks: number | string;
-  assessmentDate: string | null;
   subjectId: string;
   programId: string;
   semester: number;
@@ -50,8 +50,8 @@ const inputStyle: CSSProperties = {
   width: "100%",
   padding: "10px 12px",
   borderRadius: "8px",
-  border: "1px solid var(--line, #e2e8f0)",
-  background: "var(--panel, #fff)",
+  border: "1px solid var(--border)",
+  background: "var(--card)",
   color: "inherit",
   fontSize: "0.9rem",
 };
@@ -60,33 +60,12 @@ const labelStyle: CSSProperties = {
   display: "block",
   marginBottom: "6px",
   fontSize: "0.8rem",
-  color: "var(--ink-soft)",
+  color: "var(--muted-foreground)",
   fontWeight: "600",
 };
 
 const thStyle: CSSProperties = { padding: "10px 14px", fontWeight: "600", fontSize: "0.78rem" };
 const tdStyle: CSSProperties = { padding: "10px 14px", verticalAlign: "middle" };
-
-const iconBtnStyle: CSSProperties = {
-  width: "34px",
-  height: "34px",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  borderRadius: "8px",
-  border: "1px solid var(--line, #e2e8f0)",
-  background: "transparent",
-  cursor: "pointer",
-  color: "var(--ink-soft)",
-};
-
-function fmtDate(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? "—"
-    : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-}
 
 export default function TeacherAssessmentsPage() {
   const router = useRouter();
@@ -101,7 +80,6 @@ export default function TeacherAssessmentsPage() {
   const [formClassId, setFormClassId] = useState("");
   const [formName, setFormName] = useState("");
   const [formMaxMarks, setFormMaxMarks] = useState("100");
-  const [formDate, setFormDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [formError, setFormError] = useState("");
   const [isSavingAssessment, setIsSavingAssessment] = useState(false);
 
@@ -191,7 +169,6 @@ export default function TeacherAssessmentsPage() {
     setFormClassId(classes[0]?.id ?? "");
     setFormName("");
     setFormMaxMarks("100");
-    setFormDate(new Date().toISOString().slice(0, 10));
     setFormError("");
   }
 
@@ -205,11 +182,6 @@ export default function TeacherAssessmentsPage() {
     setFormClassId(match?.id ?? "");
     setFormName(a.name);
     setFormMaxMarks(String(Number(a.maxMarks)));
-    setFormDate(
-      a.assessmentDate
-        ? new Date(a.assessmentDate).toISOString().slice(0, 10)
-        : new Date().toISOString().slice(0, 10),
-    );
     setFormError("");
   }
 
@@ -234,7 +206,6 @@ export default function TeacherAssessmentsPage() {
       subjectId: chosenClass.subjectId,
       name: formName.trim(),
       maxMarks: max,
-      assessmentDate: formDate ? new Date(formDate).toISOString() : undefined,
     };
 
     try {
@@ -377,10 +348,10 @@ export default function TeacherAssessmentsPage() {
     }
   }
 
-  const bannerStyle: CSSProperties =
+  const bannerClass =
     banner?.kind === "error"
-      ? { background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca" }
-      : { background: "#ecfdf5", color: "#047857", border: "1px solid #a7f3d0" };
+      ? "border-destructive/25 bg-destructive/10 text-destructive dark:border-destructive/40 dark:bg-destructive/20"
+      : "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:border-emerald-400/30 dark:bg-emerald-400/15 dark:text-emerald-400";
 
   return (
     <TeacherShell
@@ -394,13 +365,7 @@ export default function TeacherAssessmentsPage() {
       {banner && (
         <div
           role={banner.kind === "error" ? "alert" : "status"}
-          style={{
-            padding: "12px 16px",
-            borderRadius: "8px",
-            marginBottom: "16px",
-            fontSize: "0.88rem",
-            ...bannerStyle,
-          }}
+          className={`mb-4 rounded-lg border px-4 py-3 text-[0.88rem] ${bannerClass}`}
         >
           {banner.text}
         </div>
@@ -418,47 +383,33 @@ export default function TeacherAssessmentsPage() {
       >
         <div>
           <h2 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>My Assessments</h2>
-          <p style={{ margin: "4px 0 0", fontSize: "0.82rem", color: "var(--ink-soft)" }}>
+          <p style={{ margin: "4px 0 0", fontSize: "0.82rem", color: "var(--muted-foreground)" }}>
             {assessments.length} total · newest first
           </p>
         </div>
-        <button
+        <Button
           onClick={openCreate}
           disabled={classes.length === 0}
           title={classes.length === 0 ? "Assigned classes will appear here" : "Create a new assessment"}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "8px",
-            padding: "10px 18px",
-            borderRadius: "8px",
-            background: "#0ea5e9",
-            color: "#fff",
-            fontWeight: "700",
-            fontSize: "0.85rem",
-            border: 0,
-            cursor: classes.length === 0 ? "not-allowed" : "pointer",
-            opacity: classes.length === 0 ? 0.5 : 1,
-          }}
         >
           <IconPlus size={16} aria-hidden="true" />
           New Assessment
-        </button>
+        </Button>
       </div>
 
       {isLoading ? (
-        <div className="profile-loading">Loading assessments…</div>
+        <div className="grid min-h-[40vh] place-items-center text-sm text-muted-foreground">Loading assessments…</div>
       ) : classes.length === 0 ? (
         <div
-          className="profile-info-card"
-          style={{ padding: "28px", textAlign: "center", color: "var(--ink-soft)" }}
+          className="rounded-xl border bg-card p-5 shadow-xs"
+          style={{ padding: "28px", textAlign: "center", color: "var(--muted-foreground)" }}
         >
           No classes are assigned to you yet — assessments appear here once the timetable
           assigns you a subject.
         </div>
       ) : assessments.length === 0 ? (
-        <div className="profile-info-card" style={{ padding: "28px", textAlign: "center" }}>
-          <p style={{ margin: 0, color: "var(--ink-soft)" }}>
+        <div className="rounded-xl border bg-card p-5 shadow-xs" style={{ padding: "28px", textAlign: "center" }}>
+          <p style={{ margin: 0, color: "var(--muted-foreground)" }}>
             No assessments yet. Click <strong>New Assessment</strong> to create the first one.
           </p>
         </div>
@@ -471,7 +422,7 @@ export default function TeacherAssessmentsPage() {
             const roster = rosterFor(a);
 
             return (
-              <div key={a.id} className="profile-info-card" style={{ padding: "16px 20px" }}>
+              <div key={a.id} className="rounded-xl border bg-card p-5 shadow-xs" style={{ padding: "16px 20px" }}>
                 <div
                   style={{
                     display: "flex",
@@ -480,17 +431,7 @@ export default function TeacherAssessmentsPage() {
                     flexWrap: "wrap",
                   }}
                 >
-                  <span
-                    style={{
-                      flexShrink: 0,
-                      padding: "6px 10px",
-                      borderRadius: "8px",
-                      background: "#e0f2fe",
-                      color: "#0369a1",
-                      fontWeight: 800,
-                      fontSize: "0.8rem",
-                    }}
-                  >
+                  <span className="inline-flex shrink-0 items-center rounded-md bg-sky-100 px-2.5 py-1 text-[0.8rem] font-extrabold text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
                     {a.subject.code}
                   </span>
                   <div style={{ flex: "1 1 260px", minWidth: 0 }}>
@@ -498,58 +439,49 @@ export default function TeacherAssessmentsPage() {
                     <div
                       style={{
                         fontSize: "0.78rem",
-                        color: "var(--ink-soft)",
+                        color: "var(--muted-foreground)",
                         marginTop: "3px",
                       }}
                     >
-                      {a.subject.name} · {a.program.code} · Sem {a.semester} · Max {max} ·{" "}
-                      {fmtDate(a.assessmentDate)}
+                      {a.subject.name} · {a.program.code} · Sem {a.semester} · Max {max}
                     </div>
                   </div>
                   <span
-                    style={{
-                      fontSize: "0.75rem",
-                      fontWeight: 700,
-                      padding: "4px 10px",
-                      borderRadius: "999px",
-                      background: recorded > 0 ? "#dcfce7" : "var(--table-row-hover)",
-                      color: recorded > 0 ? "#15803d" : "var(--ink-soft)",
-                    }}
+                    className={`inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[0.75rem] font-bold ${
+                      recorded > 0
+                        ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:border-emerald-400/30 dark:bg-emerald-400/15 dark:text-emerald-400"
+                        : "border-border bg-muted text-muted-foreground"
+                    }`}
                   >
                     {recorded > 0 ? `${recorded} recorded` : "No marks yet"}
                   </span>
                   <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                    <button
+                    <Button
                       onClick={() => openMarks(a)}
-                      style={{
-                        padding: "8px 14px",
-                        borderRadius: "8px",
-                        fontSize: "0.8rem",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        border: `1px solid ${isOpen ? "transparent" : "var(--line-strong)"}`,
-                        background: isOpen ? "#0ea5e9" : "transparent",
-                        color: isOpen ? "#fff" : "var(--ink)",
-                      }}
+                      variant={isOpen ? "default" : "outline"}
+                      size="sm"
                     >
                       {isOpen ? "Hide Marks" : "Enter Marks"}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => openEdit(a)}
                       title="Edit assessment"
                       aria-label={`Edit ${a.name}`}
-                      style={iconBtnStyle}
+                      variant="outline"
+                      size="icon-sm"
                     >
                       <IconPencil size={15} aria-hidden="true" />
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => askDelete(a)}
                       title="Delete assessment"
                       aria-label={`Delete ${a.name}`}
-                      style={{ ...iconBtnStyle, color: "#dc2626" }}
+                      variant="outline"
+                      size="icon-sm"
+                      className="border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive dark:border-destructive/40 dark:bg-destructive/20"
                     >
                       <IconTrash size={15} aria-hidden="true" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
@@ -557,16 +489,16 @@ export default function TeacherAssessmentsPage() {
                   <div
                     style={{
                       marginTop: "14px",
-                      borderTop: "1px solid var(--line)",
+                      borderTop: "1px solid var(--border)",
                       paddingTop: "14px",
                     }}
                   >
                     {marksLoading ? (
-                      <div style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>
+                      <div style={{ color: "var(--muted-foreground)", fontSize: "0.85rem" }}>
                         Loading recorded marks…
                       </div>
                     ) : roster.length === 0 ? (
-                      <div style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>
+                      <div style={{ color: "var(--muted-foreground)", fontSize: "0.85rem" }}>
                         No active students found for this class.
                       </div>
                     ) : (
@@ -581,14 +513,14 @@ export default function TeacherAssessmentsPage() {
                             gap: "8px",
                           }}
                         >
-                          <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+                          <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
                             Grades calculate automatically from marks ÷ {max}. Pass mark 40%.
                           </span>
                           <span
                             style={{
                               fontSize: "0.75rem",
                               fontWeight: 700,
-                              color: "var(--ink-soft)",
+                              color: "var(--muted-foreground)",
                             }}
                           >
                             {filledCount} of {roster.length} filled
@@ -606,9 +538,9 @@ export default function TeacherAssessmentsPage() {
                             <thead>
                               <tr
                                 style={{
-                                  borderBottom: "1px solid var(--line)",
+                                  borderBottom: "1px solid var(--border)",
                                   background: "var(--table-header-bg)",
-                                  color: "var(--ink-soft)",
+                                  color: "var(--muted-foreground)",
                                 }}
                               >
                                 <th style={thStyle}>Roll</th>
@@ -628,7 +560,7 @@ export default function TeacherAssessmentsPage() {
                                 return (
                                   <tr
                                     key={s.id}
-                                    style={{ borderBottom: "1px solid var(--line-faint)" }}
+                                    style={{ borderBottom: "1px solid var(--border)" }}
                                   >
                                     <td style={tdStyle}>
                                       {s.rollNumber || s.enrollmentNumber}
@@ -638,7 +570,7 @@ export default function TeacherAssessmentsPage() {
                                       <div
                                         style={{
                                           fontSize: "0.72rem",
-                                          color: "var(--ink-soft)",
+                                          color: "var(--muted-foreground)",
                                         }}
                                       >
                                         {s.enrollmentNumber}
@@ -664,9 +596,9 @@ export default function TeacherAssessmentsPage() {
                                           padding: "7px 10px",
                                           borderRadius: "8px",
                                           border: `1px solid ${
-                                            invalid ? "#ef4444" : "var(--line)"
+                                            invalid ? "var(--destructive)" : "var(--border)"
                                           }`,
-                                          background: "var(--panel)",
+                                          background: "var(--card)",
                                           color: "inherit",
                                         }}
                                       />
@@ -675,7 +607,7 @@ export default function TeacherAssessmentsPage() {
                                       {raw.trim() === "" || invalid || grade === null ? (
                                         <span
                                           style={{
-                                            color: invalid ? "#ef4444" : "var(--ink-soft)",
+                                            color: invalid ? "var(--destructive)" : "var(--muted-foreground)",
                                             fontSize: "0.8rem",
                                           }}
                                         >
@@ -683,16 +615,11 @@ export default function TeacherAssessmentsPage() {
                                         </span>
                                       ) : (
                                         <span
-                                          style={{
-                                            display: "inline-block",
-                                            padding: "3px 10px",
-                                            borderRadius: "6px",
-                                            fontSize: "0.75rem",
-                                            fontWeight: 800,
-                                            background:
-                                              grade === "F" ? "#fee2e2" : "#dcfce7",
-                                            color: grade === "F" ? "#b91c1c" : "#15803d",
-                                          }}
+                                          className={`inline-block rounded-md px-2.5 py-0.5 text-[0.75rem] font-extrabold ${
+                                            grade === "F"
+                                              ? "bg-destructive/10 text-destructive dark:bg-destructive/20"
+                                              : "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-400"
+                                          }`}
                                         >
                                           {grade}
                                         </span>
@@ -714,27 +641,17 @@ export default function TeacherAssessmentsPage() {
                             flexWrap: "wrap",
                           }}
                         >
-                          <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>
+                          <span style={{ fontSize: "0.78rem", color: "var(--muted-foreground)" }}>
                             Leave a field empty to skip that student.
                           </span>
-                          <button
+                          <Button
                             onClick={() => saveMarks(a)}
                             disabled={isSubmittingMarks}
-                            style={{
-                              padding: "10px 22px",
-                              borderRadius: "8px",
-                              background: "#0ea5e9",
-                              color: "#fff",
-                              fontWeight: "700",
-                              fontSize: "0.85rem",
-                              border: 0,
-                              cursor: isSubmittingMarks ? "wait" : "pointer",
-                            }}
                           >
                             {isSubmittingMarks
                               ? "Saving…"
                               : `Save Marks (${filledCount})`}
-                          </button>
+                          </Button>
                         </div>
                       </>
                     )}
@@ -778,8 +695,7 @@ export default function TeacherAssessmentsPage() {
                 style={inputStyle}
               />
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-              <div>
+            <div>
                 <label style={labelStyle}>Full marks</label>
                 <input
                   type="number"
@@ -791,18 +707,8 @@ export default function TeacherAssessmentsPage() {
                   style={inputStyle}
                 />
               </div>
-              <div>
-                <label style={labelStyle}>Date</label>
-                <input
-                  type="date"
-                  value={formDate}
-                  onChange={(e) => setFormDate(e.target.value)}
-                  style={inputStyle}
-                />
-              </div>
-            </div>
             {formError && (
-              <div style={{ color: "#b91c1c", fontSize: "0.82rem" }}>{formError}</div>
+              <div className="text-[0.82rem] text-destructive">{formError}</div>
             )}
             <div
               style={{
@@ -812,41 +718,23 @@ export default function TeacherAssessmentsPage() {
                 marginTop: "4px",
               }}
             >
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => setModal(null)}
-                style={{
-                  padding: "9px 16px",
-                  borderRadius: "8px",
-                  border: "1px solid var(--line-strong)",
-                  background: "transparent",
-                  color: "var(--ink)",
-                  cursor: "pointer",
-                  fontSize: "0.85rem",
-                }}
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
                 disabled={isSavingAssessment}
-                style={{
-                  padding: "9px 20px",
-                  borderRadius: "8px",
-                  background: "#0ea5e9",
-                  color: "#fff",
-                  fontWeight: "700",
-                  fontSize: "0.85rem",
-                  border: 0,
-                  cursor: isSavingAssessment ? "wait" : "pointer",
-                }}
               >
                 {isSavingAssessment
                   ? "Saving…"
                   : modal.kind === "create"
                     ? "Create Assessment"
                     : "Save Changes"}
-              </button>
+              </Button>
             </div>
           </form>
         </AdminModal>
@@ -861,53 +749,27 @@ export default function TeacherAssessmentsPage() {
             {Number(deleteTarget.maxMarks)})?
           </p>
           {(deleteTarget._count?.results ?? 0) > 0 && (
-            <p
-              style={{
-                fontSize: "0.85rem",
-                color: "#b91c1c",
-                background: "#fef2f2",
-                border: "1px solid #fecaca",
-                borderRadius: "8px",
-                padding: "10px 12px",
-              }}
-            >
+            <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2.5 text-[0.85rem] text-destructive dark:border-destructive/40 dark:bg-destructive/20">
               This will also permanently delete {deleteTarget._count?.results} recorded student
               result(s). This cannot be undone.
             </p>
           )}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "16px" }}>
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={() => setDeleteTarget(null)}
-              style={{
-                padding: "9px 16px",
-                borderRadius: "8px",
-                border: "1px solid var(--line-strong)",
-                background: "transparent",
-                color: "var(--ink)",
-                cursor: "pointer",
-                fontSize: "0.85rem",
-              }}
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="destructive"
               onClick={doDelete}
               disabled={isDeleting}
-              style={{
-                padding: "9px 18px",
-                borderRadius: "8px",
-                background: "#dc2626",
-                color: "#fff",
-                fontWeight: "700",
-                fontSize: "0.85rem",
-                border: 0,
-                cursor: isDeleting ? "wait" : "pointer",
-              }}
             >
               {isDeleting ? "Deleting…" : "Delete"}
-            </button>
+            </Button>
           </div>
         </AdminModal>
       )}

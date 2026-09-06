@@ -16,6 +16,19 @@ import {
   type ProgramsMeta,
   type StudyMaterialDto,
 } from "@/app/lib/materials-shared";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Profile = {
   enrollmentNumber: string;
@@ -100,7 +113,6 @@ export default function StudentNotesPage() {
         setSubjects(subjectsData.subjects ?? []);
         setRecentIds(readRecentMaterialIds());
 
-        // Deep-link support: /student/notes?subjectId=... (from the Subjects hub).
         const subjectParam = new URLSearchParams(window.location.search).get("subjectId");
         if (
           subjectParam &&
@@ -109,7 +121,6 @@ export default function StudentNotesPage() {
           setFilters({ ...EMPTY_FILTERS, subjectId: subjectParam });
           setActiveTab("ALL");
         }
-      
       } catch {
         setError("Unable to reach the server");
       } finally {
@@ -122,7 +133,6 @@ export default function StudentNotesPage() {
   const myProgramId = profile?.program?.id ?? null;
   const mySemester = profile?.currentSemester ?? null;
 
-  /** Subject ids of the student's current program + semester. */
   const mySubjectIds = useMemo(() => {
     if (!myProgramId || !mySemester) return new Set<string>();
     return new Set(
@@ -132,7 +142,6 @@ export default function StudentNotesPage() {
 
   function matchesMySubjects(m: StudyMaterialDto): boolean {
     if (m.subjectId && mySubjectIds.has(m.subjectId)) return true;
-    // Curriculum-agnostic material still relevant to the student's semester.
     if (!m.subjectId && m.programId && m.programId === myProgramId && m.semester != null) {
       return m.semester === mySemester;
     }
@@ -187,7 +196,6 @@ export default function StudentNotesPage() {
 
   async function toggleBookmark(id: string) {
     const previous = materials.find((m) => m.id === id)?.bookmarked ?? false;
-    // Optimistic flip
     setMaterials((list) =>
       list.map((m) =>
         m.id === id
@@ -208,11 +216,9 @@ export default function StudentNotesPage() {
         ),
       );
     } catch {
-      // Revert optimistic update on failure
       setMaterials((list) => list.map((m) => (m.id === id ? { ...m, bookmarked: previous } : m)));
     }
   }
-
 
   function openDetails(m: StudyMaterialDto) {
     rememberRecentMaterial(m.id);
@@ -236,13 +242,26 @@ export default function StudentNotesPage() {
       ...EMPTY_FILTERS,
       ...f,
       [key]: value,
-      // reset dependent cascades
       ...(key === "programId" ? { subjectId: "" } : {}),
     }));
   }
 
-  if (error) return <main className="profile-error">{error}</main>;
-  if (loading || !profile) return <main className="profile-loading">Loading study materials…</main>;
+  if (error) {
+    return (
+      <StudentShell title="Notes & Study Material" active="/student/notes">
+        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </p>
+      </StudentShell>
+    );
+  }
+  if (loading || !profile) {
+    return (
+      <StudentShell title="Notes & Study Material" active="/student/notes">
+        <Skeleton className="h-48 w-full" />
+      </StudentShell>
+    );
+  }
 
   const fullName = `${profile.user.firstName} ${profile.user.lastName}`;
   const studentId = profile.rollNumber || profile.enrollmentNumber;
@@ -263,187 +282,207 @@ export default function StudentNotesPage() {
       title="Notes & Study Material"
       subtitle="College Study Library"
     >
-      <section className="admin-metric-grid" style={{ marginBottom: "24px" }}>
-        <article className="admin-metric-card">
-          <span>Available Materials</span>
-          <strong>{materials.length}</strong>
-          <small>Visible across the college</small>
-        </article>
-        <article className="admin-metric-card">
-          <span>For My Subjects</span>
-          <strong>{materials.filter(matchesMySubjects).length}</strong>
-          <small>
-            {profile.program ? `${profile.program.code}${mySemester ? ` · Semester ${mySemester}` : ""}` : "Set your program"}
-          </small>
-        </article>
-        <article className="admin-metric-card">
-          <span>Bookmarked</span>
-          <strong>{materials.filter((m) => m.bookmarked).length}</strong>
-          <small>Saved for quick access</small>
-        </article>
-      </section>
-
-      <div className="notes-toolbar">
-        <div className="notes-search">
-          <input
-            type="search"
-            value={filters.q}
-            onChange={(e) => updateFilter("q", e.target.value)}
-            placeholder="Search by title, subject, topic…"
-            aria-label="Search study materials"
-          />
+      <div className="flex flex-col gap-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Card>
+            <CardContent className="p-5">
+              <p className="text-xs font-medium text-muted-foreground">Available Materials</p>
+              <p className="mt-1 text-3xl font-bold">{materials.length}</p>
+              <small className="text-xs text-muted-foreground">Visible across the college</small>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-5">
+              <p className="text-xs font-medium text-muted-foreground">For My Subjects</p>
+              <p className="mt-1 text-3xl font-bold">{materials.filter(matchesMySubjects).length}</p>
+              <small className="text-xs text-muted-foreground">
+                {profile.program ? `${profile.program.code}${mySemester ? ` · Semester ${mySemester}` : ""}` : "Set your program"}
+              </small>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-5">
+              <p className="text-xs font-medium text-muted-foreground">Bookmarked</p>
+              <p className="mt-1 text-3xl font-bold">{materials.filter((m) => m.bookmarked).length}</p>
+              <small className="text-xs text-muted-foreground">Saved for quick access</small>
+            </CardContent>
+          </Card>
         </div>
 
-        <div className="notes-tabs" role="tablist" aria-label="Material tabs">
-          {TABS.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab.key}
-              className={`notes-tab${activeTab === tab.key ? " active" : ""}`}
-              onClick={() => setActiveTab(tab.key)}
-            >
-              {tab.label}
-              {tab.key === "BOOKMARKED" && materials.some((m) => m.bookmarked) && (
-                <span className="notes-tab-count">{materials.filter((m) => m.bookmarked).length}</span>
-              )}
-            </button>
-          ))}
+        <Card>
+          <CardContent className="flex flex-col gap-4 p-4">
+            <div className="relative min-w-0">
+              <Input
+                type="search"
+                value={filters.q}
+                onChange={(e) => updateFilter("q", e.target.value)}
+                placeholder="Search by title, subject, topic…"
+                aria-label="Search study materials"
+              />
+            </div>
+
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)}>
+              <TabsList className="flex w-full flex-wrap sm:w-auto">
+                {TABS.map((tab) => (
+                  <TabsTrigger key={tab.key} value={tab.key}>
+                    {tab.label}
+                    {tab.key === "BOOKMARKED" && materials.some((m) => m.bookmarked) && (
+                      <span className="ml-1 rounded-full bg-muted px-1.5 text-xs">
+                        {materials.filter((m) => m.bookmarked).length}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+
+            {activeTab === "MY_SUBJECTS" && (
+              <p className="text-sm text-muted-foreground">
+                Showing materials automatically matched to{" "}
+                <strong className="text-foreground">
+                  {profile.program?.name ?? "your program"}
+                  {mySemester ? ` · Semester ${mySemester}` : ""}
+                </strong>
+                . Switch to <em>All Materials</em> to discover notes beyond your curriculum.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={filters.programId || undefined} onValueChange={(value) => updateFilter("programId", value)}>
+            <SelectTrigger className="w-full sm:w-48" aria-label="Program filter">
+              <SelectValue placeholder="All Programs" />
+            </SelectTrigger>
+            <SelectContent>
+              {myProgramFilteredPrograms.map((p) => (
+                <SelectItem key={p.id} value={p.id}>{p.code} — {p.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={filters.semester || undefined} onValueChange={(value) => updateFilter("semester", value)}>
+            <SelectTrigger className="w-full sm:w-40" aria-label="Semester filter">
+              <SelectValue placeholder="All Semesters" />
+            </SelectTrigger>
+            <SelectContent>
+              {[...new Set(materials.map((m) => m.semester).filter((s): s is number => s != null))]
+                .sort((a, b) => a - b)
+                .map((s) => (
+                  <SelectItem key={s} value={String(s)}>Semester {s}</SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={filters.subjectId || undefined} onValueChange={(value) => updateFilter("subjectId", value)}>
+            <SelectTrigger className="w-full sm:w-48" aria-label="Subject filter">
+              <SelectValue placeholder="All Subjects" />
+            </SelectTrigger>
+            <SelectContent>
+              {subjectOptions.map((s) => (
+                <SelectItem key={s.id} value={s.id}>{s.code} — {s.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={filters.type || undefined} onValueChange={(value) => updateFilter("type", value)}>
+            <SelectTrigger className="w-full sm:w-40" aria-label="Material type filter">
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              {MATERIAL_TYPES.map((t) => (
+                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={filters.uploaderId || undefined} onValueChange={(value) => updateFilter("uploaderId", value)}>
+            <SelectTrigger className="w-full sm:w-44" aria-label="Teacher filter">
+              <SelectValue placeholder="All Teachers" />
+            </SelectTrigger>
+            <SelectContent>
+              {meta.teachers.map((t) => (
+                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {activeFiltersCount > 0 && (
+            <Button type="button" variant="ghost" onClick={() => setFilters({ ...EMPTY_FILTERS })}>
+              Reset ({activeFiltersCount})
+            </Button>
+          )}
         </div>
 
-        {activeTab === "MY_SUBJECTS" && (
-          <p className="notes-tab-hint">
-            Showing materials automatically matched to{" "}
-            <strong>
-              {profile.program?.name ?? "your program"}
-              {mySemester ? ` · Semester ${mySemester}` : ""}
-            </strong>
-            . Switch to <em>All Materials</em> to discover notes beyond your curriculum.
-          </p>
-        )}
-      </div>
+        <p className="text-sm text-muted-foreground">
+          Showing <strong className="text-foreground">{filtered.length}</strong> of {materials.length} materials
+        </p>
 
-      <div className="notes-filter-row">
-        <select value={filters.programId} onChange={(e) => updateFilter("programId", e.target.value)} aria-label="Program filter">
-          <option value="">All Programs</option>
-          {myProgramFilteredPrograms.map((p) => (
-            <option key={p.id} value={p.id}>{p.code} — {p.name}</option>
-          ))}
-        </select>
-
-        <select value={filters.semester} onChange={(e) => updateFilter("semester", e.target.value)} aria-label="Semester filter">
-          <option value="">All Semesters</option>
-          {[...new Set(materials.map((m) => m.semester).filter((s): s is number => s != null))]
-            .sort((a, b) => a - b)
-            .map((s) => (
-              <option key={s} value={String(s)}>Semester {s}</option>
+        {filtered.length === 0 ? (
+          <div className="rounded-md border bg-muted/40 px-4 py-12 text-center">
+            <h3 className="mb-1 text-sm font-semibold">
+              {activeTab === "MY_SUBJECTS" ? "No materials matched to your subjects yet" : "Nothing here yet"}
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              {activeTab === "MY_SUBJECTS"
+                ? "Teachers haven't published material for your current program/semester so far. Browse All Materials to explore the full library."
+                : activeTab === "RECENT"
+                  ? "Materials you open or download will appear here."
+                  : activeTab === "BOOKMARKED"
+                    ? "Bookmark materials with the star button to keep them one click away."
+                    : "Try adjusting your search or filters."}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((m) => (
+              <MaterialCard
+                key={m.id}
+                material={m}
+                onToggleBookmark={toggleBookmark}
+                onOpenDetails={openDetails}
+              />
             ))}
-        </select>
-
-        <select value={filters.subjectId} onChange={(e) => updateFilter("subjectId", e.target.value)} aria-label="Subject filter">
-          <option value="">All Subjects</option>
-          {subjectOptions.map((s) => (
-            <option key={s.id} value={s.id}>{s.code} — {s.name}</option>
-          ))}
-        </select>
-
-        <select value={filters.type} onChange={(e) => updateFilter("type", e.target.value)} aria-label="Material type filter">
-          <option value="">All Types</option>
-          {MATERIAL_TYPES.map((t) => (
-            <option key={t.value} value={t.value}>{t.label}</option>
-          ))}
-        </select>
-
-        <select value={filters.uploaderId} onChange={(e) => updateFilter("uploaderId", e.target.value)} aria-label="Teacher filter">
-          <option value="">All Teachers</option>
-          {meta.teachers.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
-
-        <input
-          type="text"
-          value={filters.topic}
-          onChange={(e) => updateFilter("topic", e.target.value)}
-          placeholder="Topic"
-          className="notes-topic-input"
-          aria-label="Topic filter"
-        />
-
-        {activeFiltersCount > 0 && (
-          <button type="button" className="btn-ghost" onClick={() => setFilters({ ...EMPTY_FILTERS })}>
-            Reset ({activeFiltersCount})
-          </button>
+          </div>
         )}
       </div>
-
-      <p className="notes-results-count">
-        Showing <strong>{filtered.length}</strong> of {materials.length} materials
-      </p>
-
-      {filtered.length === 0 ? (
-        <div className="profile-info-card notes-empty">
-          <h3>{activeTab === "MY_SUBJECTS" ? "No materials matched to your subjects yet" : "Nothing here yet"}</h3>
-          <p>
-            {activeTab === "MY_SUBJECTS"
-              ? "Teachers haven't published material for your current program/semester so far. Browse All Materials to explore the full library."
-              : activeTab === "RECENT"
-                ? "Materials you open or download will appear here."
-                : activeTab === "BOOKMARKED"
-                  ? "Bookmark materials with the star button to keep them one click away."
-                  : "Try adjusting your search or filters."}
-          </p>
-        </div>
-      ) : (
-        <div className="notes-grid">
-          {filtered.map((m) => (
-            <MaterialCard
-              key={m.id}
-              material={m}
-              onToggleBookmark={toggleBookmark}
-              onOpenDetails={openDetails}
-            />
-          ))}
-        </div>
-      )}
 
       {details && (
         <AdminModal title="Study Material" onClose={() => setDetails(null)}>
-          <div className="note-details">
-            <div className="note-card-chips" style={{ marginBottom: "10px" }}>
-              <span className="type-pill">{materialTypeLabel(details.materialType)}</span>
-              {details.subject && <span className="chip chip-sky">{details.subject.code}</span>}
-              {details.topic && <span className="chip">{details.topic}</span>}
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap gap-1.5">
+              <Badge variant="outline">{materialTypeLabel(details.materialType)}</Badge>
+              {details.subject && <Badge variant="secondary">{details.subject.code}</Badge>}
+              {details.topic && <Badge variant="outline">{details.topic}</Badge>}
             </div>
-            <h3 style={{ margin: "0 0 8px", fontSize: "1.15rem" }}>{details.title}</h3>
-            {details.description && <p className="note-details-desc">{details.description}</p>}
-            <dl className="note-details-grid">
-              <dt>Subject</dt>
+            <h3 className="text-lg font-semibold">{details.title}</h3>
+            {details.description && <p className="text-sm text-muted-foreground">{details.description}</p>}
+            <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+              <dt className="text-muted-foreground">Subject</dt>
               <dd>{details.subject ? details.subject.name : "General"}</dd>
-              <dt>Teacher</dt>
+              <dt className="text-muted-foreground">Teacher</dt>
               <dd>{details.uploader.name}</dd>
-              <dt>Department / Program</dt>
+              <dt className="text-muted-foreground">Department / Program</dt>
               <dd>
                 {details.departmentName ?? "—"}
                 {details.program ? ` · ${details.program.name}` : ""}
               </dd>
-              <dt>Semester</dt>
+              <dt className="text-muted-foreground">Semester</dt>
               <dd>{details.semester ?? "—"}</dd>
-              <dt>Visibility</dt>
+              <dt className="text-muted-foreground">Visibility</dt>
               <dd>{VISIBILITY_LABELS[details.visibility] ?? details.visibility}</dd>
-              <dt>File</dt>
+              <dt className="text-muted-foreground">File</dt>
               <dd>{details.fileName} ({formatBytes(details.fileSize)})</dd>
-              <dt>Uploaded</dt>
+              <dt className="text-muted-foreground">Uploaded</dt>
               <dd>{formatDate(details.createdAt)}</dd>
             </dl>
-            <div className="modal-actions">
-              <button className="btn-primary" type="button" onClick={() => downloadMaterial(details.id)}>
-                Download
-              </button>
-              <button className="btn-ghost" type="button" onClick={() => setDetails(null)}>
+            <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
+              <Button variant="ghost" type="button" onClick={() => setDetails(null)}>
                 Close
-              </button>
+              </Button>
+              <Button type="button" onClick={() => downloadMaterial(details.id)}>
+                Download
+              </Button>
             </div>
           </div>
         </AdminModal>
@@ -451,8 +490,3 @@ export default function StudentNotesPage() {
     </StudentShell>
   );
 }
-
-
-
-
-

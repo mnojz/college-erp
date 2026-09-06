@@ -1,17 +1,18 @@
 "use client";
+import { Button } from "@/components/ui/button";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { AdminModal } from "@/app/components/admin/AdminModal";
+import { Skeleton } from "@/components/ui/skeleton";
 import { SyllabusForm, type SyllabusSubmitValues } from "@/app/components/syllabi/SyllabusForm";
 import { SyllabusToolbar } from "@/app/components/syllabi/SyllabusToolbar";
+import { useSyllabusProgramGroups } from "@/app/components/syllabi/SyllabusGroupedList";
+import { SyllabusProgramSections } from "@/app/components/syllabi/SyllabusProgramSections";
 import {
-  useSyllabusGroups,
-  type GroupedByDepartment,
-} from "@/app/components/syllabi/SyllabusGroupedList";
-import { SyllabusGroupedView } from "@/app/components/syllabi/SyllabusGroupedView";
-import {
+  formatBytes,
+  MAX_SYLLABUS_BYTES,
   resolveTitle,
   type ProgramsMeta,
   type SyllabusDto,
@@ -32,6 +33,9 @@ export default function AdminSyllabiPage() {
 
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createPreset, setCreatePreset] = useState<Partial<SyllabusSubmitValues> | undefined>(
+    undefined,
+  );
   const [editing, setEditing] = useState<Syllabus | null>(null);
   const [deleting, setDeleting] = useState<Syllabus | null>(null);
 
@@ -43,6 +47,11 @@ export default function AdminSyllabiPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [message, setMessage] = useState("");
+  /** Empty slot currently receiving a direct drop-upload (drives the slot spinner). */
+  const [uploadingSlot, setUploadingSlot] = useState<{
+    programId: string | null;
+    semester: number;
+  } | null>(null);
 
   async function refresh() {
     const [listRes, metaRes] = await Promise.all([
@@ -100,7 +109,7 @@ export default function AdminSyllabiPage() {
     });
   }, [syllabi, q, filterProgram, filterSemester]);
 
-  const groups: GroupedByDepartment[] = useSyllabusGroups(filtered, meta.programs);
+  const groups = useSyllabusProgramGroups(filtered, meta.programs);
 
   async function handleCreate(values: SyllabusSubmitValues) {
     setFormError("");
@@ -122,6 +131,7 @@ export default function AdminSyllabiPage() {
       // previously crashed grouping and produced undefined React keys).
       await refresh();
       setShowCreateModal(false);
+      setCreatePreset(undefined);
       setMessage("Syllabus uploaded successfully.");
     } catch (err) {
       setFormError((err as Error).message ?? "Unable to upload syllabus");
@@ -180,6 +190,59 @@ export default function AdminSyllabiPage() {
     setFilterSemester("");
   }
 
+  /** Open the upload modal, optionally pre-filled from an empty semester slot. */
+  function openCreate(preset?: Partial<SyllabusSubmitValues>) {
+    setFormError("");
+    setCreatePreset(preset);
+    setShowCreateModal(true);
+  }
+
+  /** Empty semester slot: click opens a pre-filled modal; dropping a PDF uploads it directly. */
+  function handleSlotAdd(programId: string | null, semester: number, file?: File) {
+    if (!file) {
+      openCreate({ programId: programId ?? "", semester: String(semester) });
+      return;
+    }
+    void uploadSlotFile(programId, semester, file);
+  }
+
+  /** Direct-to-slot upload used when a PDF is dropped onto an empty semester slot. */
+  async function uploadSlotFile(programId: string | null, semester: number, file: File) {
+    setMessage("");
+    setError("");
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      setError("Only PDF files can be uploaded as syllabus.");
+      return;
+    }
+    if (file.size > MAX_SYLLABUS_BYTES) {
+      setError(`That file is too large — the maximum size is ${formatBytes(MAX_SYLLABUS_BYTES)}.`);
+      return;
+    }
+    setSaving(true);
+    setUploadingSlot({ programId, semester });
+    try {
+      const fd = new FormData();
+      // Title intentionally omitted (optional server-side): the library falls
+      // back to the file name until an admin edits the entry.
+      fd.append("departmentName", meta.departments[0] ?? "");
+      fd.append("programId", programId ?? "");
+      fd.append("semester", String(semester));
+      fd.append("file", file);
+
+      const res = await fetch("/api/syllabus", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Unable to upload syllabus");
+      await refresh();
+      setMessage("Syllabus uploaded successfully.");
+    } catch (err) {
+      setError((err as Error).message ?? "Unable to upload syllabus");
+    } finally {
+      setSaving(false);
+      setUploadingSlot(null);
+    }
+  }
+
   if (loading) {
     return (
       <AdminShell
@@ -187,7 +250,8 @@ export default function AdminSyllabiPage() {
         subtitle="Program syllabus library"
         active="/admin/syllabus"
       >
-        <p>Loading…</p>
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-64 w-full" />
       </AdminShell>
     );
   }
@@ -200,46 +264,27 @@ export default function AdminSyllabiPage() {
     >
       <div>
         {/* Top bar */}
-        <div className="admin-topbar">
-          <p style={{ margin: 0, color: "var(--ink-soft)", fontSize: 13, fontFamily: "Arial, sans-serif" }}>
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+          <p className="m-0 text-[13px] text-muted-foreground">
             {`${syllabi.length} syllabus file${syllabi.length !== 1 ? "s" : ""} registered`}
           </p>
-          <div className="admin-topbar-actions">
-            <button
+          <div className="flex flex-wrap gap-2.5">
+            <Button
               type="button"
-              className="btn-add"
-              onClick={() => {
-                setFormError("");
-                setShowCreateModal(true);
-              }}
+              size="sm"
+              onClick={() => openCreate()}
             >
               <IconPlus size={15} aria-hidden="true" />
               Upload Syllabus
-            </button>
+            </Button>
           </div>
         </div>
 
-        {message && <p className="notes-success-banner">{message}</p>}
-        {error && <p className="notes-form-error">{error}</p>}
-
-        {/* Metrics */}
-        <section className="admin-metric-grid" style={{ marginBottom: "24px" }}>
-          <div className="admin-metric-card">
-            <span>Total Syllabus</span>
-            <strong>{syllabi.length}</strong>
-          </div>
-          <div className="admin-metric-card">
-            <span>Programs</span>
-            <strong>{new Set(syllabi.map((s) => s.programId).filter(Boolean)).size}</strong>
-          </div>
-          <div className="admin-metric-card">
-            <span>Showing</span>
-            <strong>{filtered.length}</strong>
-          </div>
-        </section>
+        {message && <p className="mb-4 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2.5 text-[13px] text-emerald-600 dark:text-emerald-400">{message}</p>}
+        {error && <p className="mb-4 rounded-lg border border-destructive/20 bg-destructive/10 px-3.5 py-2.5 text-[13px] font-medium text-destructive">{error}</p>}
 
         {/* Search + filters */}
-        <div style={{ marginBottom: "16px" }}>
+        <div className="mb-5">
           <SyllabusToolbar
             q={q}
             filterProgram={filterProgram}
@@ -254,41 +299,50 @@ export default function AdminSyllabiPage() {
           />
         </div>
 
-        {/* Grouped list */}
-        <SyllabusGroupedView
-          groups={groups}
-          onEdit={(s) => setEditing(s)}
-          onDelete={(s) => setDeleting(s)}
-        />
-
-        {filtered.length === 0 && !error && (
-          <div className="profile-info-card notes-empty">
-            <h3>No syllabus found</h3>
-            <p>
-              {syllabi.length === 0
-                ? "No syllabus files have been uploaded yet. Click \u201cUpload Syllabus\u201d to get started."
-                : "No syllabus files match the selected filters. Try adjusting your search or filters."}
-            </p>
-          </div>
+        {/* Program sections — one card per program, shared with student/public views */}
+        {filtered.length > 0 ? (
+          <SyllabusProgramSections
+            variant="admin"
+            groups={groups}
+            onEdit={setEditing}
+            onDelete={setDeleting}
+            onAdd={handleSlotAdd}
+            uploading={uploadingSlot}
+          />
+        ) : (
+          !error && (
+            <div className="rounded-xl border border-dashed bg-card px-8 py-12 text-center">
+              <h3 className="mb-2 text-base font-semibold">No syllabus found</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {syllabi.length === 0
+                  ? "No syllabus files have been uploaded yet. Click “Upload Syllabus” to get started."
+                  : "No syllabus files match the selected filters. Try adjusting your search or filters."}
+              </p>
+            </div>
+          )
         )}
 
         {/* Create modal */}
         {showCreateModal && (
-          <AdminModal title="Upload Syllabus" onClose={() => setShowCreateModal(false)}>
+          <AdminModal title="Upload Syllabus" wide onClose={() => setShowCreateModal(false)}>
             <SyllabusForm
               mode="create"
               meta={meta}
+              initial={createPreset}
               submitting={saving}
               error={formError}
               onSubmit={handleCreate}
-              onCancel={() => setShowCreateModal(false)}
+              onCancel={() => {
+                setShowCreateModal(false);
+                setCreatePreset(undefined);
+              }}
             />
           </AdminModal>
         )}
 
         {/* Edit modal */}
         {editing && (
-          <AdminModal title="Edit Syllabus" onClose={() => setEditing(null)}>
+          <AdminModal title="Edit Syllabus" wide onClose={() => setEditing(null)}>
             <SyllabusForm
               mode="edit"
               meta={meta}
@@ -308,47 +362,36 @@ export default function AdminSyllabiPage() {
         {/* Delete confirmation */}
         {deleting && (
           <AdminModal title="Delete Syllabus" onClose={() => setDeleting(null)}>
-            <div className="modal-confirm-box">
+            <div className="grid gap-3 text-sm text-muted-foreground">
               <p>
                 Are you sure you want to delete <strong>&ldquo;{resolveTitle(deleting)}&rdquo;</strong>?
               </p>
-              <p
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  fontSize: "13px",
-                  color: "#dc2626",
-                  background: "rgba(220, 38, 38, 0.08)",
-                  padding: "10px 14px",
-                  borderRadius: "8px",
-                }}
-              >
+              <p className="flex items-center gap-2 rounded-lg border border-destructive/25 bg-destructive/10 px-3.5 py-2.5 text-[13px] font-medium text-destructive dark:border-destructive/40 dark:bg-destructive/20">
                 <IconAlertTriangle size={16} aria-hidden="true" />
                 This PDF will be immediately removed and no longer downloadable by students.
               </p>
               {formError && (
-                <p style={{ margin: "12px 0 0", fontSize: 13, color: "#b91c1c" }}>
+                <p className="mt-1 text-[13px] text-destructive">
                   {formError}
                 </p>
               )}
-              <div className="modal-actions" style={{ marginTop: "20px" }}>
-                <button
-                  className="btn-danger"
+              <div className="mt-5 flex flex-wrap justify-end gap-2.5">
+                <Button
+                  variant="destructive"
                   type="button"
                   onClick={handleDelete}
                   disabled={saving}
                 >
                   {saving ? "Deleting…" : "Yes, Delete"}
-                </button>
-                <button
-                  className="btn-ghost"
+                </Button>
+                <Button
+                  variant="outline"
                   type="button"
                   onClick={() => setDeleting(null)}
                   disabled={saving}
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           </AdminModal>

@@ -4,12 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { StudentShell } from "@/app/components/student/StudentShell";
 import { SyllabusToolbar } from "@/app/components/syllabi/SyllabusToolbar";
-import {
-  useSyllabusGroups,
-  type GroupedByDepartment,
-} from "@/app/components/syllabi/SyllabusGroupedList";
-import { SyllabusPublicGroupedView } from "@/app/components/syllabi/SyllabusPublicGroupedView";
+import { useSyllabusProgramGroups } from "@/app/components/syllabi/SyllabusGroupedList";
+import { SyllabusProgramSections } from "@/app/components/syllabi/SyllabusProgramSections";
 import { type ProgramsMeta, type SyllabusDto } from "@/app/lib/syllabi-shared";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Syllabus = SyllabusDto;
 
@@ -76,7 +74,7 @@ export default function StudentSyllabiPage() {
     });
   }, [syllabi, q, filterProgram, filterSemester]);
 
-  const groups: GroupedByDepartment[] = useSyllabusGroups(filtered, meta.programs);
+  const groups = useSyllabusProgramGroups(filtered, meta.programs);
 
   function resetFilters() {
     setQ("");
@@ -87,19 +85,24 @@ export default function StudentSyllabiPage() {
   if (loading) {
     return (
       <StudentShell title="Syllabus" active="/student/syllabus">
-        <p>Loading…</p>
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-72 w-full" />
+        </div>
       </StudentShell>
     );
   }
 
   return (
     <StudentShell title="Syllabus" active="/student/syllabus">
-      <div>
-        {error && <p className="notes-form-error">{error}</p>}
+      <div className="flex flex-col gap-4">
+        {error && (
+          <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error}
+          </p>
+        )}
 
-        <h2 style={{ margin: "0 0 4px", fontSize: "18px", fontWeight: 700 }}>
-          Syllabus Library
-        </h2>
+        <h2 className="text-lg font-semibold tracking-tight">Syllabus Library</h2>
 
         <SyllabusToolbar
           q={q}
@@ -114,12 +117,12 @@ export default function StudentSyllabiPage() {
           onReset={resetFilters}
         />
 
-        <SyllabusPublicGroupedView groups={groups} />
+        <SyllabusProgramSections variant="public" groups={groups} />
 
         {filtered.length === 0 && !error && (
-          <div className="profile-info-card notes-empty">
-            <h3>No syllabus found</h3>
-            <p>
+          <div className="rounded-md border bg-muted/40 px-4 py-10 text-center">
+            <h3 className="mb-1 text-sm font-semibold">No syllabus found</h3>
+            <p className="text-sm text-muted-foreground">
               {syllabi.length === 0
                 ? "No syllabus files are currently available."
                 : "No syllabus files match the selected filters. Try adjusting your search or filters."}

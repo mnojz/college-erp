@@ -2,57 +2,46 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { IconChevronDown, IconLogout, IconSchool, IconUser } from "@tabler/icons-react";
+import type { ReactNode } from "react";
+import { LogOut, User } from "lucide-react";
 import { ThemeToggle } from "@/app/components/common/ThemeToggle";
 import { NotificationDropdown } from "@/app/components/common/NotificationDropdown";
+import { Logo } from "@/app/components/common/Logo";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export type DashboardNavProps = {
   brandTitle?: string;
   brandSubtitle?: string;
   brandHomeHref?: string;
-  brandIconBg?: string;
   userName?: string;
-    userSubtitle?: string;
-    avatarUrl?: string | null;
+  userSubtitle?: string;
+  avatarUrl?: string | null;
   /** Where the "View profile" menu item links to. */
   profileHref?: string;
   onLogout?: () => void;
+  /** Slot used by DashboardShell to render the mobile sidebar toggle. */
+  menuButton?: ReactNode;
 };
 
 export function DashboardNav({
   brandTitle = "College-ERP",
   brandSubtitle = "Academic Terminal",
   brandHomeHref = "/",
-  brandIconBg = "#0284c7",
   userName = "User",
   userSubtitle = "Sign out",
-    avatarUrl,
+  avatarUrl,
   profileHref = "/profile",
   onLogout,
+  menuButton,
 }: DashboardNavProps) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close the dropdown when clicking outside it or pressing Escape.
-  useEffect(() => {
-    if (!open) return undefined;
-    function onPointer(event: PointerEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("pointerdown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
 
   async function handleLogout() {
     if (onLogout) {
@@ -63,100 +52,77 @@ export function DashboardNav({
     router.replace("/");
   }
 
-  const initials = userName
-    .trim()
-    .split(/\s+/)
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase() || "US";
+  const initials =
+    userName
+      .trim()
+      .split(/\s+/)
+      .map((n) => n[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "US";
 
   return (
-    <header className="student-nav">
-      <Link href={brandHomeHref} className="home-nav-brand">
-        <span
-          className="home-brand-icon"
-          style={{ width: 38, height: 38, borderRadius: "10px", background: brandIconBg }}
+    <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80">
+      <div className="mx-auto flex h-14 w-full max-w-7xl items-center gap-2 px-4 sm:h-16 sm:px-6 lg:px-8">
+        {menuButton}
+
+        <Link
+          href={brandHomeHref}
+          className="flex min-w-0 items-center gap-2.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <IconSchool size={22} />
-        </span>
-        <div className="home-brand-text">
-          <strong>{brandTitle}</strong>
-          <small>{brandSubtitle}</small>
-        </div>
-      </Link>
+          <Logo className="size-8 text-foreground" />
+          <span className="flex min-w-0 flex-col leading-tight">
+            <strong className="truncate text-sm font-semibold">{brandTitle}</strong>
+            <small className="hidden truncate text-xs text-muted-foreground sm:block">
+              {brandSubtitle}
+            </small>
+          </span>
+        </Link>
 
-      <div className="student-nav-actions">
-        {/* Theme Switcher — single toggle */}
-        <ThemeToggle />
+        <div className="ml-auto flex items-center gap-1 sm:gap-1.5">
+          <ThemeToggle />
+          <NotificationDropdown />
 
-        {/* Notifications (bell icon + dropdown) */}
-        <NotificationDropdown />
-
-                {/* User Account — dropdown with profile + logout */}
-        <div ref={dropdownRef} className="student-nav-user-wrap">
-          <button
-            className="student-user-trigger"
-            type="button"
-            onClick={() => setOpen((value) => !value)}
-            aria-haspopup="menu"
-            aria-expanded={open}
-            aria-label="Open user menu"
-          >
-            <span>
-              <strong>{userName}</strong>
-              <small>{userSubtitle}</small>
-            </span>
-            <IconChevronDown size={14} aria-hidden="true" />
-            {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt=""
-                width={34}
-                height={34}
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: "50%",
-                  objectFit: "cover",
-                  flexShrink: 0,
-                }}
-              />
-            ) : (
-              <span
-                className="nav-avatar-fallback"
-                style={{ background: brandIconBg }}
+          <div className="ml-4 sm:ml-6">
+            <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="h-9 gap-2 px-1.5 sm:px-2"
+                aria-label="Open user menu"
               >
-                {initials}
-              </span>
-            )}
-          </button>
-
-          {open && (
-            <div className="user-dropdown" role="menu" aria-orientation="vertical">
-              <Link
-                href={profileHref}
-                className="user-dropdown-item"
-                role="menuitem"
-                onClick={() => setOpen(false)}
-              >
-                <IconUser size={14} aria-hidden="true" />
-                View profile
-              </Link>
-              <button
-                type="button"
-                className="user-dropdown-item"
-                role="menuitem"
-                onClick={() => {
-                  setOpen(false);
+                <span className="hidden flex-col items-end leading-tight sm:flex">
+                  <strong className="max-w-40 truncate text-xs font-semibold">{userName}</strong>
+                  <small className="max-w-40 truncate text-[10px] text-muted-foreground">
+                    {userSubtitle}
+                  </small>
+                </span>
+                <Avatar>
+                  {avatarUrl ? <AvatarImage src={avatarUrl} alt={userName} /> : null}
+                  <AvatarFallback className="bg-primary/10 font-semibold">{initials}</AvatarFallback>
+                </Avatar>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-44">
+              <DropdownMenuItem asChild>
+                <Link href={profileHref} className="gap-2">
+                  <User className="size-4" aria-hidden="true" />
+                  View profile
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                variant="destructive"
+                className="gap-2"
+                onSelect={() => {
                   handleLogout();
                 }}
               >
-                <IconLogout size={14} aria-hidden="true" />
+                <LogOut className="size-4" aria-hidden="true" />
                 Log out
-              </button>
-            </div>
-          )}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          </div>
         </div>
       </div>
     </header>

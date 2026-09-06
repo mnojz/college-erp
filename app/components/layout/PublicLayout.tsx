@@ -3,8 +3,21 @@
 import Link from "next/link";
 import { useState, FormEvent, createContext, useContext } from "react";
 import { useRouter } from "next/navigation";
+import { Logo } from "@/app/components/common/Logo";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { PublicNavbar } from "./PublicNavbar";
 import { useTheme } from "@/app/lib/useTheme";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type PublicLayoutContextValue = {
   openLogin: () => void;
@@ -70,111 +83,142 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <PublicLayoutContext.Provider value={{ openLogin }}>
-      <div className="home-modern-root">
+      <div className="flex min-h-screen flex-col bg-background text-foreground">
         <PublicNavbar onSignInClick={openLogin} />
 
-        <main>{children}</main>
+        <main className="flex-1">{children}</main>
 
         {/* Footer */}
-        <footer className="home-modern-footer">
-          <div className="home-footer-inner">
-            <div className="home-footer-brand">
-              <strong>College-ERP</strong>
-              <span>Far Western University</span>
+        <footer className="border-t bg-muted/40">
+          <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-8 sm:flex-row sm:px-6">
+            <div className="flex items-center gap-2.5">
+              <Logo className="size-7 text-foreground" />
+              <div className="leading-tight">
+                <strong className="block text-sm font-semibold">College-ERP</strong>
+                <span className="text-xs text-muted-foreground">Far Western University</span>
+              </div>
             </div>
-            <div className="home-footer-links">
-              <Link href="/public/course-structure">Curriculum</Link>
-              <Link href="/public/fee-structure">Fees</Link>
-              <Link href="/public/syllabus">Syllabus</Link>
-              <Link href="/public/notices">Notices</Link>
-            </div>
+            <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm" aria-label="Footer">
+              <Link href="/public/course-structure" className="text-muted-foreground transition-colors hover:text-foreground">
+                Curriculum
+              </Link>
+              <Link href="/public/fee-structure" className="text-muted-foreground transition-colors hover:text-foreground">
+                Fees
+              </Link>
+              <Link href="/public/syllabus" className="text-muted-foreground transition-colors hover:text-foreground">
+                Syllabus
+              </Link>
+              <Link href="/public/notices" className="text-muted-foreground transition-colors hover:text-foreground">
+                Notices
+              </Link>
+            </nav>
           </div>
         </footer>
 
-        {/* Login Modal */}
-        {showLoginModal && (
-        <div className="login-modal-overlay">
-          <div className="login-modal">
-            <button
-              className="login-modal-close"
-              onClick={() => setShowLoginModal(false)}
-            >
-              &times;
-            </button>
-            <h2>Sign In to College-ERP</h2>
-            <form onSubmit={handleSignIn}>
-              <div className="login-input-group">
-                <label htmlFor="email">Email</label>
-                <input
+        {/* Login dialog */}
+        <Dialog open={showLoginModal} onOpenChange={(open) => !open && setShowLoginModal(false)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Sign in to College-ERP</DialogTitle>
+              <DialogDescription>
+                Access your student, faculty, or administration dashboard.
+              </DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={handleSignIn} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
                   id="email"
                   type="email"
+                  placeholder="you@fwu.edu.np"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   disabled={loading}
                 />
               </div>
-              <div className="login-input-group">
-                <label htmlFor="password">Password</label>
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={loading}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((value) => !value)}
+                    className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-muted-foreground hover:text-foreground"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    tabIndex={-1}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="size-4" aria-hidden="true" />
+                    ) : (
+                      <Eye className="size-4" aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={remember}
+                  onCheckedChange={(checked) => setRemember(checked === true)}
                   disabled={loading}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="login-show-password"
-                >
-                  {showPassword ? "Hide" : "Show"}
-                </button>
-              </div>
-              <div className="login-options">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={remember}
-                    onChange={(e) => setRemember(e.target.checked)}
-                    disabled={loading}
-                  />
-                  Remember me
-                </label>
-              </div>
-              {error && <p className="login-error">{error}</p>}
-              <button type="submit" className="login-submit-btn" disabled={loading}>
-                {loading ? "Signing In..." : "Sign In"}
-              </button>
+                Remember me
+              </label>
+
+              {error && (
+                <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {error}
+                </p>
+              )}
+
+              <Button type="submit" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                    Signing in…
+                  </>
+                ) : (
+                  "Sign In"
+                )}
+              </Button>
             </form>
-            <div className="login-demo-accounts">
-              <p>Demo accounts:</p>
-              <button
-                type="button"
-                onClick={() => fillDemo("student@fwu.edu.np", "student1234")}
-                disabled={loading}
-              >
-                Student
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo("teacher@fwu.edu.np", "teacher1234")}
-                disabled={loading}
-              >
-                Teacher
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo("admin@fwu.edu.np", "admin1234")}
-                disabled={loading}
-              >
-                Admin
-              </button>
+
+            <div className="flex flex-col gap-2 border-t pt-4">
+              <p className="text-xs font-medium text-muted-foreground">Demo accounts:</p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: "Student", email: "student@fwu.edu.np", pass: "student1234" },
+                  { label: "Teacher", email: "teacher@fwu.edu.np", pass: "teacher1234" },
+                  { label: "Admin", email: "admin@fwu.edu.np", pass: "admin1234" },
+                ].map((demo) => (
+                  <Button
+                    key={demo.label}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={loading}
+                    onClick={() => fillDemo(demo.email, demo.pass)}
+                  >
+                    {demo.label}
+                  </Button>
+                ))}
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </DialogContent>
+        </Dialog>
       </div>
     </PublicLayoutContext.Provider>
   );

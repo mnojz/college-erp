@@ -38,7 +38,6 @@ export function AdminShell({
         brandTitle: "College-ERP",
         brandSubtitle: "Administration",
         brandHomeHref: "/dashboard",
-        brandIconBg: "#0284c7",
         userName: "Administrator",
         userSubtitle: "Sign out",
       }}

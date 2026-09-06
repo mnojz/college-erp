@@ -2,8 +2,27 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { AdminShell } from "@/app/components/admin/AdminShell";
-import { IconPlus, IconX } from "@tabler/icons-react";
+import { IconLoader2, IconPlus, IconTrash, IconX } from "@tabler/icons-react";
 
 type Program = {
   id: string;
@@ -334,105 +353,88 @@ export default function AdminCurriculumPage() {
     }
   }
 
-  const inputStyle: React.CSSProperties = {
-    padding: "8px 10px",
-    border: "1px solid var(--line)",
-    borderRadius: "8px",
-    background: "var(--input-bg)",
-    color: "var(--input-color, inherit)",
-    fontSize: "13px",
-    width: "100%",
-    boxSizing: "border-box",
-  };
-
   return (
     <AdminShell
       title="Curriculum"
       subtitle="Course Structure Management"
       active="/admin/curriculum"
     >
-      <div style={{ display: "grid", gap: "20px" }}>
+      <div className="flex flex-col gap-5">
         {/* Program selector + actions */}
-        <section
-          style={{
-            padding: "18px 20px",
-            borderRadius: "12px",
-            background: "var(--panel)",
-            border: "1px solid var(--line)",
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "14px",
-            alignItems: "flex-end",
-          }}
-        >
-          <label style={{ display: "grid", gap: "6px", minWidth: "280px", flex: 1 }}>
-            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--ink-soft)" }}>
-              Program
-            </span>
-            <select
-              value={programId}
-              onChange={(e) => setProgramId(e.target.value)}
-              style={inputStyle}
-              disabled={loading || programs.length === 0}
+        <Card>
+          <CardContent className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="grid min-w-0 flex-1 gap-1.5 sm:min-w-64">
+              <Label htmlFor="curriculum-program">Program</Label>
+              <Select
+                value={programId}
+                onValueChange={setProgramId}
+                disabled={loading || programs.length === 0}
+              >
+                <SelectTrigger id="curriculum-program" className="w-full">
+                  <SelectValue
+                    placeholder={programs.length === 0 ? "No programs" : "Select a program"}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {programs.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.code} — {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={addYear}
+              className="w-full sm:w-auto"
             >
-              {programs.length === 0 && <option value="">No programs</option>}
-              {programs.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.code} — {p.name}
-                </option>
-              ))}
-            </select>
-          </label>
+              <IconPlus size={16} aria-hidden="true" />
+              Add Year
+            </Button>
 
-          <button
-            type="button"
-            onClick={addYear}
-            style={{
-              ...inputStyle,
-              width: "auto",
-              cursor: "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            <IconPlus size={14} aria-hidden="true" />
-            Add Year
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving || loadingCurriculum}
-            style={{
-              ...inputStyle,
-              width: "auto",
-              cursor: saving ? "wait" : "pointer",
-              background: "#0284c7",
-              borderColor: "#0284c7",
-              color: "#fff",
-              fontWeight: 700,
-            }}
-          >
-            {saving ? "Saving…" : hasCurriculum ? "Save Changes" : "Publish Curriculum"}
-          </button>
-        </section>
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || loadingCurriculum}
+              className="w-full sm:w-auto"
+            >
+              {saving ? (
+                <>
+                  <IconLoader2 size={16} className="animate-spin" aria-hidden="true" />
+                  Saving…
+                </>
+              ) : hasCurriculum ? (
+                "Save Changes"
+              ) : (
+                "Publish Curriculum"
+              )}
+            </Button>
+          </CardContent>
+        </Card>
 
         {error && (
-          <p className="admin-message error" role="alert">
+          <p className="rounded-lg border border-destructive/20 bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive" role="alert">
             {error}
           </p>
         )}
         {message && (
-          <p className="admin-message" role="status">
+          <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2.5 text-[13px] text-emerald-600 dark:text-emerald-400" role="status">
             {message}
           </p>
         )}
 
-        {loadingCurriculum && <p className="cs-empty">Loading curriculum…</p>}
+        {loadingCurriculum && (
+          <div className="rounded-xl border border-dashed px-8 py-10 text-center text-sm text-muted-foreground">
+            <IconLoader2 size={20} className="mx-auto mb-2 animate-spin" aria-hidden="true" />
+            Loading curriculum…
+          </div>
+        )}
 
         {!loadingCurriculum && !hasCurriculum && !error && (
-          <div className="cs-empty">
+          <div className="rounded-xl border border-dashed px-8 py-10 text-center text-sm text-muted-foreground">
             <p>
               No curriculum published for this program yet. Add years,
               semesters and courses below, then click “Publish Curriculum”.
@@ -443,230 +445,236 @@ export default function AdminCurriculumPage() {
         {/* Years / semesters / courses editor */}
         {!loadingCurriculum &&
           draft.years.map((year, yi) => (
-            <section
-              key={`year-${yi}`}
-              style={{
-                padding: "18px 20px",
-                borderRadius: "12px",
-                background: "var(--panel)",
-                border: "1px solid var(--line)",
-                display: "grid",
-                gap: "14px",
-              }}
-            >
-              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                <input
+            <Card key={`year-${yi}`}>
+              <CardHeader className="border-b">
+                <Input
                   value={year.label}
                   onChange={(e) => updateYearLabel(yi, e.target.value)}
+                  aria-label="Year label"
                   placeholder="Year label"
-                  style={{ ...inputStyle, fontWeight: 700 }}
+                  className="font-semibold"
                 />
-                <button
-                  type="button"
-                  onClick={() => removeYear(yi)}
-                  title="Remove year"
-                  style={{ ...inputStyle, width: "auto", whiteSpace: "nowrap", color: "#dc2626" }}
-                >
-                  Remove Year
-                </button>
-              </div>
-
-              {year.semesters.map((sem, si) => {
-                const totalCredits = sem.courses.reduce(
-                  (sum, c) =>
-                    sum + (Number.isFinite(c.credits) ? c.credits : 0),
-                  0,
-                );
-                return (
-                  <div
-                    key={`sem-${yi}-${si}`}
-                    style={{
-                      border: "1px solid var(--line)",
-                      borderRadius: "10px",
-                      padding: "14px",
-                      display: "grid",
-                      gap: "10px",
-                    }}
+                <CardAction>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    title="Remove year"
+                    onClick={() => removeYear(yi)}
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                   >
-                    <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                      <input
-                        value={sem.label}
-                        onChange={(e) => updateSemesterLabel(yi, si, e.target.value)}
-                        placeholder="Semester label"
-                        style={{ ...inputStyle, maxWidth: "260px", fontWeight: 700 }}
-                      />
-                      <small style={{ color: "var(--ink-soft)", fontSize: "12px" }}>
-                        {sem.courses.length} courses · {totalCredits} cr
-                      </small>
-                      <span style={{ flex: 1 }} />
-                      <button
-                        type="button"
-                        onClick={() => addCourse(yi, si)}
-                        style={{ ...inputStyle, width: "auto", whiteSpace: "nowrap" }}
-                      >
-                        + Course
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeSemester(yi, si)}
-                        title="Remove semester"
-                        style={{ ...inputStyle, width: "auto", whiteSpace: "nowrap", color: "#dc2626" }}
-                      >
-                        Remove Semester
-                      </button>
-                    </div>
-
-                    {sem.courses.length > 0 && (
-                      <div style={{ display: "grid", gap: "8px" }}>
-                        {sem.courses.map((course, ci) => (
-                          <div
-                            key={`course-${yi}-${si}-${ci}`}
-                            style={{ display: "flex", gap: "8px", alignItems: "center" }}
+                    <IconTrash size={16} aria-hidden="true" />
+                  </Button>
+                </CardAction>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                {year.semesters.map((sem, si) => {
+                  const totalCredits = sem.courses.reduce(
+                    (sum, c) =>
+                      sum + (Number.isFinite(c.credits) ? c.credits : 0),
+                    0,
+                  );
+                  return (
+                    <div
+                      key={`sem-${yi}-${si}`}
+                      className="overflow-hidden rounded-lg border"
+                    >
+                      <div className="flex flex-col gap-2.5 border-b bg-muted/40 p-3 sm:flex-row sm:flex-wrap sm:items-center">
+                        <Input
+                          value={sem.label}
+                          onChange={(e) => updateSemesterLabel(yi, si, e.target.value)}
+                          placeholder="Semester label"
+                          aria-label="Semester label"
+                          className="font-semibold sm:max-w-56"
+                        />
+                        <Badge variant="secondary" className="w-fit">
+                          {sem.courses.length} courses · {totalCredits} cr
+                        </Badge>
+                        <div className="flex flex-1 flex-wrap items-center gap-2 sm:justify-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => addCourse(yi, si)}
                           >
-                            <input
-                              value={course.code}
-                              onChange={(e) =>
-                                updateCourse(yi, si, ci, { code: e.target.value })
-                              }
-                              placeholder="Code (optional)"
-                              style={{ ...inputStyle, maxWidth: "130px" }}
-                            />
-                            <input
-                              value={course.name}
-                              onChange={(e) =>
-                                updateCourse(yi, si, ci, { name: e.target.value })
-                              }
-                              placeholder="Course name"
-                              style={{ ...inputStyle, flex: 1 }}
-                            />
-                            <input
-                              type="number"
-                              min={0}
-                              value={Number.isFinite(course.credits) ? course.credits : ""}
-                              onChange={(e) =>
-                                updateCourse(yi, si, ci, {
-                                  credits: Number(e.target.value),
-                                })
-                              }
-                              placeholder="Cr"
-                              style={{ ...inputStyle, maxWidth: "80px" }}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removeCourse(yi, si, ci)}
-                              title="Remove course"
-                              style={{ ...inputStyle, width: "auto", color: "#dc2626" }}
-                            >
-                              <IconX size={14} strokeWidth={2.5} aria-hidden="true" />
-                            </button>
-                          </div>
-                        ))}
+                            <IconPlus size={15} aria-hidden="true" />
+                            Course
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            title="Remove semester"
+                            onClick={() => removeSemester(yi, si)}
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <IconTrash size={16} aria-hidden="true" />
+                          </Button>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
 
-              <button
-                type="button"
-                onClick={() => addSemester(yi)}
-                style={{
-                  ...inputStyle,
-                  width: "auto",
-                  justifySelf: "start",
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                <IconPlus size={14} aria-hidden="true" />
-                Add Semester
-              </button>
-            </section>
+                    <div className="flex flex-col gap-2.5 p-3">
+                        {sem.courses.length === 0 ? (
+                          <p className="py-2 text-center text-xs text-muted-foreground">
+                            No courses yet — use “Course” to add one.
+                          </p>
+                        ) : (
+                          sem.courses.map((course, ci) => (
+                            <div
+                              key={`course-${yi}-${si}-${ci}`}
+                              className="flex flex-col gap-2 sm:flex-row sm:items-center"
+                            >
+                              <Input
+                                value={course.code}
+                                onChange={(e) =>
+                                  updateCourse(yi, si, ci, { code: e.target.value })
+                                }
+                                placeholder="Code (optional)"
+                                aria-label="Course code"
+                                className="sm:max-w-36"
+                              />
+                              <Input
+                                value={course.name}
+                                onChange={(e) =>
+                                  updateCourse(yi, si, ci, { name: e.target.value })
+                                }
+                                placeholder="Course name"
+                                aria-label="Course name"
+                                className="flex-1"
+                              />
+                              <Input
+                                type="number"
+                                min={0}
+                                value={Number.isFinite(course.credits) ? course.credits : ""}
+                                onChange={(e) =>
+                                  updateCourse(yi, si, ci, {
+                                    credits: Number(e.target.value),
+                                  })
+                                }
+                                placeholder="Cr"
+                                aria-label="Credits"
+                                className="sm:max-w-24"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                title="Remove course"
+                                onClick={() => removeCourse(yi, si, ci)}
+                                className="shrink-0 self-end text-destructive hover:bg-destructive/10 hover:text-destructive sm:self-auto"
+                              >
+                                <IconX size={16} aria-hidden="true" />
+                              </Button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+              <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => addSemester(yi)}
+                  className="w-full sm:w-auto sm:self-start"
+                >
+                  <IconPlus size={15} aria-hidden="true" />
+                  Add Semester
+                </Button>
+              </CardContent>
+            </Card>
           ))}
 
         {/* Electives editor */}
         {!loadingCurriculum && (
-          <section
-            style={{
-              padding: "18px 20px",
-              borderRadius: "12px",
-              background: "var(--panel)",
-              border: "1px solid var(--line)",
-              display: "grid",
-              gap: "14px",
-            }}
-          >
-            <strong>Electives</strong>
-
-            {(["ELECTIVE_I", "ELECTIVE_II"] as const).map((group) => {
-              const items = draft.electives.filter((e) => e.group === group);
-              return (
-                <div key={group} style={{ display: "grid", gap: "8px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <strong style={{ fontSize: "13px", color: "#0284c7" }}>
-                      {group === "ELECTIVE_I" ? "Elective-I" : "Elective-II"}
-                    </strong>
-                    <span style={{ flex: 1 }} />
-                    <button
-                      type="button"
-                      onClick={() => addElective(group)}
-                      style={{ ...inputStyle, width: "auto", cursor: "pointer" }}
-                    >
-                      + Elective
-                    </button>
-                  </div>
-
-                  {items.map((item) => {
-                    const realIndex = draft.electives.indexOf(item);
-                    return (
-                      <div
-                        key={`${group}-${realIndex}`}
-                        style={{ display: "flex", gap: "8px", alignItems: "center" }}
+          <Card>
+            <CardHeader>
+              <CardTitle>Electives</CardTitle>
+              <CardDescription>
+                Open elective courses offered alongside the core curriculum.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-6">
+              {(["ELECTIVE_I", "ELECTIVE_II"] as const).map((group) => {
+                const items = draft.electives.filter((e) => e.group === group);
+                return (
+                  <div key={group} className="flex flex-col gap-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h4 className="text-sm font-semibold">
+                        {group === "ELECTIVE_I" ? "Elective I" : "Elective II"}
+                      </h4>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => addElective(group)}
                       >
-                        <input
-                          value={item.code}
-                          onChange={(e) =>
-                            updateElective(realIndex, { code: e.target.value })
-                          }
-                          placeholder="Code"
-                          style={{ ...inputStyle, maxWidth: "130px" }}
-                        />
-                        <input
-                          value={item.name}
-                          onChange={(e) =>
-                            updateElective(realIndex, { name: e.target.value })
-                          }
-                          placeholder="Elective name"
-                          style={{ ...inputStyle, flex: 1 }}
-                        />
-                        <input
-                          type="number"
-                          min={0}
-                          value={item.credits}
-                          onChange={(e) =>
-                            updateElective(realIndex, {
-                              credits: Number(e.target.value),
-                            })
-                          }
-                          style={{ ...inputStyle, maxWidth: "80px" }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeElective(realIndex)}
-                          title="Remove elective"
-                          style={{ ...inputStyle, width: "auto", color: "#dc2626" }}
-                        >
-                          <IconX size={14} strokeWidth={2.5} aria-hidden="true" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </section>
+                        <IconPlus size={15} aria-hidden="true" />
+                        Add Elective
+                      </Button>
+                    </div>
+
+                    {items.length === 0 ? (
+                      <p className="rounded-md border border-dashed px-3 py-4 text-center text-xs text-muted-foreground">
+                        No electives added yet.
+                      </p>
+                    ) : (
+                      items.map((item) => {
+                        const realIndex = draft.electives.indexOf(item);
+                        return (
+                          <div
+                            key={`${group}-${realIndex}`}
+                            className="flex flex-col gap-2 sm:flex-row sm:items-center"
+                          >
+                            <Input
+                              value={item.code}
+                              onChange={(e) =>
+                                updateElective(realIndex, { code: e.target.value })
+                              }
+                              placeholder="Code"
+                              aria-label={`${group} code`}
+                              className="sm:max-w-36"
+                            />
+                            <Input
+                              value={item.name}
+                              onChange={(e) =>
+                                updateElective(realIndex, { name: e.target.value })
+                              }
+                              placeholder="Elective name"
+                              aria-label={`${group} name`}
+                              className="flex-1"
+                            />
+                            <Input
+                              type="number"
+                              min={0}
+                              value={item.credits}
+                              onChange={(e) =>
+                                updateElective(realIndex, {
+                                  credits: Number(e.target.value),
+                                })
+                              }
+                              placeholder="Cr"
+                              aria-label={`${group} credits`}
+                              className="sm:max-w-24"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              title="Remove elective"
+                              onClick={() => removeElective(realIndex)}
+                              className="shrink-0 self-end text-destructive hover:bg-destructive/10 hover:text-destructive sm:self-auto"
+                            >
+                              <IconX size={16} aria-hidden="true" />
+                            </Button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
         )}
       </div>
     </AdminShell>

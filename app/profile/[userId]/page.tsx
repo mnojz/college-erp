@@ -43,10 +43,10 @@ function ProfileLoader({ userId }: { userId: string }) {
   }, [userId]);
 
   if (error) {
-    return <p style={{ margin: 0, fontSize: 14, color: "var(--ink-soft)" }}>{error}</p>;
+    return <p className="text-sm text-muted-foreground">{error}</p>;
   }
   if (!data) {
-    return <p style={{ color: "var(--ink-soft)", fontSize: 14 }}>Loading…</p>;
+    return <p className="text-sm text-muted-foreground">Loading…</p>;
   }
   return <ProfileView profile={data.profile} />;
 }

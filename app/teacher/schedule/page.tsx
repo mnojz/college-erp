@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "cn";
 
 type ClassSchedule = {
   id: string;
@@ -32,8 +34,6 @@ const weekDays = [
   "WEDNESDAY",
   "THURSDAY",
   "FRIDAY",
-  "SATURDAY",
-  "SUNDAY",
 ];
 
 const dayMap: Record<number, string> = {
@@ -89,14 +89,14 @@ export default function TeacherSchedulePage() {
 
   if (error) {
     return (
-      <main className="profile-error">
+      <main className="grid min-h-[40vh] place-items-center px-6 text-sm font-semibold text-destructive">
         <p>{error}</p>
       </main>
     );
   }
 
   if (loading) {
-    return <main className="profile-loading">Loading teaching schedule...</main>;
+    return <main className="grid min-h-[40vh] place-items-center text-sm text-muted-foreground">Loading teaching schedule...</main>;
   }
 
   const todayDayName = dayMap[new Date().getDay()];
@@ -115,26 +115,26 @@ export default function TeacherSchedulePage() {
       avatarUrl={teacherInfo?.profileImageUrl}
     >
       {/* Metric Cards */}
-      <section className="admin-metric-grid" style={{ marginBottom: "24px" }}>
-        <article className="admin-metric-card">
+      <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs [&>span]:text-xs [&>span]:font-semibold [&>span]:uppercase [&>span]:tracking-wide [&>span]:text-muted-foreground [&>strong]:my-1 [&>strong]:text-[34px] [&>strong]:font-bold [&>strong]:leading-none [&>strong]:tracking-tight [&>small]:text-xs [&>small]:text-muted-foreground">
           <span>Weekly Lecture Sessions</span>
           <strong>{classes.length}</strong>
           <small>Scheduled class slots</small>
         </article>
-        <article className="admin-metric-card">
+        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs [&>span]:text-xs [&>span]:font-semibold [&>span]:uppercase [&>span]:tracking-wide [&>span]:text-muted-foreground [&>strong]:my-1 [&>strong]:text-[34px] [&>strong]:font-bold [&>strong]:leading-none [&>strong]:tracking-tight [&>small]:text-xs [&>small]:text-muted-foreground">
           <span>Teaching Days</span>
-          <strong style={{ color: "#0ea5e9" }}>{activeDays} Days</strong>
+          <strong className="text-primary">{activeDays} Days</strong>
           <small>Per academic week</small>
         </article>
-        <article className="admin-metric-card">
+        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs [&>span]:text-xs [&>span]:font-semibold [&>span]:uppercase [&>span]:tracking-wide [&>span]:text-muted-foreground [&>strong]:my-1 [&>strong]:text-[34px] [&>strong]:font-bold [&>strong]:leading-none [&>strong]:tracking-tight [&>small]:text-xs [&>small]:text-muted-foreground">
           <span>Unique Subjects</span>
-          <strong style={{ color: "#8b5cf6" }}>{uniqueSubjects}</strong>
+          <strong className="text-violet-600 dark:text-violet-400">{uniqueSubjects}</strong>
           <small>Distinct courses taught</small>
         </article>
       </section>
 
       {/* Schedule by Day */}
-      <div style={{ display: "grid", gap: "20px" }}>
+      <div className="grid gap-5">
         {weekDays.map((day) => {
           const dayClasses = classes.filter((c) => c.dayOfWeek === day);
           const isToday = day === todayDayName;
@@ -142,93 +142,55 @@ export default function TeacherSchedulePage() {
           return (
             <section
               key={day}
-              className="profile-info-card"
-              style={{
-                padding: "20px 24px",
-                borderLeft: isToday ? "4px solid #0ea5e9" : "1px solid var(--line, #e2e8f0)",
-              }}
+              className={cn(
+                "rounded-xl border bg-card p-5 shadow-xs",
+                isToday && "border-l-4 border-l-primary bg-primary/3",
+              )}
             >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  paddingBottom: "12px",
-                  borderBottom: "1px solid var(--line, #e2e8f0)",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <h2 style={{ margin: 0, padding: 0, fontSize: "1.05rem", fontWeight: "700" }}>
+              <div className="flex items-center justify-between border-b pb-3">
+                <div className="flex items-center gap-2.5">
+                  <h2 className="m-0 p-0 text-[1.05rem] font-bold">
                     {day}
                   </h2>
                   {isToday && (
-                    <span
-                      style={{
-                        padding: "2px 8px",
-                        borderRadius: "99px",
-                        background: "#0ea5e9",
-                        color: "#fff",
-                        fontSize: "0.72rem",
-                        fontWeight: "700",
-                      }}
-                    >
-                      TODAY
-                    </span>
+                    <Badge variant="default">TODAY</Badge>
                   )}
                 </div>
-                <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+                <span className="text-xs text-muted-foreground">
                   {dayClasses.length} {dayClasses.length === 1 ? "Session" : "Sessions"}
                 </span>
               </div>
 
               {dayClasses.length === 0 ? (
-                <p style={{ margin: "14px 0 4px", fontSize: "0.85rem", color: "var(--ink-soft)" }}>
+                <p className="mt-3.5 mb-1 text-sm text-muted-foreground">
                   No scheduled classes for {day.toLowerCase()}.
                 </p>
               ) : (
-                <div style={{ display: "grid", gap: "12px", marginTop: "14px" }}>
+                <div className="mt-3.5 grid gap-3">
                   {dayClasses.map((item) => (
                     <div
                       key={item.id}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        padding: "14px 18px",
-                        borderRadius: "10px",
-                        border: "1px solid var(--line, #e2e8f0)",
-                        background: isToday ? "rgba(14, 165, 233, 0.04)" : "var(--panel, #fff)",
-                      }}
+                      className="flex items-center justify-between rounded-[10px] border bg-card px-4 py-3.5"
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                        <div
-                          style={{
-                            padding: "8px 12px",
-                            borderRadius: "8px",
-                            background: "#e0f2fe",
-                            color: "#0284c7",
-                            fontWeight: "700",
-                            fontSize: "0.85rem",
-                            textAlign: "center",
-                          }}
-                        >
+                      <div className="flex items-center gap-4">
+                        <Badge variant="outline" className="px-3 py-1.5 text-sm">
                           {item.subject.code}
-                        </div>
+                        </Badge>
                         <div>
-                          <strong style={{ display: "block", fontSize: "0.95rem" }}>
+                          <strong className="block text-[0.95rem]">
                             {item.subject.name}
                           </strong>
-                          <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)" }}>
+                          <span className="text-xs text-muted-foreground">
                             Program: {item.program.name} ({item.program.code}) · Semester {item.semester}
                           </span>
                         </div>
                       </div>
 
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontWeight: "700", fontSize: "0.9rem", color: "#0ea5e9" }}>
+                      <div className="text-right">
+                        <div className="text-sm font-bold text-primary">
                           {new Date(item.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} – {new Date(item.endTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </div>
-                        <span style={{ fontSize: "0.75rem", color: "var(--ink-soft)" }}>
+                        <span className="text-[0.75rem] text-muted-foreground">
                           Lecture Hall
                         </span>
                       </div>

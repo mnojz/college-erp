@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
-import { IconX } from "@tabler/icons-react";
+import type { ReactNode } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface AdminModalProps {
   title: string;
@@ -9,32 +14,30 @@ interface AdminModalProps {
   children: ReactNode;
   /** Wider dialog for content-heavy modals (e.g. notice detail previews). */
   wide?: boolean;
+  /** Optional muted description rendered under the title. */
+  description?: string;
 }
 
-export function AdminModal({ title, onClose, children, wide = false }: AdminModalProps) {
-  // Close on Escape key
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
+export function AdminModal({
+  title,
+  onClose,
+  children,
+  wide = false,
+  description,
+}: AdminModalProps) {
   return (
-    <div
-      className="modal-backdrop"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className={`modal-box${wide ? " modal-box-wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <button className="modal-close" type="button" onClick={onClose} aria-label="Close">
-          <IconX size={18} aria-hidden="true" />
-        </button>
-        <h2 id="modal-title">{title}</h2>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        className={wide ? "max-h-[90vh] overflow-y-auto sm:max-w-2xl" : "max-h-[90vh] overflow-y-auto sm:max-w-lg"}
+      >
+        <DialogHeader className="pr-6">
+          <DialogTitle className="text-base">{title}</DialogTitle>
+          {description && (
+            <p className="text-sm text-muted-foreground">{description}</p>
+          )}
+        </DialogHeader>
         {children}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

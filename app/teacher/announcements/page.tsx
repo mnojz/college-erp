@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/ui/button";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -303,8 +304,8 @@ export default function TeacherAnnouncementsPage() {
     }
   }
 
-  if (loadError) return <main className="profile-error">{loadError}</main>;
-  if (loading || !teacherInfo) return <main className="profile-loading">Loading announcements…</main>;
+  if (loadError) return <main className="grid min-h-[40vh] place-items-center px-6 text-sm font-semibold text-destructive">{loadError}</main>;
+  if (loading || !teacherInfo) return <main className="grid min-h-[40vh] place-items-center text-sm text-muted-foreground">Loading announcements…</main>;
 
   const userId = teacherInfo.user.id;
 
@@ -316,42 +317,40 @@ export default function TeacherAnnouncementsPage() {
       teacherName={`${teacherInfo.user.firstName} ${teacherInfo.user.lastName}`}
       employeeNo={teacherInfo.employeeNo}
       avatarUrl={teacherInfo.profileImageUrl}
+      headerActions={
+        <Button
+          type="button"
+          onClick={() => {
+            setFormError("");
+            setShowCreateModal(true);
+          }}
+        >
+          <IconPlus size={16} aria-hidden="true" /> New Announcement
+        </Button>
+      }
     >
-      <section className="admin-metric-grid" style={{ marginBottom: "24px" }}>
-        <article className="admin-metric-card">
+      <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs [&>span]:text-xs [&>span]:font-semibold [&>span]:uppercase [&>span]:tracking-wide [&>span]:text-muted-foreground [&>strong]:my-1 [&>strong]:text-[34px] [&>strong]:font-bold [&>strong]:leading-none [&>strong]:tracking-tight [&>small]:text-xs [&>small]:text-muted-foreground">
           <span>Your Notices</span>
           <strong>{announcements.filter((a) => a.authorId === userId).length}</strong>
           <small>Announcements sent to your classes</small>
         </article>
-        <article className="admin-metric-card">
+        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs [&>span]:text-xs [&>span]:font-semibold [&>span]:uppercase [&>span]:tracking-wide [&>span]:text-muted-foreground [&>strong]:my-1 [&>strong]:text-[34px] [&>strong]:font-bold [&>strong]:leading-none [&>strong]:tracking-tight [&>small]:text-xs [&>small]:text-muted-foreground">
           <span>Students Reached</span>
           <strong>{totalStudentsReached}</strong>
           <small>Across {classGroups.length} teaching group{classGroups.length === 1 ? "" : "s"}</small>
         </article>
-        <article className="admin-metric-card">
-          <span style={{ display: "block", marginBottom: "10px" }}>Notify Students</span>
-          <button
-            className="btn-primary"
-            type="button"
-            onClick={() => {
-              setFormError("");
-              setShowCreateModal(true);
-            }}
-          >
-            <IconPlus size={16} aria-hidden="true" /> New Announcement
-          </button>
-        </article>
       </section>
 
-      {message && <p className="admin-message success">{message}</p>}
+      {message && <p className="mt-3.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2.5 text-[13px] text-emerald-600 dark:text-emerald-400">{message}</p>}
       {formError && !deleting && !showCreateModal && !editing && (
-        <p className="admin-message error">{formError}</p>
+        <p className="mt-3.5 rounded-lg border border-destructive/20 bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive">{formError}</p>
       )}
 
-      <div className="admin-notice-grid">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 *:h-full">
         {announcements.length === 0 ? (
-          <div className="admin-table-wrap">
-            <div className="admin-table-empty">
+          <div className="w-full overflow-x-auto rounded-lg border">
+            <div className="px-3 py-10 text-center text-sm text-muted-foreground">
               <IconBell size={26} aria-hidden="true" />
               <p>
                 No announcements yet. Click <strong>New Announcement</strong> to notify the students of a
@@ -370,9 +369,9 @@ export default function TeacherAnnouncementsPage() {
                 actions={
                   isMine ? (
                     <>
-                      <button
+                      <Button
                         type="button"
-                        className="btn-action-edit"
+                        variant="outline" size="icon-sm"
                         title="Edit Announcement"
                         aria-label="Edit Announcement"
                         onClick={() => {
@@ -389,10 +388,10 @@ export default function TeacherAnnouncementsPage() {
                         }}
                       >
                         <IconPencil size={15} aria-hidden="true" />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className="btn-action-delete"
+                        variant="outline" size="icon-sm" className="border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
                         title="Delete Announcement"
                         aria-label="Delete Announcement"
                         onClick={() => {
@@ -401,7 +400,7 @@ export default function TeacherAnnouncementsPage() {
                         }}
                       >
                         <IconTrash size={15} aria-hidden="true" />
-                      </button>
+                      </Button>
                     </>
                   ) : undefined
                 }
@@ -420,10 +419,11 @@ export default function TeacherAnnouncementsPage() {
             setForm(emptyForm);
           }}
         >
-          <form className="modal-form" onSubmit={handleCreate}>
-            <label>
+          <form className="grid gap-4" onSubmit={handleCreate}>
+            <label className="form-field">
               Notify Subject &amp; Class
               <select
+ className="form-control"
                 value={form.scopeKey}
                 onChange={(e) => setForm({ ...form, scopeKey: e.target.value })}
                 required
@@ -435,14 +435,15 @@ export default function TeacherAnnouncementsPage() {
                   </option>
                 ))}
               </select>
-              <small className="form-hint">
+              <small className="text-xs text-muted-foreground">
                 Only students of this subject &amp; class will see the notice.
               </small>
             </label>
 
-            <label>
+            <label className="form-field">
               Announcement Headline
               <input
+ className="form-control"
                 type="text"
                 placeholder="e.g. Assignment submission deadline extended"
                 value={form.title}
@@ -451,9 +452,10 @@ export default function TeacherAnnouncementsPage() {
               />
             </label>
 
-            <label>
+            <label className="form-field">
               Full Announcement Content
               <textarea
+ className="form-control"
                 placeholder="Write the full message for your students..."
                 value={form.body}
                 onChange={(e) => setForm({ ...form, body: e.target.value })}
@@ -462,8 +464,8 @@ export default function TeacherAnnouncementsPage() {
               />
             </label>
 
-            <label>
-              Attachment <span className="optional-tag">(optional image or PDF)</span>
+            <label className="form-field">
+              Attachment <span className="text-xs font-normal text-muted-foreground">(optional image or PDF)</span>
               <FileDropzone
                 id="teacher-notice-create-attachment"
                 accept="image/png,image/jpeg,image/webp,image/gif,application/pdf"
@@ -475,14 +477,14 @@ export default function TeacherAnnouncementsPage() {
               />
             </label>
 
-            {formError && <p className="admin-form-error">{formError}</p>}
+            {formError && <p className="m-0 text-[13px] text-destructive">{formError}</p>}
 
-            <div className="modal-actions">
-              <button className="btn-primary" type="submit" disabled={saving}>
+            <div className="flex flex-wrap justify-end gap-2.5">
+              <Button type="submit" disabled={saving}>
                 {saving ? "Publishing…" : "Publish to Class"}
-              </button>
-              <button
-                className="btn-ghost"
+              </Button>
+              <Button
+                variant="outline"
                 type="button"
                 onClick={() => {
                   setShowCreateModal(false);
@@ -490,7 +492,7 @@ export default function TeacherAnnouncementsPage() {
                 }}
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </form>
         </AdminModal>
@@ -499,10 +501,11 @@ export default function TeacherAnnouncementsPage() {
       {/* Modal 2: Edit Announcement */}
       {editing && (
         <AdminModal title="Edit Announcement / Notice" onClose={() => setEditing(null)}>
-          <form className="modal-form" onSubmit={handleUpdate}>
-            <label>
+          <form className="grid gap-4" onSubmit={handleUpdate}>
+            <label className="form-field">
               Notify Subject &amp; Class
               <select
+ className="form-control"
                 value={editing.scopeKey}
                 onChange={(e) => setEditing({ ...editing, scopeKey: e.target.value })}
                 required
@@ -515,9 +518,10 @@ export default function TeacherAnnouncementsPage() {
               </select>
             </label>
 
-            <label>
+            <label className="form-field">
               Announcement Headline
               <input
+ className="form-control"
                 type="text"
                 value={editing.title}
                 onChange={(e) => setEditing({ ...editing, title: e.target.value })}
@@ -525,9 +529,10 @@ export default function TeacherAnnouncementsPage() {
               />
             </label>
 
-            <label>
+            <label className="form-field">
               Full Announcement Content
               <textarea
+ className="form-control"
                 value={editing.body}
                 onChange={(e) => setEditing({ ...editing, body: e.target.value })}
                 rows={6}
@@ -535,10 +540,10 @@ export default function TeacherAnnouncementsPage() {
               />
             </label>
 
-            <label>
-              Attachment <span className="optional-tag">(optional image or PDF)</span>
+            <label className="form-field">
+              Attachment <span className="text-xs font-normal text-muted-foreground">(optional image or PDF)</span>
               {editing.existingAttachment && !editing.file && (
-                <span className="notice-card-attachment-chip">
+                <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground">
                   <IconPaperclip size={13} aria-hidden="true" />
                   Current: {editing.existingAttachment.fileName}
                 </span>
@@ -553,10 +558,11 @@ export default function TeacherAnnouncementsPage() {
                 hint="or click to browse — a new file replaces the current attachment"
               />
               {editing.existingAttachment && (
-                <span className="notice-attachment-remove">
+                <span className="inline-flex cursor-pointer items-center gap-2 text-[13px] text-muted-foreground">
                   <input
                     type="checkbox"
                     id="teacher-notice-remove-attachment"
+ className="accent-primary"
                     checked={editing.removeAttachment}
                     onChange={(e) =>
                       setEditing({
@@ -571,15 +577,15 @@ export default function TeacherAnnouncementsPage() {
               )}
             </label>
 
-            {formError && <p className="admin-form-error">{formError}</p>}
+            {formError && <p className="m-0 text-[13px] text-destructive">{formError}</p>}
 
-            <div className="modal-actions">
-              <button className="btn-primary" type="submit" disabled={saving}>
+            <div className="flex flex-wrap justify-end gap-2.5">
+              <Button type="submit" disabled={saving}>
                 {saving ? "Saving Changes…" : "Save Changes"}
-              </button>
-              <button className="btn-ghost" type="button" onClick={() => setEditing(null)}>
+              </Button>
+              <Button variant="outline" type="button" onClick={() => setEditing(null)}>
                 Cancel
-              </button>
+              </Button>
             </div>
           </form>
         </AdminModal>
@@ -588,31 +594,31 @@ export default function TeacherAnnouncementsPage() {
       {/* Modal 3: Delete Announcement Confirmation */}
       {deleting && (
         <AdminModal title="Delete Announcement" onClose={() => setDeleting(null)}>
-          <div className="modal-confirm-box">
+          <div className="grid gap-3 text-sm text-muted-foreground">
             <p>
               Are you sure you want to delete the notice <strong>&ldquo;{deleting.title}&rdquo;</strong>?
             </p>
-            <p className="admin-form-error notice-confirm-warning">
+            <p className="m-0 flex items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3.5 py-2.5 text-[13px] font-medium text-amber-600 dark:text-amber-400">
               <IconAlertTriangle size={14} aria-hidden="true" />
               Students of this class will no longer see this announcement.
             </p>
             {formError && (
-              <p className="admin-form-error" style={{ marginTop: 12 }}>
+              <p className="m-0 text-[13px] text-destructive" style={{ marginTop: 12 }}>
                 {formError}
               </p>
             )}
-            <div className="modal-actions" style={{ marginTop: "20px" }}>
-              <button className="btn-danger" type="button" onClick={handleDelete} disabled={saving}>
+            <div className="flex flex-wrap justify-end gap-2.5" style={{ marginTop: "20px" }}>
+              <Button variant="destructive" type="button" onClick={handleDelete} disabled={saving}>
                 {saving ? "Deleting…" : "Yes, Delete Notice"}
-              </button>
-              <button
-                className="btn-ghost"
+              </Button>
+              <Button
+                variant="outline"
                 type="button"
                 onClick={() => setDeleting(null)}
                 disabled={saving}
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </AdminModal>

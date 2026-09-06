@@ -5,6 +5,17 @@ import { useRouter } from "next/navigation";
 import { StudentShell } from "@/app/components/student/StudentShell";
 import { TimetableGrid, type TimetableItem } from "@/app/components/timetable/TimetableGrid";
 import { IconUsers, IconRosetteDiscountCheck } from "@tabler/icons-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Profile = {
   enrollmentNumber: string;
@@ -31,22 +42,14 @@ type ClassRow = {
   teacher: { employeeNo: string; user: { firstName: string; lastName: string } } | null;
 };
 
-const ttInput: React.CSSProperties = {
-  padding: "9px 12px",
-  border: "1px solid var(--line)",
-  borderRadius: "8px",
-  background: "var(--input-bg)",
-  color: "var(--input-color, inherit)",
-  fontSize: "13px",
-  width: "100%",
-  boxSizing: "border-box",
-};
+type BreakRow = { id: string; programId: string; semester: number; startTime: string; endTime: string };
 
 export default function StudentSchedulesPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [programs, setPrograms] = useState<ProgramOption[]>([]);
   const [classes, setClasses] = useState<ClassRow[]>([]);
+  const [breaks, setBreaks] = useState<BreakRow[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState("");
   const [selectedSemester, setSelectedSemester] = useState("");
   const [loading, setLoading] = useState(true);
@@ -55,13 +58,14 @@ export default function StudentSchedulesPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [profileRes, programsRes, classesRes] = await Promise.all([
+        const [profileRes, programsRes, classesRes, breaksRes] = await Promise.all([
           fetch("/api/student/profile"),
           fetch("/api/programs"),
           fetch("/api/classes"),
+          fetch("/api/breaks"),
         ]);
 
-        if (!profileRes.ok || !programsRes.ok || !classesRes.ok) {
+        if (!profileRes.ok || !programsRes.ok || !classesRes.ok || !breaksRes.ok) {
           router.replace("/dashboard");
           return;
         }
@@ -69,13 +73,14 @@ export default function StudentSchedulesPage() {
         const profileData = await profileRes.json();
         const programsData = await programsRes.json();
         const classesData = await classesRes.json();
+        const breaksData = await breaksRes.json();
 
         const p: Profile = profileData.student;
         setProfile(p);
         setPrograms((programsData.programs ?? []) as ProgramOption[]);
         setClasses((classesData.classes ?? []) as ClassRow[]);
+        setBreaks((breaksData.breaks ?? []) as BreakRow[]);
 
-        // Default to the student's own routine.
         const programId = p.program?.id ?? "";
         setSelectedProgramId(programId);
         setSelectedSemester(String(p.currentSemester ?? 1));
@@ -91,6 +96,13 @@ export default function StudentSchedulesPage() {
 
   const selectedProgram = programs.find((p) => p.id === selectedProgramId) ?? null;
   const semesterCount = selectedProgram ? selectedProgram.durationYears * 2 : 0;
+
+  const breakPeriod = useMemo(() => {
+    const match = breaks.find(
+      (b) => b.programId === selectedProgramId && String(b.semester) === selectedSemester,
+    );
+    return match ? { start: match.startTime, end: match.endTime } : null;
+  }, [breaks, selectedProgramId, selectedSemester]);
 
   const items: TimetableItem[] = useMemo(
     () =>
@@ -120,8 +132,22 @@ export default function StudentSchedulesPage() {
     profile.program.id === selectedProgramId &&
     profile.currentSemester === Number(selectedSemester);
 
-  if (error) return <main className="profile-error">{error}</main>;
-  if (loading || !profile) return <main className="profile-loading">Loading timetable...</main>;
+  if (error) {
+    return (
+      <StudentShell title="Class Schedules & Timetable" active="/student/schedules">
+        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </p>
+      </StudentShell>
+    );
+  }
+  if (loading || !profile) {
+    return (
+      <StudentShell title="Class Schedules & Timetable" active="/student/schedules">
+        <Skeleton className="h-40 w-full" />
+      </StudentShell>
+    );
+  }
 
   const fullName = `${profile.user.firstName} ${profile.user.lastName}`;
   const studentId = profile.rollNumber || profile.enrollmentNumber;
@@ -135,127 +161,83 @@ export default function StudentSchedulesPage() {
       title="Class Schedules & Timetable"
       subtitle="Weekly Routine"
     >
-      <div style={{ display: "grid", gap: "20px" }}>
+      <div className="flex flex-col gap-5">
         {/* Toolbar: pick any program + semester (read-only view). */}
-        <section
-          style={{
-            padding: "18px 20px",
-            borderRadius: "12px",
-            background: "var(--panel)",
-            border: "1px solid var(--line)",
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "14px",
-            alignItems: "flex-end",
-          }}
-        >
-          <label style={{ display: "grid", gap: "6px", minWidth: "260px", flex: 1 }}>
-            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--ink-soft)" }}>
-              Program
-            </span>
-            <select
-              value={selectedProgramId}
-              onChange={(e) => {
-                setSelectedProgramId(e.target.value);
-                setSelectedSemester("");
-              }}
-              style={ttInput}
-              disabled={programs.length === 0}
-            >
-              {programs.length === 0 && <option value="">No programs</option>}
-              {programs.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.code} — {p.name}
-                </option>
-              ))}
-            </select>
-          </label>
+        <Card>
+          <CardContent className="flex flex-wrap items-end gap-4 p-4">
+            <div className="grid min-w-60 flex-1 gap-1.5">
+              <Label>Program</Label>
+              <Select
+                value={selectedProgramId || undefined}
+                onValueChange={(value) => {
+                  setSelectedProgramId(value);
+                  setSelectedSemester("");
+                }}
+                disabled={programs.length === 0}
+              >
+                <SelectTrigger aria-label="Program">
+                  <SelectValue placeholder="Select program" />
+                </SelectTrigger>
+                <SelectContent>
+                  {programs.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.code} — {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <label style={{ display: "grid", gap: "6px", width: "180px" }}>
-            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--ink-soft)" }}>
-              Semester
-            </span>
-            <select
-              value={selectedSemester}
-              onChange={(e) => setSelectedSemester(e.target.value)}
-              style={ttInput}
-              disabled={!selectedProgramId}
-            >
-              <option value="">Select semester</option>
-              {Array.from({ length: semesterCount }, (_, i) => i + 1).map((n) => (
-                <option key={n} value={String(n)}>
-                  Semester {n}
-                </option>
-              ))}
-            </select>
-          </label>
+            <div className="grid w-44 gap-1.5">
+              <Label>Semester</Label>
+              <Select
+                value={selectedSemester || undefined}
+                onValueChange={setSelectedSemester}
+                disabled={!selectedProgramId}
+              >
+                <SelectTrigger aria-label="Semester">
+                  <SelectValue placeholder="Select semester" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: semesterCount }, (_, i) => i + 1).map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      Semester {n}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          {isOwnRoutine ? (
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                fontSize: "12px",
-                fontWeight: 700,
-                color: "#0369a1",
-                background: "#e0f2fe",
-                borderRadius: "99px",
-                padding: "8px 14px",
-              }}
-            >
-              <IconRosetteDiscountCheck size={15} aria-hidden="true" />
-              Your routine
-            </span>
-          ) : (
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                fontSize: "12px",
-                fontWeight: 700,
-                color: "var(--ink-soft)",
-                borderRadius: "99px",
-                padding: "8px 14px",
-                border: "1px solid var(--line)",
-              }}
-            >
-              <IconUsers size={15} aria-hidden="true" />
-              Viewing a public routine
-            </span>
-          )}
-        </section>
+            {isOwnRoutine ? (
+              <Badge className="gap-1.5 bg-sky-500/10 px-3 py-1.5 text-sky-700 hover:bg-sky-500/10 dark:text-sky-300">
+                <IconRosetteDiscountCheck size={15} aria-hidden="true" />
+                Your routine
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="gap-1.5 px-3 py-1.5">
+                <IconUsers size={15} aria-hidden="true" />
+                Viewing a public routine
+              </Badge>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Read-only weekly grid — same visual as the admin timetable editor. */}
         {selectedProgramId && selectedSemester ? (
-          <section
-            style={{
-              padding: "18px 20px",
-              borderRadius: "12px",
-              background: "var(--panel)",
-              border: "1px solid var(--line)",
-            }}
-          >
-            <TimetableGrid items={items} readonly />
-            {items.length === 0 && (
-              <p
-                style={{
-                  margin: "14px 0 0",
-                  padding: "14px",
-                  fontSize: "13px",
-                  color: "var(--ink-soft)",
-                  textAlign: "center",
-                  border: "1px dashed var(--line)",
-                  borderRadius: "10px",
-                }}
-              >
-                No classes scheduled for {selectedProgram?.code} · Semester {selectedSemester} yet.
-              </p>
-            )}
-          </section>
+          <Card>
+            <CardContent className="p-4 sm:p-5">
+              <TimetableGrid items={items} breakPeriod={breakPeriod} readonly />
+              {items.length === 0 && (
+                <p className="mt-4 rounded-md border border-dashed px-4 py-4 text-center text-sm text-muted-foreground">
+                  No classes scheduled for {selectedProgram?.code} · Semester {selectedSemester} yet.
+                </p>
+              )}
+            </CardContent>
+          </Card>
         ) : (
-          <div className="cs-empty">Pick a program and semester to view its weekly timetable.</div>
+          <p className="rounded-md border bg-muted/40 px-4 py-8 text-center text-sm text-muted-foreground">
+            Pick a program and semester to view its weekly timetable.
+          </p>
         )}
       </div>
     </StudentShell>

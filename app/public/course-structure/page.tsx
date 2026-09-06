@@ -1,18 +1,17 @@
 import { PublicLayout } from "@/app/components/layout/PublicLayout";
 import { CourseStructureViewer } from "@/app/components/public/CourseStructureViewer";
+import { Badge } from "@/components/ui/badge";
 
 export default function CourseStructurePage() {
   return (
     <PublicLayout>
-      <div className="public-page-body">
-        <section className="public-page-intro">
-          <span className="badge badge-blue" style={{ marginBottom: "12px" }}>
+      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
+        <section className="mb-8">
+          <Badge variant="secondary" className="mb-3">
             Academic catalogue
-          </span>
-          <h1 style={{ margin: "6px 0 12px", fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 700 }}>
-            Course Structure
-          </h1>
-          <p style={{ color: "var(--ink-soft)", fontSize: "15px", lineHeight: 1.6, maxWidth: "680px" }}>
+          </Badge>
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Course Structure</h1>
+          <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted-foreground">
             Explore the current course map, credit assignments, and departmental structure.
           </p>
         </section>

@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/ui/button";
 
 import { useMemo, useState } from "react";
 import {
@@ -11,7 +12,6 @@ import {
 export type MaterialSubmitValues = {
   title: string;
   description: string;
-  topic: string;
   materialType: string;
   visibility: string;
   departmentName: string;
@@ -25,7 +25,6 @@ export type MaterialSubmitValues = {
 export type MaterialFormInitial = Partial<{
   title: string;
   description: string | null;
-  topic: string | null;
   materialType: string;
   visibility: string;
   departmentName: string | null;
@@ -51,7 +50,6 @@ type MaterialFormProps = {
 const DEFAULT_VALUES = {
   title: "",
   description: "",
-  topic: "",
   materialType: "LECTURE_NOTES",
   visibility: "EVERYONE",
   departmentName: "",
@@ -80,7 +78,6 @@ export function MaterialForm({
     ...DEFAULT_VALUES,
     ...(initial ?? {}),
     description: initial?.description ?? "",
-    topic: initial?.topic ?? "",
     departmentName: initial?.departmentName ?? "",
     programId: initial?.programId ?? "",
     semester: initial?.semester != null ? String(initial.semester) : "",
@@ -151,7 +148,6 @@ export function MaterialForm({
     onSubmit({
       title: values.title.trim(),
       description: values.description.trim(),
-      topic: values.topic.trim(),
       materialType: values.materialType,
       visibility: values.visibility,
       departmentName: values.departmentName,
@@ -164,7 +160,7 @@ export function MaterialForm({
   }
 
   return (
-    <form className="modal-form" onSubmit={handleSubmit}>
+    <form className="grid gap-4" onSubmit={handleSubmit}>
       <label>
         Title *
         <input
@@ -187,7 +183,7 @@ export function MaterialForm({
         />
       </label>
 
-      <div className="inline-pair">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label>
           Material Type *
           <select value={values.materialType} onChange={(e) => set("materialType", e.target.value)} required>
@@ -198,19 +194,9 @@ export function MaterialForm({
             ))}
           </select>
         </label>
-
-        <label>
-          Topic
-          <input
-            type="text"
-            value={values.topic}
-            onChange={(e) => set("topic", e.target.value)}
-            placeholder="e.g. Operating Systems"
-          />
-        </label>
       </div>
 
-      <div className="inline-pair">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label>
           Program
           <select value={values.programId} onChange={(e) => handleProgramChange(e.target.value)}>
@@ -224,7 +210,7 @@ export function MaterialForm({
         </label>
       </div>
 
-      <div className="inline-pair">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label>
           Semester
           <select
@@ -254,13 +240,13 @@ export function MaterialForm({
         </label>
       </div>
 
-      <div className="notes-visibility-group">
-        <span className="notes-field-caption">Visibility *</span>
-        <div className="notes-visibility-options">
+      <div className="grid gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Visibility *</span>
+        <div className="grid gap-2">
           {VISIBILITY_OPTIONS.map((opt) => (
             <label
               key={opt.value}
-              className={`notes-visibility-option${values.visibility === opt.value ? " selected" : ""}`}
+              className="flex cursor-pointer items-start gap-2.5 rounded-[10px] border bg-background px-3.5 py-3 transition-colors hover:border-primary/60 has-checked:border-primary has-checked:bg-primary/5 [&_span]:grid [&_span]:gap-1 [&_strong]:text-[13px] [&_small]:text-[11.5px] [&_small]:leading-snug [&_small]:text-muted-foreground [&_input]:mt-1"
             >
               <input
                 type="radio"
@@ -271,7 +257,6 @@ export function MaterialForm({
               />
               <span>
                 <strong>{opt.label}</strong>
-                <small>{opt.hint}</small>
               </span>
             </label>
           ))}
@@ -279,14 +264,14 @@ export function MaterialForm({
       </div>
 
       {values.visibility === "CLASSES" && (
-        <div className="notes-class-picker">
-          <span className="notes-field-caption">Select classes *</span>
+        <div className="grid gap-1.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Select classes *</span>
           {classGroups.length === 0 ? (
-            <p className="notes-hint-text">
+            <p className="m-0 text-[12.5px] leading-relaxed text-muted-foreground">
               No teaching groups found. Add classes to your schedule first to target them here.
             </p>
           ) : (
-            <div className="notes-class-grid">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2">
               {classGroups.map((g) => {
                 const selected =
                   g.classIds.length > 0 && g.classIds.every((id) => values.selectedClassIds.includes(id));
@@ -311,7 +296,7 @@ export function MaterialForm({
         )}
         <input
           type="file"
-          className="notes-file-input"
+          className="w-full cursor-pointer rounded-lg border border-dashed bg-transparent px-3 py-2.5 text-[13px] file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-foreground"
           accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.md,.zip,.rar,.jpg,.jpeg,.png,.gif,.webp"
           onChange={(e) => {
             const selected = e.target.files?.[0] ?? null;
@@ -321,16 +306,16 @@ export function MaterialForm({
           required={mode === "create"}
           disabled={submitting}
         />
-        {fileName && <span className="notes-file-chosen">Selected: {fileName}</span>}
+        {fileName && <span className="mt-1.5 inline-block text-xs font-semibold text-primary">Selected: {fileName}</span>}
         {!fileName && mode === "edit" && (
-          <span className="notes-file-chosen muted">Keeping the existing file.</span>
+          <span className="mt-1.5 inline-block text-xs font-medium text-muted-foreground">Keeping the existing file.</span>
         )}
       </label>
 
-      {error && <p className="notes-form-error">{error}</p>}
+      {error && <p className="rounded-lg border border-destructive/20 bg-destructive/10 px-3.5 py-2.5 text-[13px] font-medium text-destructive">{error}</p>}
 
-      <div className="modal-actions">
-        <button className="btn-primary" type="submit" disabled={submitting}>
+      <div className="flex flex-wrap justify-end gap-2.5">
+        <Button type="submit" disabled={submitting}>
           {submitting
             ? mode === "create"
               ? "Uploading…"
@@ -338,10 +323,10 @@ export function MaterialForm({
             : mode === "create"
               ? "Upload Material"
               : "Save Changes"}
-        </button>
-        <button className="btn-ghost" type="button" onClick={onCancel} disabled={submitting}>
+        </Button>
+        <Button variant="outline" type="button" onClick={onCancel} disabled={submitting}>
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );

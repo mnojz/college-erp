@@ -1,16 +1,16 @@
 "use client";
+import { Button } from "@/components/ui/button";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
+import { Badge } from "@/components/ui/badge";
 import {
   IconArrowRight,
   IconBook,
   IconCalendarCheck,
-  IconClipboardCheck,
   IconReportAnalytics,
-  IconTarget,
   IconUser,
 } from "@tabler/icons-react";
 
@@ -79,26 +79,41 @@ export default function TeacherOverviewPage() {
 
   if (error) {
     return (
-      <main className="profile-error">
+      <main className="grid min-h-[40vh] place-items-center px-6 text-sm font-semibold text-destructive">
         <p>{error}</p>
-        <button
+        <Button
           className="primary-button"
           type="button"
           onClick={() => router.replace("/dashboard")}
           style={{ marginTop: "16px" }}
         >
           Back to Login
-        </button>
+        </Button>
       </main>
     );
   }
 
   if (loading || !data) {
-    return <main className="profile-loading">Loading faculty dashboard...</main>;
+    return <main className="grid min-h-[40vh] place-items-center text-sm text-muted-foreground">Loading faculty dashboard...</main>;
   }
 
   const fullName = `${data.user.firstName} ${data.user.lastName}`;
-  const totalClasses = data.classes.length;
+
+  // Deduplicate classes into unique subjects (subjects ≠ class slots — no time periods)
+  const subjectMap = new Map<string, { code: string; name: string; program: string; semester: number; studentCount: number }>();
+  for (const c of data.classes) {
+    if (!subjectMap.has(c.subject.id)) {
+      subjectMap.set(c.subject.id, {
+        code: c.subject.code,
+        name: c.subject.name,
+        program: c.program.code,
+        semester: c.semester,
+        studentCount: c.program.students.length,
+      });
+    }
+  }
+  const uniqueSubjects = Array.from(subjectMap.values());
+  const totalSubjects = uniqueSubjects.length;
 
   // Calculate unique students across all programs
   const studentIdSet = new Set<string>();
@@ -128,53 +143,25 @@ export default function TeacherOverviewPage() {
       avatarUrl={data.profileImageUrl}
     >
       {/* Faculty Profile Hero Card */}
-      <section className="profile-hero" style={{ marginBottom: "24px" }}>
+      <section className="mb-6 flex flex-wrap items-center gap-5 rounded-xl border bg-card p-6 shadow-xs">
         {data.profileImageUrl ? (
           <img
             src={data.profileImageUrl}
             alt={fullName}
-            className="profile-hero-image"
-            style={{
-              width: "110px",
-              height: "110px",
-              borderRadius: "12px",
-              objectFit: "cover",
-              border: "2px solid var(--line, #e2e8f0)",
-            }}
+            className="size-27.5 shrink-0 rounded-xl border-2 object-cover"
           />
         ) : (
-          <div
-            className="profile-hero-image"
-            style={{
-              display: "grid",
-              placeItems: "center",
-              background: "var(--accent-grad)",
-              color: "#fff",
-              fontSize: "36px",
-              fontWeight: "700",
-            }}
-          >
+          <div className="grid size-27.5 shrink-0 place-items-center rounded-xl bg-linear-to-br from-primary/85 to-primary text-4xl font-bold text-primary-foreground">
             {data.user.firstName[0]}
             {data.user.lastName[0]}
           </div>
         )}
-        <div className="profile-hero-details">
-          <div className="profile-name-row">
-            <h1>{fullName}</h1>
-            <span className="active-badge">
-              <span
-                style={{
-                  width: "8px",
-                  height: "8px",
-                  borderRadius: "50%",
-                  background: "var(--ok)",
-                  display: "inline-block",
-                }}
-              />
-              Active Faculty
-            </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="m-0 text-2xl font-bold tracking-tight">{fullName}</h1>
+            <Badge variant="secondary">Active</Badge>
           </div>
-          <div className="profile-meta-row">
+          <div className="flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-muted-foreground [&_span]:inline-flex [&_span]:items-center [&_span]:gap-1.5 [&_strong]:font-semibold [&_strong]:text-foreground">
             <span>
               <IconBook size={16} />
               {departmentName}
@@ -184,172 +171,75 @@ export default function TeacherOverviewPage() {
               Employee ID: <strong>{data.employeeNo}</strong>
             </span>
           </div>
-          <p>
+          <p className="m-0 text-[13px] text-muted-foreground [&_strong]:font-semibold [&_strong]:text-foreground">
             Institutional Email: <strong>{data.user.email}</strong>
           </p>
         </div>
-        <div className="profile-hero-actions">
-          <Link
-            href="/teacher/attendance"
-            className="profile-edit-button"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "10px 16px",
-              borderRadius: "8px",
-              textDecoration: "none",
-            }}
-          >
-            <IconCalendarCheck size={16} />
-            Take Attendance
-          </Link>
-          <Link
-            href="/teacher/assessments"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "10px 16px",
-              border: "1px solid var(--line, #e2e8f0)",
-              borderRadius: "8px",
-              background: "var(--panel, #fff)",
-              color: "inherit",
-              fontSize: "12px",
-              fontWeight: "600",
-              textDecoration: "none",
-            }}
-          >
-            <IconReportAnalytics size={16} />
-            Manage Grades
-          </Link>
+        <div className="flex flex-wrap gap-2.5">
+          <Button asChild>
+            <Link href="/teacher/attendance">
+              <IconCalendarCheck size={16} />
+              Take Attendance
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/teacher/assessments">
+              <IconReportAnalytics size={16} />
+              Manage Grades
+            </Link>
+          </Button>
         </div>
       </section>
 
       {/* Metrics Row */}
-      <section className="admin-metric-grid" style={{ marginBottom: "24px" }}>
-        <article className="admin-metric-card">
-          <span>Assigned Classes</span>
-          <strong>{totalClasses}</strong>
-          <small>Active subject sections</small>
+      <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Teaching Subjects</span>
+          <strong className="my-1 text-[34px] font-bold leading-none tracking-tight">{totalSubjects}</strong>
+          <small className="text-xs text-muted-foreground">Unique subjects</small>
         </article>
-        <article className="admin-metric-card">
-          <span>Enrolled Students</span>
-          <strong style={{ color: "var(--accent)" }}>{totalStudents}</strong>
-          <small>Across assigned programs</small>
+        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Enrolled Students</span>
+          <strong className="my-1 text-[34px] font-bold leading-none tracking-tight text-primary">{totalStudents}</strong>
+          <small className="text-xs text-muted-foreground">Across assigned programs</small>
         </article>
-        <article className="admin-metric-card">
-          <span>Assessments Held</span>
-          <strong style={{ color: "var(--violet)" }}>{totalAssessments}</strong>
-          <small>Quizzes, mid-terms &amp; finals</small>
+        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Assessments Held</span>
+          <strong className="my-1 text-[34px] font-bold leading-none tracking-tight">{totalAssessments}</strong>
+          <small className="text-xs text-muted-foreground">Quizzes, mid-terms &amp; finals</small>
         </article>
-        <article className="admin-metric-card">
-          <span>Attendance Sessions</span>
-          <strong style={{ color: "var(--ok)" }}>{totalSessionsLogged}</strong>
-          <small>Completed roll-call logs</small>
+        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Attendance Sessions</span>
+          <strong className="my-1 text-[34px] font-bold leading-none tracking-tight text-primary">{totalSessionsLogged}</strong>
+          <small className="text-xs text-muted-foreground">Completed roll-call logs</small>
         </article>
       </section>
 
-      {/* Main Grid: Today's Schedule & Assigned Subjects */}
-      <div className="two-col-split">
-        {/* Assigned Classes */}
-        <section className="profile-info-card" style={{ padding: "24px" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              paddingBottom: "14px",
-              borderBottom: "1px solid var(--line, #e2e8f0)",
-            }}
-          >
-            <h2 style={{ margin: 0, padding: 0, fontSize: "1.1rem", fontWeight: "700" }}>
-              My Assigned Classes
-            </h2>
-            <span style={{ fontSize: "0.8rem", color: "var(--ink-soft, #64748b)" }}>
-              {totalClasses} Classes
-            </span>
+      {/* Main Grid: Today's Schedule & Teaching Subjects */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.2fr_1fr]">
+        {/* Teaching Subjects (unique, no time slots) */}
+        <section className="rounded-xl border bg-card p-6 shadow-xs">
+          <div className="mb-4 flex items-center justify-between border-b pb-3.5">
+            <h2 className="m-0 text-lg font-bold">Teaching Subjects</h2>
+            <span className="text-xs text-muted-foreground">{totalSubjects} unique</span>
           </div>
 
-          {data.classes.length === 0 ? (
-            <p className="empty-state" style={{ textAlign: "center", padding: "30px 0" }}>
-              No teaching classes assigned yet.
-            </p>
+          {uniqueSubjects.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">No teaching subjects assigned yet.</p>
           ) : (
-            <div style={{ display: "grid", gap: "14px", marginTop: "16px" }}>
-              {data.classes.map((cls) => (
-                <div
-                  key={cls.id}
-                  style={{
-                    padding: "16px",
-                    borderRadius: "12px",
-                    border: "1px solid var(--line, #e2e8f0)",
-                    background: "var(--panel, #fff)",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                      <span
-                        style={{
-                          padding: "2px 8px",
-                          borderRadius: "4px",
-                          background: "var(--info-soft)",
-                          color: "var(--info-ink)",
-                          fontSize: "0.75rem",
-                          fontWeight: "700",
-                        }}
-                      >
-                        {cls.subject.code}
-                      </span>
-                      <strong style={{ fontSize: "0.95rem" }}>{cls.subject.name}</strong>
-                    </div>
-                    <div style={{ fontSize: "0.82rem", color: "var(--ink-soft, #64748b)", display: "flex", gap: "12px" }}>
-                      <span>Program: {cls.program.code}</span>
-                      <span>•</span>
-                      <span>Semester: {cls.semester}</span>
-                      <span>•</span>
-                      <span>{cls.program.students.length} Students</span>
-                    </div>
-                    <div style={{ marginTop: "6px", fontSize: "0.78rem", color: "var(--ink-soft, #64748b)" }}>
-                      ⏰ {cls.dayOfWeek} · {new Date(cls.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} - {new Date(cls.endTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </div>
+            <div className="mt-4 grid gap-3.5">
+              {uniqueSubjects.map((sub) => (
+                <div key={sub.code} className="rounded-xl border bg-card p-4">
+                  <div className="mb-1 flex items-center gap-2">
+                    <Badge variant="outline">{sub.code}</Badge>
+                    <strong className="text-[0.95rem]">{sub.name}</strong>
                   </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                    <Link
-                      href="/teacher/attendance"
-                      style={{
-                        padding: "6px 12px",
-                        borderRadius: "6px",
-                        background: "var(--accent)",
-                        color: "#fff",
-                        fontSize: "0.78rem",
-                        fontWeight: "600",
-                        textAlign: "center",
-                        textDecoration: "none",
-                      }}
-                    >
-                      Roll Call
-                    </Link>
-                    <Link
-                      href="/teacher/assessments"
-                      style={{
-                        padding: "6px 12px",
-                        borderRadius: "6px",
-                        border: "1px solid var(--line, #e2e8f0)",
-                        background: "transparent",
-                        color: "inherit",
-                        fontSize: "0.78rem",
-                        fontWeight: "600",
-                        textAlign: "center",
-                        textDecoration: "none",
-                      }}
-                    >
-                      Assessments
-                    </Link>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[0.82rem] text-muted-foreground">
+                    <span>Program: {sub.program}</span>
+                    <span>•</span>
+                    <span>Semester: {sub.semester}</span>
+                    <span>•</span>
+                    <span>{sub.studentCount} Students</span>
                   </div>
                 </div>
               ))}
@@ -358,62 +248,42 @@ export default function TeacherOverviewPage() {
         </section>
 
         {/* Today's Schedule Card */}
-        <section className="profile-info-card" style={{ padding: "24px" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              paddingBottom: "14px",
-              borderBottom: "1px solid var(--line, #e2e8f0)",
-            }}
-          >
-            <h2 style={{ margin: 0, padding: 0, fontSize: "1.1rem", fontWeight: "700" }}>
+        <section className="rounded-xl border bg-card p-5 shadow-xs" style={{ padding: "24px" }}>
+          <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2 border-b pb-3.5">
+            <h2 className="m-0 p-0 text-[1.1rem] font-bold">
               Today&apos;s Schedule ({todayDayName})
             </h2>
-            <Link
-              href="/teacher/schedule"
-              style={{ fontSize: "0.8rem", color: "var(--accent)", fontWeight: "600", textDecoration: "none" }}
-            >
-              <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                Full Timetable <IconArrowRight size={14} strokeWidth={2.25} aria-hidden="true" />
-              </span>
-            </Link>
+            <Button asChild variant="link" size="sm" className="h-auto p-0 text-xs font-semibold">
+              <Link href="/teacher/schedule">
+                <span className="inline-flex items-center gap-1">
+                  Full Timetable <IconArrowRight size={14} strokeWidth={2.25} aria-hidden="true" />
+                </span>
+              </Link>
+            </Button>
           </div>
 
           {todaysClasses.length === 0 ? (
-            <div style={{ padding: "40px 0", textAlign: "center", color: "var(--ink-soft, #64748b)" }}>
-              <p style={{ margin: 0 }}>No lectures scheduled for today ({todayDayName}).</p>
-              <small style={{ display: "block", marginTop: "8px" }}>Enjoy your lecture-free day or prepare assessments.</small>
+            <div className="py-10 text-center text-muted-foreground">
+              <p className="m-0">No lectures scheduled for today ({todayDayName}).</p>
+              <small className="mt-2 block">Enjoy your lecture-free day or prepare assessments.</small>
             </div>
           ) : (
-            <div style={{ display: "grid", gap: "12px", marginTop: "16px" }}>
+            <div className="mt-4 grid gap-3">
               {todaysClasses.map((cls) => (
-                <div
-                  key={cls.id}
-                  style={{
-                    padding: "14px",
-                    borderRadius: "10px",
-                    borderLeft: "4px solid var(--accent)",
-                    background: "var(--info-soft)",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
+                <div key={cls.id} className="flex items-center justify-between rounded-[10px] border-l-4 border-l-primary bg-secondary p-3.5">
                   <div>
-                    <strong style={{ display: "block", fontSize: "0.92rem" }}>
+                    <strong className="block text-[0.92rem]">
                       {cls.subject.code} — {cls.subject.name}
                     </strong>
-                    <span style={{ fontSize: "0.8rem", color: "var(--ink-soft, #64748b)" }}>
+                    <span className="text-[0.8rem] text-muted-foreground">
                       {cls.program.code} · Semester {cls.semester}
                     </span>
                   </div>
-                  <div style={{ textAlign: "right" }}>
-                    <span style={{ fontWeight: "700", fontSize: "0.85rem", color: "var(--accent)" }}>
+                  <div className="text-right">
+                    <span className="text-sm font-bold text-primary">
                       {new Date(cls.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </span>
-                    <small style={{ display: "block", color: "var(--ink-soft, #64748b)", fontSize: "0.75rem" }}>
+                    <small className="block text-[0.75rem] text-muted-foreground">
                       to {new Date(cls.endTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </small>
                   </div>
@@ -422,54 +292,6 @@ export default function TeacherOverviewPage() {
             </div>
           )}
 
-          {/* Quick Shortcuts */}
-          <div
-            style={{
-              marginTop: "24px",
-              paddingTop: "16px",
-              borderTop: "1px solid var(--line, #e2e8f0)",
-            }}
-          >
-            <strong style={{ fontSize: "0.85rem", display: "block", marginBottom: "10px" }}>
-              Quick Navigation
-            </strong>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-              <Link
-                href="/teacher/attendance"
-                style={{
-                  padding: "10px",
-                  borderRadius: "8px",
-                  background: "var(--panel, #fff)",
-                  border: "1px solid var(--line, #e2e8f0)",
-                  color: "inherit",
-                  fontSize: "0.8rem",
-                  fontWeight: "600",
-                  textDecoration: "none",
-                  textAlign: "center",
-                }}
-              >
-                <IconClipboardCheck size={14} aria-hidden="true" style={{ marginRight: 4, verticalAlign: "-2px" }} />
-                Take Attendance
-              </Link>
-              <Link
-                href="/teacher/assessments"
-                style={{
-                  padding: "10px",
-                  borderRadius: "8px",
-                  background: "var(--panel, #fff)",
-                  border: "1px solid var(--line, #e2e8f0)",
-                  color: "inherit",
-                  fontSize: "0.8rem",
-                  fontWeight: "600",
-                  textDecoration: "none",
-                  textAlign: "center",
-                }}
-              >
-                <IconTarget size={14} aria-hidden="true" style={{ marginRight: 4, verticalAlign: "-2px" }} />
-                Enter Marks
-              </Link>
-            </div>
-          </div>
         </section>
       </div>
     </TeacherShell>

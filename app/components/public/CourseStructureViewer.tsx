@@ -1,6 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Program = {
   id: string;
@@ -56,7 +66,6 @@ export function CourseStructureViewer() {
   const [curriculum, setCurriculum] = useState<Curriculum | null>(null);
   const [loadingCurriculum, setLoadingCurriculum] = useState(false);
 
-  // 1. Load programs for the dropdowns.
   useEffect(() => {
     fetch("/api/programs")
       .then(async (res) => {
@@ -76,13 +85,8 @@ export function CourseStructureViewer() {
     [programs],
   );
 
-  // 2. Effective selection: falls back to the first program while none has
-  //    been picked. Derived during render — no effect, no cascading setState.
   const selectedId = programId || programOptions[0]?.id || "";
 
-  // 3. Load the selected program's curriculum from the database. The state
-  //    reset + fetch start are deferred by a zero-delay timer so the effect
-  //    body stays side-effect-free (react-hooks/set-state-in-effect).
   useEffect(() => {
     if (!selectedId) return;
     let cancelled = false;
@@ -114,129 +118,129 @@ export function CourseStructureViewer() {
   const selectedProgram = programOptions.find((p) => p.id === selectedId);
 
   return (
-    <div className="cs-root">
-      {/* ─── Selectors ─────────────────────────────────────────────── */}
-      <div className="cs-selectors">
-        <label className="cs-field">
-          <span>Program</span>
-          <select
-            value={selectedId}
-            onChange={(e) => setProgramId(e.target.value)}
-            disabled={programOptions.length === 0}
-          >
-            {programOptions.length === 0 && <option value="">Loading…</option>}
+    <div className="mx-auto max-w-5xl">
+      {/* Selectors */}
+      <div className="mb-8">
+        <label className="mb-2 block text-sm font-medium">Program</label>
+        <Select value={selectedId || undefined} onValueChange={setProgramId} disabled={programOptions.length === 0}>
+          <SelectTrigger className="w-full sm:w-96" aria-label="Program">
+            <SelectValue placeholder="Loading…" />
+          </SelectTrigger>
+          <SelectContent>
             {programOptions.map((p) => (
-              <option key={p.id} value={p.id}>
+              <SelectItem key={p.id} value={p.id}>
                 {p.name}
-              </option>
+              </SelectItem>
             ))}
-          </select>
-        </label>
+          </SelectContent>
+        </Select>
       </div>
 
       {error && (
-        <p className="cs-empty" role="alert">
+        <p className="mb-6 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
           {error}
         </p>
       )}
 
-      {loadingCurriculum && <p className="cs-empty">Loading curriculum…</p>}
+      {loadingCurriculum && (
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-72 w-full" />
+        </div>
+      )}
 
-      {/* ─── Timeline ──────────────────────────────────────────────── */}
       {!loadingCurriculum && curriculum && selectedProgram && (
-        <div className="cs-detail">
-          <header className="cs-program-header">
-            <h2>{selectedProgram.name}</h2>
+        <div className="flex flex-col gap-8">
+          <header>
+            <h2 className="text-2xl font-semibold tracking-tight">{selectedProgram.name}</h2>
             {selectedProgram.departmentName && (
-              <p>{selectedProgram.departmentName}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{selectedProgram.departmentName}</p>
             )}
           </header>
 
-          <div className="curriculum-timeline">
+          <div className="flex flex-col gap-8">
             {curriculum.years.map((year) => (
-              <div className="curriculum-era" key={year.id}>
-                <div className="curriculum-era-title">{year.label}</div>
-
-                {year.semesters.map((semester) => {
-                  const totalCredits = semester.courses.reduce(
-                    (sum, c) => sum + c.credits,
-                    0,
-                  );
-                  return (
-                    <div className="curriculum-sem" key={semester.id}>
-                      <div className="curriculum-sem-left">
-                        <span className="curriculum-sem-label">
-                          {semester.label}
-                        </span>
-                        <span className="curriculum-sem-credits">
-                          {totalCredits} cr
-                        </span>
-                      </div>
-
-                      <div className="curriculum-track" aria-hidden="true">
-                        <span className="curriculum-dot" />
-                      </div>
-
-                      <div className="curriculum-card">
-                        <table className="curriculum-table">
-                          <thead>
-                            <tr>
-                              <th>Code</th>
-                              <th>Course</th>
-                              <th className="num">Cr</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {semester.courses.map((course) => (
-                              <tr key={course.id}>
-                                <td className="code">
-                                  {course.code ?? "—"}
-                                </td>
-                                <td className="name">{course.name}</td>
-                                <td className="num">{course.credits}</td>
+              <section key={year.id}>
+                <h3 className="mb-3 text-base font-semibold text-muted-foreground">{year.label}</h3>
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  {year.semesters.map((semester) => {
+                    const totalCredits = semester.courses.reduce(
+                      (sum, c) => sum + c.credits,
+                      0,
+                    );
+                    return (
+                      <Card key={semester.id}>
+                        <CardContent className="p-5">
+                          <div className="mb-3 flex items-center justify-between gap-2">
+                            <span className="text-sm font-semibold">{semester.label}</span>
+                            <Badge variant="secondary">{totalCredits} cr</Badge>
+                          </div>
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b text-left text-xs text-muted-foreground">
+                                <th className="pb-2 pr-2 font-medium">Code</th>
+                                <th className="pb-2 pr-2 font-medium">Course</th>
+                                <th className="pb-2 text-right font-medium">Cr</th>
                               </tr>
-                            ))}
-                          </tbody>
-                          <tfoot>
-                            <tr>
-                              <td colSpan={2}>Semester Total</td>
-                              <td className="num">{totalCredits}</td>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                            </thead>
+                            <tbody className="divide-y divide-border/60">
+                              {semester.courses.map((course) => (
+                                <tr key={course.id}>
+                                  <td className="py-2 pr-2 font-mono text-xs text-muted-foreground">
+                                    {course.code ?? "—"}
+                                  </td>
+                                  <td className="py-2 pr-2">{course.name}</td>
+                                  <td className="py-2 text-right tabular-nums">{course.credits}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot>
+                              <tr className="border-t font-medium">
+                                <td className="pt-2 pr-2" colSpan={2}>
+                                  Semester Total
+                                </td>
+                                <td className="pt-2 text-right tabular-nums">{totalCredits}</td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </section>
             ))}
           </div>
 
           {curriculum.electives && curriculum.electives.length > 0 && (
-            <div className="curriculum-electives">
-              <h3>Electives</h3>
-              {(["ELECTIVE_I", "ELECTIVE_II"] as const).map((group) => {
-                const items = curriculum.electives.filter(
-                  (e) => e.group === group,
-                );
-                if (items.length === 0) return null;
-                return (
-                  <div className="curriculum-elective" key={group}>
-                    <strong>
-                      {group === "ELECTIVE_I" ? "Elective-I" : "Elective-II"}
-                    </strong>
-                    <ul>
-                      {items.map((e) => (
-                        <li key={e.id}>
-                          <span className="code">{e.code ?? "—"}</span>
-                          {e.name}
-                          <span className="num">{e.credits} cr</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                );
-              })}
+            <div>
+              <h3 className="mb-3 text-base font-semibold">Electives</h3>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {(["ELECTIVE_I", "ELECTIVE_II"] as const).map((group) => {
+                  const items = curriculum.electives.filter(
+                    (e) => e.group === group,
+                  );
+                  if (items.length === 0) return null;
+                  return (
+                    <Card key={group}>
+                      <CardContent className="p-5">
+                        <strong className="mb-3 block text-sm font-semibold">
+                          {group === "ELECTIVE_I" ? "Elective-I" : "Elective-II"}
+                        </strong>
+                        <ul className="flex flex-col gap-2 text-sm">
+                          {items.map((e) => (
+                            <li key={e.id} className="flex items-center gap-2">
+                              <span className="font-mono text-xs text-muted-foreground">{e.code ?? "—"}</span>
+                              <span className="flex-1">{e.name}</span>
+                              <span className="tabular-nums text-xs text-muted-foreground">{e.credits} cr</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -246,7 +250,7 @@ export function CourseStructureViewer() {
         !loadingPrograms &&
         !error &&
         curriculum === null && (
-          <p className="cs-empty">
+          <p className="rounded-md border bg-muted/40 px-4 py-8 text-center text-sm text-muted-foreground">
             No curriculum published for this program yet.
           </p>
         )}

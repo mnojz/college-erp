@@ -2,20 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { SyllabusToolbar } from "@/app/components/syllabi/SyllabusToolbar";
-import {
-  useSyllabusGroups,
-  type GroupedByDepartment,
-} from "@/app/components/syllabi/SyllabusGroupedList";
-import { SyllabusPublicGroupedView } from "@/app/components/syllabi/SyllabusPublicGroupedView";
+import { useSyllabusProgramGroups } from "@/app/components/syllabi/SyllabusGroupedList";
+import { SyllabusProgramSections } from "@/app/components/syllabi/SyllabusProgramSections";
 import { type ProgramsMeta, type SyllabusDto } from "@/app/lib/syllabi-shared";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Syllabus = SyllabusDto;
 
-/**
- * Anonymous public syllabus library — no auth required.
- * Renders the grouped department → program → semester(1..8) list with
- * search + department/program/semester filters, mirroring /student/syllabus.
- */
 export function PublicSyllabusLibrary() {
   const [syllabi, setSyllabi] = useState<Syllabus[]>([]);
   const [meta, setMeta] = useState<ProgramsMeta>({
@@ -70,7 +63,7 @@ export function PublicSyllabusLibrary() {
     });
   }, [syllabi, q, filterProgram, filterSemester]);
 
-  const groups: GroupedByDepartment[] = useSyllabusGroups(filtered, meta.programs);
+  const groups = useSyllabusProgramGroups(filtered, meta.programs);
 
   function resetFilters() {
     setQ("");
@@ -78,42 +71,49 @@ export function PublicSyllabusLibrary() {
     setFilterSemester("");
   }
 
-  if (loading) {
-    return <p style={{ color: "var(--ink-soft)", padding: "24px 0" }}>Loading…</p>;
-  }
-
   return (
-    <div>
-      {error && <p className="notes-form-error">{error}</p>}
+    <div className="flex flex-col gap-5">
+      {error && (
+        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </p>
+      )}
 
-      <h2 style={{ margin: "0 0 4px", fontSize: "18px", fontWeight: 700 }}>
-        Syllabus Library
-      </h2>
-
-      <SyllabusToolbar
-        q={q}
-        filterProgram={filterProgram}
-        filterSemester={filterSemester}
-        programs={meta.programs}
-        onChange={(p) => {
-          if (p.q !== undefined) setQ(p.q);
-          if (p.filterProgram !== undefined) setFilterProgram(p.filterProgram);
-          if (p.filterSemester !== undefined) setFilterSemester(p.filterSemester);
-        }}
-        onReset={resetFilters}
-      />
-
-      <SyllabusPublicGroupedView groups={groups} />
-
-      {filtered.length === 0 && !error && (
-        <div className="profile-info-card notes-empty">
-          <h3>No syllabus found</h3>
-          <p>
-            {syllabi.length === 0
-              ? "No syllabus files are currently available."
-              : "No syllabus files match the selected filters. Try adjusting your search or filters."}
-          </p>
+      {loading ? (
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-64 w-full" />
         </div>
+      ) : (
+        <>
+          <SyllabusToolbar
+            q={q}
+            filterProgram={filterProgram}
+            filterSemester={filterSemester}
+            programs={meta.programs}
+            onChange={(p) => {
+              if (p.q !== undefined) setQ(p.q);
+              if (p.filterProgram !== undefined) setFilterProgram(p.filterProgram);
+              if (p.filterSemester !== undefined) setFilterSemester(p.filterSemester);
+            }}
+            onReset={resetFilters}
+          />
+
+          {filtered.length > 0 ? (
+            <SyllabusProgramSections variant="public" groups={groups} />
+          ) : (
+            !error && (
+              <div className="rounded-md border bg-muted/40 px-4 py-10 text-center">
+                <h3 className="mb-1 text-sm font-semibold">No syllabus found</h3>
+                <p className="text-sm text-muted-foreground">
+                  {syllabi.length === 0
+                    ? "No syllabus files are currently available."
+                    : "No syllabus files match the selected filters. Try adjusting your search or filters."}
+                </p>
+              </div>
+            )
+          )}
+        </>
       )}
     </div>
   );

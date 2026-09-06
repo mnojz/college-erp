@@ -6,6 +6,9 @@ import {
   NoticeDetailModal,
 } from "@/app/components/common/NoticeDetailModal";
 import { NoticePostCard } from "@/app/components/common/NoticePostCard";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type CatalogKind = "courses" | "syllabus" | "fees" | "notices";
 type CatalogProps = { kind: CatalogKind; title: string; eyebrow: string; description: string };
@@ -43,8 +46,6 @@ export function PublicCatalog({ kind, title, eyebrow, description }: CatalogProp
       .finally(() => setLoading(false));
   }, [endpoint, key]);
 
-  // Map raw announcement rows into the client-safe notice shape used by the
-  // post-style cards and the detail modal.
   const notices = useMemo<NoticeDetailData[]>(
     () =>
       kind === "notices"
@@ -68,23 +69,35 @@ export function PublicCatalog({ kind, title, eyebrow, description }: CatalogProp
   );
 
   return (
-    <div className="public-page-body">
-      <section className="public-page-intro">
-        <span className="badge badge-blue" style={{ marginBottom: "12px" }}>
+    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
+      <section className="mb-8">
+        <Badge variant="secondary" className="mb-3">
           {eyebrow}
-        </span>
-        <h1 style={{ margin: "6px 0 12px", fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 700 }}>{title}</h1>
-        <p style={{ color: "var(--ink-soft)", fontSize: "15px", lineHeight: 1.6, maxWidth: "680px" }}>{description}</p>
+        </Badge>
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
+        <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted-foreground">
+          {description}
+        </p>
       </section>
 
-      {error && <p className="banner error-banner">{error}</p>}
+      {error && (
+        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </p>
+      )}
 
-      {items.length === 0 && !loading && !error ? (
-        <div className="public-empty">
-          <p>No published records found in this category yet.</p>
+      {loading && items.length === 0 && !error ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-32 w-full" />
+          ))}
         </div>
+      ) : items.length === 0 && !error ? (
+        <p className="rounded-md border bg-muted/40 px-4 py-8 text-center text-sm text-muted-foreground">
+          No published records found in this category yet.
+        </p>
       ) : kind === "notices" ? (
-        <div className="public-list notice-list">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {notices.map((notice) => (
             <NoticePostCard
               key={notice.id}
@@ -94,14 +107,12 @@ export function PublicCatalog({ kind, title, eyebrow, description }: CatalogProp
           ))}
         </div>
       ) : (
-        <div className="public-list">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((item, index) => (
             <PublicItem key={String(item.id ?? index)} item={item} kind={kind} />
           ))}
         </div>
       )}
-
-      {loading && items.length === 0 && !error && <p className="public-empty">Loading…</p>}
 
       {selectedNotice && (
         <NoticeDetailModal notice={selectedNotice} onClose={() => setSelectedNotice(null)} />
@@ -113,18 +124,22 @@ export function PublicCatalog({ kind, title, eyebrow, description }: CatalogProp
 function PublicItem({ item, kind }: { item: Item; kind: CatalogKind }) {
   if (kind === "fees") {
     return (
-      <article className="public-item">
-        <span className="badge badge-amber" style={{ marginBottom: "8px" }}>
-          {String(item.code)}
-        </span>
-        <h2>{String(item.name)}</h2>
-        <p style={{ margin: "6px 0" }}>
-          <strong>Department:</strong> {String(item.departmentName || "General")}
-        </p>
-        <p style={{ margin: "6px 0" }}>
-          <strong>Program Duration:</strong> {String(item.durationYears)} Years ({Number(item.durationYears) * 2} Semesters)
-        </p>
-      </article>
+      <Card>
+        <CardContent className="flex h-full flex-col p-5">
+          <Badge variant="secondary" className="mb-3 w-fit">
+            {String(item.code)}
+          </Badge>
+          <h2 className="mb-3 text-base font-semibold">{String(item.name)}</h2>
+          <p className="text-sm text-muted-foreground">
+            <strong className="font-medium text-foreground">Department:</strong>{" "}
+            {String(item.departmentName || "General")}
+          </p>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            <strong className="font-medium text-foreground">Program Duration:</strong>{" "}
+            {String(item.durationYears)} Years ({Number(item.durationYears) * 2} Semesters)
+          </p>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -132,15 +147,17 @@ function PublicItem({ item, kind }: { item: Item; kind: CatalogKind }) {
   const semester = typeof item.semester === "number" ? item.semester : undefined;
 
   return (
-    <article className="public-item">
-      <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
-        <span className="badge badge-blue">{String(item.code)}</span>
-        {semester && <span className="badge badge-slate">Semester {semester}</span>}
-      </div>
-      <h2>{String(item.name)}</h2>
-      <p style={{ color: "var(--ink-soft)", margin: "4px 0" }}>
-        {program?.code ? `${program.code} — ${program.name}` : "General Subject Course"}
-      </p>
-    </article>
+    <Card>
+      <CardContent className="flex h-full flex-col p-5">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <Badge>{String(item.code)}</Badge>
+          {semester && <Badge variant="secondary">Semester {semester}</Badge>}
+        </div>
+        <h2 className="mb-1 text-base font-semibold">{String(item.name)}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {program?.code ? `${program.code} — ${program.name}` : "General Subject Course"}
+        </p>
+      </CardContent>
+    </Card>
   );
 }

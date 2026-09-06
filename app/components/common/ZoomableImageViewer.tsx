@@ -10,17 +10,14 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { IconExternalLink, IconRefresh, IconZoomIn, IconZoomOut } from "@tabler/icons-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "cn";
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 6;
 
 type Offset = { x: number; y: number };
 
-/**
- * Interactive image viewer for notice attachments: zoom via buttons, mouse
- * wheel or double-click, and drag-to-pan. Includes a reset (1:1) control and
- * an "open full size" action. Used inside the notice detail modal.
- */
 export function ZoomableImageViewer({
   src,
   alt,
@@ -64,8 +61,6 @@ export function ZoomableImageViewer({
     setOffset({ x, y });
   }, []);
 
-  // Zoom towards a focal point (cursor position in stage coordinates) so the
-  // image point under the cursor stays put while the zoom level changes.
   const zoomAround = useCallback(
     (nextZoomRaw: number, focal?: Offset) => {
       const rect = stageRef.current?.getBoundingClientRect();
@@ -84,8 +79,6 @@ export function ZoomableImageViewer({
     [applyView],
   );
 
-  // Wheel zoom needs a non-passive listener so preventDefault actually stops
-  // the page from scrolling while zooming.
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
@@ -102,16 +95,8 @@ export function ZoomableImageViewer({
     return () => stage.removeEventListener("wheel", onWheel);
   }, [zoomAround]);
 
-  // Reset the view whenever a (new) image finishes loading — event-driven so
-  // we never call setState synchronously inside an effect.
-  function handleImageLoad() {
-    applyView(MIN_ZOOM, { x: 0, y: 0 });
-  }
-
-  function handlePointerDown(e: ReactPointerEvent<HTMLDivElement>) {
-    if (zoom <= MIN_ZOOM || e.button !== 0) return;
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
+  const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (viewRef.current.zoom <= MIN_ZOOM) return;
     dragRef.current = {
       pointerId: e.pointerId,
       startX: e.clientX,
@@ -119,33 +104,39 @@ export function ZoomableImageViewer({
       baseX: viewRef.current.offset.x,
       baseY: viewRef.current.offset.y,
     };
-  }
+  };
 
-  function handlePointerMove(e: ReactPointerEvent<HTMLDivElement>) {
+  const handlePointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== e.pointerId) return;
+    e.preventDefault();
     applyView(viewRef.current.zoom, {
       x: drag.baseX + (e.clientX - drag.startX),
       y: drag.baseY + (e.clientY - drag.startY),
     });
-  }
+  };
 
-  function endDrag(e: ReactPointerEvent<HTMLDivElement>) {
-    if (dragRef.current?.pointerId === e.pointerId) dragRef.current = null;
-  }
+  const endDrag = () => {
+    dragRef.current = null;
+  };
 
-  function handleDoubleClick(e: ReactMouseEvent<HTMLDivElement>) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    if (viewRef.current.zoom > MIN_ZOOM) {
-      applyView(MIN_ZOOM, { x: 0, y: 0 });
-    } else {
-      zoomAround(2.5, { x: e.clientX - rect.left, y: e.clientY - rect.top });
-    }
-  }
+  const handleDoubleClick = (e: ReactMouseEvent<HTMLDivElement>) => {
+    const rect = stageRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    zoomAround(
+      viewRef.current.zoom >= 2 ? MIN_ZOOM : viewRef.current.zoom * 2,
+      { x: e.clientX - rect.left, y: e.clientY - rect.top },
+    );
+  };
 
-  function handleKeyDown(e: ReactKeyboardEvent<HTMLDivElement>) {
-    const step = 40;
-    const { zoom: z, offset: o } = viewRef.current;
+  const handleImageLoad = () => {
+    applyView(MIN_ZOOM, { x: 0, y: 0 });
+  };
+
+  const handleKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const z = viewRef.current.zoom;
+    const o = viewRef.current.offset;
+    const step = 32;
     if (e.key === "+" || e.key === "=") {
       e.preventDefault();
       zoomAround(z * 1.25);
@@ -168,15 +159,18 @@ export function ZoomableImageViewer({
       e.preventDefault();
       applyView(z, { x: o.x, y: o.y - step });
     }
-  }
+  };
 
   const canPan = zoom > MIN_ZOOM;
 
   return (
-    <div className="zoom-viewer">
+    <div className="flex flex-col gap-2">
       <div
         ref={stageRef}
-        className={`zoom-viewer-stage${canPan ? " pannable" : ""}`}
+        className={cn(
+          "relative flex h-72 w-full touch-none items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/40 select-none sm:h-96",
+          canPan && "cursor-grab active:cursor-grabbing"
+        )}
         role="application"
         aria-label={`Zoomable preview of ${alt}. Use the plus, minus and arrow keys to zoom and pan.`}
         tabIndex={0}
@@ -192,62 +186,38 @@ export function ZoomableImageViewer({
           src={src}
           alt={alt}
           draggable={false}
-          className="zoom-viewer-img"
+          className="max-h-full max-w-full object-contain"
           onLoad={handleImageLoad}
           style={{
-            transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px)) scale(${zoom})`,
+            transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
           }}
         />
         {!canPan && (
-          <span className="zoom-viewer-hint">Scroll or double-click to zoom</span>
+          <span className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">
+            Scroll or double-click to zoom
+          </span>
         )}
       </div>
 
-      <div className="zoom-viewer-controls">
-        <button
-          type="button"
-          className="zoom-viewer-btn"
-          onClick={() => zoomAround(viewRef.current.zoom / 1.25)}
-          disabled={zoom <= MIN_ZOOM}
-          aria-label="Zoom out"
-          title="Zoom out"
-        >
+      <div className="flex items-center justify-center gap-1">
+        <Button type="button" variant="outline" size="icon-sm" onClick={() => zoomAround(viewRef.current.zoom / 1.25)} disabled={zoom <= MIN_ZOOM} aria-label="Zoom out" title="Zoom out">
           <IconZoomOut size={16} aria-hidden="true" />
-        </button>
-        <span className="zoom-viewer-level" aria-live="polite">
+        </Button>
+        <span className="min-w-14 text-center text-xs font-medium tabular-nums" aria-live="polite">
           {Math.round(zoom * 100)}%
         </span>
-        <button
-          type="button"
-          className="zoom-viewer-btn"
-          onClick={() => zoomAround(viewRef.current.zoom * 1.25)}
-          disabled={zoom >= MAX_ZOOM}
-          aria-label="Zoom in"
-          title="Zoom in"
-        >
+        <Button type="button" variant="outline" size="icon-sm" onClick={() => zoomAround(viewRef.current.zoom * 1.25)} disabled={zoom >= MAX_ZOOM} aria-label="Zoom in" title="Zoom in">
           <IconZoomIn size={16} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          className="zoom-viewer-btn"
-          onClick={() => applyView(MIN_ZOOM, { x: 0, y: 0 })}
-          disabled={!canPan}
-          aria-label="Reset zoom and position"
-          title="Reset view (1:1)"
-        >
+        </Button>
+        <Button type="button" variant="outline" size="icon-sm" onClick={() => applyView(MIN_ZOOM, { x: 0, y: 0 })} disabled={!canPan} aria-label="Reset zoom and position" title="Reset view (1:1)">
           <IconRefresh size={16} aria-hidden="true" />
-        </button>
+        </Button>
         {openUrl && (
-          <a
-            className="zoom-viewer-btn"
-            href={openUrl}
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Open full size image in a new tab"
-            title="Open full size"
-          >
-            <IconExternalLink size={16} aria-hidden="true" />
-          </a>
+          <Button type="button" variant="outline" size="icon-sm" asChild>
+            <a href={openUrl} target="_blank" rel="noreferrer" aria-label="Open full size image in a new tab" title="Open full size">
+              <IconExternalLink size={16} aria-hidden="true" />
+            </a>
+          </Button>
         )}
       </div>
     </div>

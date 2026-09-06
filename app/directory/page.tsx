@@ -6,47 +6,17 @@ import { IconSearch } from "@tabler/icons-react";
 import { Avatar } from "@/app/components/profile/Avatar";
 import { ProfileShell } from "@/app/components/profile/ProfileShell";
 import type { DirectoryEntry, RoleName } from "@/app/lib/profile-shared";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { cn } from "cn";
 
 const ROLE_FILTERS: { value: "" | RoleName; label: string }[] = [
   { value: "", label: "Everyone" },
   { value: "STUDENT", label: "Students" },
   { value: "TEACHER", label: "Faculty" },
 ];
-
-const chipStyle = (active: boolean) =>
-  ({
-    fontSize: 12,
-    fontWeight: 700,
-    padding: "7px 14px",
-    borderRadius: 999,
-    border: "1px solid var(--line-strong)",
-    background: active ? "var(--accent-dark)" : "transparent",
-    color: active ? "#ffffff" : "var(--ink-soft)",
-  }) as const;
-
-const rowCardStyle = {
-  display: "flex",
-  alignItems: "center",
-  gap: 14,
-  padding: "14px 16px",
-  borderRadius: 12,
-  background: "var(--panel)",
-  border: "1px solid var(--line)",
-  color: "inherit",
-  textDecoration: "none",
-} as const;
-
-function roleBadge(role: RoleName) {
-  const student = role === "STUDENT";
-  return {
-    fontSize: 11,
-    fontWeight: 700,
-    padding: "3px 10px",
-    borderRadius: 999,
-    background: student ? "rgba(2,132,199,0.12)" : "rgba(16,185,129,0.14)",
-    color: student ? "#0369a1" : "#047857",
-  } as const;
-}
 
 export default function DirectoryPage() {
   const [query, setQuery] = useState("");
@@ -91,73 +61,72 @@ export default function DirectoryPage() {
       title="Directory"
       subtitle="Find students and faculty — open any card to view a profile"
     >
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 18 }}>
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 12px",
-            borderRadius: 10,
-            border: "1px solid var(--input-border)",
-            background: "var(--input-bg)",
-            flex: 1,
-            minWidth: 220,
-          }}
-        >
-          <IconSearch size={16} style={{ color: "var(--ink-soft)" }} aria-hidden="true" />
-          <input
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-56 flex-1">
+          <IconSearch
+            size={16}
+            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search by name…"
             aria-label="Search people by name"
-            style={{
-              border: "none",
-              outline: "none",
-              background: "transparent",
-              color: "var(--input-color)",
-              width: "100%",
-              fontSize: 14,
-            }}
+            className="pl-9"
           />
-        </label>
+        </div>
         {ROLE_FILTERS.map((filter) => (
-          <button
+          <Button
             key={filter.label}
             type="button"
+            size="sm"
+            variant={role === filter.value ? "default" : "outline"}
             onClick={() => setRole(filter.value)}
             aria-pressed={role === filter.value}
-            style={chipStyle(role === filter.value)}
           >
             {filter.label}
-          </button>
+          </Button>
         ))}
       </div>
 
       {error && (
-        <p style={{ margin: "0 0 16px", fontSize: 13, fontWeight: 600, color: "#b91c1c" }}>
+        <p className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
         </p>
       )}
 
       {isLoading ? (
-        <p style={{ color: "var(--ink-soft)", fontSize: 14 }}>Loading…</p>
+        <p className="text-sm text-muted-foreground">Loading…</p>
       ) : entries.length === 0 ? (
-        <p style={{ color: "var(--ink-soft)", fontSize: 14 }}>No people found.</p>
+        <p className="rounded-md border bg-muted/40 px-4 py-8 text-center text-sm text-muted-foreground">
+          No people found.
+        </p>
       ) : (
-        <div style={{ display: "grid", gap: 12 }}>
+        <div className="grid grid-cols-1 gap-3">
           {entries.map((entry) => (
-            <Link key={entry.id} href={`/profile/${entry.id}`} style={rowCardStyle}>
+            <Link
+              key={entry.id}
+              href={`/profile/${entry.id}`}
+              className={cn(
+                "flex items-center gap-3.5 rounded-xl border bg-card p-3.5 transition-colors hover:border-ring hover:bg-accent/5 sm:p-4"
+              )}
+            >
               <Avatar name={entry.name} photoUrl={entry.photoUrl} size={44} />
-              <div style={{ flex: 1, minWidth: 160 }}>
-                <strong style={{ fontSize: 14 }}>{entry.name}</strong>
-                <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--ink-soft)" }}>
-                  {entry.subtitle}
-                </p>
+              <div className="min-w-40 flex-1">
+                <strong className="text-sm">{entry.name}</strong>
+                <p className="mt-0.5 text-xs text-muted-foreground">{entry.subtitle}</p>
               </div>
-              <span style={roleBadge(entry.role)}>
+              <Badge
+                variant="outline"
+                className={cn(
+                  entry.role === "STUDENT"
+                    ? "border-sky-600/30 bg-sky-500/10 text-sky-700 dark:text-sky-300"
+                    : "border-emerald-600/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                )}
+              >
                 {entry.role === "STUDENT" ? "Student" : "Faculty"}
-              </span>
+              </Badge>
             </Link>
           ))}
         </div>

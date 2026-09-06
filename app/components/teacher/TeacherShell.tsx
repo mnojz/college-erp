@@ -17,6 +17,8 @@ type TeacherShellProps = {
   teacherName?: string;
   employeeNo?: string;
   avatarUrl?: string | null;
+  /** Optional actions rendered on the same line as the page heading. */
+  headerActions?: React.ReactNode;
   children: React.ReactNode;
 };
 
@@ -36,6 +38,7 @@ export function TeacherShell({
   teacherName = "Faculty Member",
   employeeNo = "FWU-FACULTY",
   avatarUrl,
+  headerActions,
   children,
 }: TeacherShellProps) {
   return (
@@ -44,7 +47,6 @@ export function TeacherShell({
         brandTitle: "College-ERP",
         brandSubtitle: "Faculty Portal",
         brandHomeHref: "/dashboard",
-        brandIconBg: "#0ea5e9",
         userName: teacherName,
         userSubtitle: `Emp ID: ${employeeNo}`,
         avatarUrl,
@@ -53,6 +55,7 @@ export function TeacherShell({
       activeHref={active}
       title={title}
       subtitle={subtitle}
+      headerActions={headerActions}
     >
       {children}
     </DashboardShell>

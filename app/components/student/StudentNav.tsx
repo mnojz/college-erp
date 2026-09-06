@@ -14,7 +14,6 @@ export function StudentNav({ name, studentId, avatarUrl }: StudentNavProps) {
       brandTitle="College-ERP"
       brandSubtitle="Student Portal"
       brandHomeHref="/dashboard"
-      brandIconBg="#0284c7"
       userName={name}
       userSubtitle={`ID: ${studentId}`}
       avatarUrl={avatarUrl}

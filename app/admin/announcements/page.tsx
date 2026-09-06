@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/ui/button";
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -208,13 +209,13 @@ export default function AdminAnnouncementsPage() {
   return (
     <AdminShell title="Announcements & Notices" subtitle="Campus Communications" active="/admin/announcements">
       {/* Top action bar */}
-      <div className="admin-topbar">
-        <p style={{ margin: 0, color: "var(--ink-soft)", fontSize: 13, fontFamily: "Arial, sans-serif" }}>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+        <p style={{ margin: 0, color: "var(--muted-foreground)", fontSize: 13, fontFamily: "Arial, sans-serif" }}>
           {loading ? "Loading notices…" : `${announcements.length} notice${announcements.length !== 1 ? "s" : ""} broadcasted`}
         </p>
-        <div className="admin-topbar-actions">
-          <button
-            className="btn-add"
+        <div className="flex flex-wrap gap-2.5">
+          <Button
+            size="sm"
             type="button"
             onClick={() => {
               setShowCreateModal(true);
@@ -223,15 +224,15 @@ export default function AdminAnnouncementsPage() {
           >
             <IconPlus size={16} aria-hidden="true" />
             New Announcement
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Announcements List */}
-      <div className="admin-notice-grid">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 [&>*]:h-full">
         {announcements.length === 0 && !loading ? (
-          <div className="admin-table-wrap">
-            <div className="admin-table-empty">
+          <div className="w-full overflow-x-auto rounded-lg border">
+            <div className="px-3 py-10 text-center text-sm text-muted-foreground">
               No campus announcements yet. Click <strong>+ New Announcement</strong> to publish notices.
             </div>
           </div>
@@ -245,9 +246,9 @@ export default function AdminAnnouncementsPage() {
                 onOpen={() => setSelectedNotice(toNoticeDetail(a))}
                 actions={
                   <>
-                    <button
+                    <Button
                       type="button"
-                      className="btn-action-edit"
+                      variant="outline" size="icon-sm"
                       title="Edit Announcement"
                       aria-label="Edit Announcement"
                       onClick={() => {
@@ -263,10 +264,10 @@ export default function AdminAnnouncementsPage() {
                       }}
                     >
                       <IconPencil size={15} aria-hidden="true" />
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
-                      className="btn-action-delete"
+                      variant="outline" size="icon-sm" className="border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
                       title="Delete Announcement"
                       aria-label="Delete Announcement"
                       onClick={() => {
@@ -275,7 +276,7 @@ export default function AdminAnnouncementsPage() {
                       }}
                     >
                       <IconTrash size={15} aria-hidden="true" />
-                    </button>
+                    </Button>
                   </>
                 }
               />
@@ -284,8 +285,8 @@ export default function AdminAnnouncementsPage() {
         )}
       </div>
 
-      {error && <p className="admin-message error">{error}</p>}
-      {message && <p className="admin-message success">{message}</p>}
+      {error && <p className="mt-3.5 rounded-lg border border-destructive/20 bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive">{error}</p>}
+      {message && <p className="mt-3.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2.5 text-[13px] text-emerald-600 dark:text-emerald-400">{message}</p>}
 
       {/* Modal 1: Create Announcement */}
       {showCreateModal && (
@@ -296,10 +297,11 @@ export default function AdminAnnouncementsPage() {
             setForm(emptyForm);
           }}
         >
-          <form className="modal-form" onSubmit={handleCreate}>
-            <label>
+          <form className="grid gap-4" onSubmit={handleCreate}>
+            <label className="form-field">
               Announcement Headline
               <input
+ className="form-control"
                 type="text"
                 placeholder="e.g. Mid-Term Examination Schedule Released"
                 value={form.title}
@@ -308,9 +310,10 @@ export default function AdminAnnouncementsPage() {
               />
             </label>
 
-            <label>
+            <label className="form-field">
               Full Announcement Content
               <textarea
+ className="form-control"
                 placeholder="Write the full message for faculty and students..."
                 value={form.body}
                 onChange={(e) => setForm({ ...form, body: e.target.value })}
@@ -319,8 +322,8 @@ export default function AdminAnnouncementsPage() {
               />
             </label>
 
-            <label>
-              Attachment <span className="optional-tag">(optional image or PDF)</span>
+            <label className="form-field">
+              Attachment <span className="text-xs font-normal text-muted-foreground">(optional image or PDF)</span>
               <FileDropzone
                 id="notice-create-attachment"
                 accept="image/png,image/jpeg,image/webp,image/gif,application/pdf"
@@ -332,14 +335,14 @@ export default function AdminAnnouncementsPage() {
               />
             </label>
 
-            {error && <p className="admin-form-error">{error}</p>}
+            {error && <p className="m-0 text-[13px] text-destructive">{error}</p>}
 
-            <div className="modal-actions">
-              <button className="btn-primary" type="submit" disabled={saving}>
+            <div className="flex flex-wrap justify-end gap-2.5">
+              <Button type="submit" disabled={saving}>
                 {saving ? "Publishing…" : "Publish Announcement"}
-              </button>
-              <button
-                className="btn-ghost"
+              </Button>
+              <Button
+                variant="outline"
                 type="button"
                 onClick={() => {
                   setShowCreateModal(false);
@@ -347,7 +350,7 @@ export default function AdminAnnouncementsPage() {
                 }}
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </form>
         </AdminModal>
@@ -359,10 +362,11 @@ export default function AdminAnnouncementsPage() {
           title="Edit Announcement / Notice"
           onClose={() => setEditingAnnouncement(null)}
         >
-          <form className="modal-form" onSubmit={handleUpdate}>
-            <label>
+          <form className="grid gap-4" onSubmit={handleUpdate}>
+            <label className="form-field">
               Announcement Headline
               <input
+ className="form-control"
                 type="text"
                 value={editingAnnouncement.title}
                 onChange={(e) => setEditingAnnouncement({ ...editingAnnouncement, title: e.target.value })}
@@ -370,9 +374,10 @@ export default function AdminAnnouncementsPage() {
               />
             </label>
 
-            <label>
+            <label className="form-field">
               Full Announcement Content
               <textarea
+ className="form-control"
                 value={editingAnnouncement.body}
                 onChange={(e) => setEditingAnnouncement({ ...editingAnnouncement, body: e.target.value })}
                 rows={6}
@@ -380,10 +385,10 @@ export default function AdminAnnouncementsPage() {
               />
             </label>
 
-            <label>
-              Attachment <span className="optional-tag">(optional image or PDF)</span>
+            <label className="form-field">
+              Attachment <span className="text-xs font-normal text-muted-foreground">(optional image or PDF)</span>
               {editingAnnouncement.existingAttachment && !editingAnnouncement.file && (
-                <span className="notice-card-attachment-chip">
+                <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground">
                   <IconPaperclip size={13} aria-hidden="true" />
                   Current: {editingAnnouncement.existingAttachment.fileName}
                 </span>
@@ -400,10 +405,11 @@ export default function AdminAnnouncementsPage() {
                 hint="or click to browse — a new file replaces the current attachment"
               />
               {editingAnnouncement.existingAttachment && (
-                <span className="notice-attachment-remove">
+                <span className="inline-flex cursor-pointer items-center gap-2 text-[13px] text-muted-foreground">
                   <input
                     type="checkbox"
                     id="notice-remove-attachment"
+ className="accent-primary"
                     checked={editingAnnouncement.removeAttachment}
                     onChange={(e) =>
                       setEditingAnnouncement({
@@ -418,19 +424,19 @@ export default function AdminAnnouncementsPage() {
               )}
             </label>
 
-            {error && <p className="admin-form-error">{error}</p>}
+            {error && <p className="m-0 text-[13px] text-destructive">{error}</p>}
 
-            <div className="modal-actions">
-              <button className="btn-primary" type="submit" disabled={saving}>
+            <div className="flex flex-wrap justify-end gap-2.5">
+              <Button type="submit" disabled={saving}>
                 {saving ? "Saving Changes…" : "Save Changes"}
-              </button>
-              <button
-                className="btn-ghost"
+              </Button>
+              <Button
+                variant="outline"
                 type="button"
                 onClick={() => setEditingAnnouncement(null)}
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </form>
         </AdminModal>
@@ -442,22 +448,22 @@ export default function AdminAnnouncementsPage() {
           title="Delete Announcement"
           onClose={() => setDeletingAnnouncement(null)}
         >
-          <div className="modal-confirm-box">
+          <div className="grid gap-3 text-sm text-muted-foreground">
             <p>
               Are you sure you want to delete the notice <strong>&ldquo;{deletingAnnouncement.title}&rdquo;</strong>?
             </p>
-            <p className="admin-form-error notice-confirm-warning">
+            <p className="m-0 flex items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3.5 py-2.5 text-[13px] font-medium text-amber-600 dark:text-amber-400">
               <IconAlertTriangle size={14} aria-hidden="true" />
               This bulletin will be removed from the public portal and all dashboards.
             </p>
-            {error && <p className="admin-form-error" style={{ marginTop: 12 }}>{error}</p>}
-            <div className="modal-actions" style={{ marginTop: "20px" }}>
-              <button className="btn-danger" type="button" onClick={handleDelete} disabled={saving}>
+            {error && <p className="m-0 text-[13px] text-destructive" style={{ marginTop: 12 }}>{error}</p>}
+            <div className="flex flex-wrap justify-end gap-2.5" style={{ marginTop: "20px" }}>
+              <Button variant="destructive" type="button" onClick={handleDelete} disabled={saving}>
                 {saving ? "Deleting…" : "Yes, Delete Notice"}
-              </button>
-              <button className="btn-ghost" type="button" onClick={() => setDeletingAnnouncement(null)} disabled={saving}>
+              </Button>
+              <Button variant="outline" type="button" onClick={() => setDeletingAnnouncement(null)} disabled={saving}>
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </AdminModal>

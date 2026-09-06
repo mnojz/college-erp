@@ -79,7 +79,7 @@ export default function MyProfilePage() {
   return (
     <ProfileShell activeHref="/profile" title="My profile" subtitle="Control what others can see">
       {error && (
-        <p style={{ margin: "0 0 16px", fontSize: 13, fontWeight: 600, color: "#b91c1c" }}>
+        <p className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
         </p>
       )}
@@ -96,7 +96,7 @@ export default function MyProfilePage() {
           )}
         </>
       ) : (
-        !error && <p style={{ color: "var(--ink-soft)", fontSize: 14 }}>Loading…</p>
+        !error && <p className="text-sm text-muted-foreground">Loading…</p>
       )}
     </ProfileShell>
   );

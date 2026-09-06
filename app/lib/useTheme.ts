@@ -16,16 +16,21 @@ function subscribeToTheme(onChange: () => void) {
   return () => window.removeEventListener("college-erp-theme-change", onChange);
 }
 
+function applyTheme(nextTheme: Theme) {
+  const root = document.documentElement;
+  root.classList.toggle("dark", nextTheme === "dark");
+}
+
 export function useTheme() {
   const theme = useSyncExternalStore(subscribeToTheme, getThemeSnapshot, () => "light" as Theme);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
+    applyTheme(theme);
   }, [theme]);
 
   function setTheme(nextTheme: Theme) {
     window.localStorage.setItem("college-erp-theme", nextTheme);
-    document.documentElement.dataset.theme = nextTheme;
+    applyTheme(nextTheme);
     window.dispatchEvent(new Event("college-erp-theme-change"));
   }
 

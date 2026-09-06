@@ -4,16 +4,14 @@ import { PublicLayout } from "@/app/components/layout/PublicLayout";
 export default function SyllabusPage() {
   return (
     <PublicLayout>
-      <section style={{ maxWidth: "1140px", margin: "0 auto", padding: "32px 20px 56px" }}>
-        <header style={{ marginBottom: "20px" }}>
-          <h1 style={{ margin: "0 0 6px", fontSize: "26px", fontWeight: 800 }}>
-            Syllabus Library
-          </h1>
-          <p style={{ margin: 0, color: "var(--ink-soft)", maxWidth: "680px" }}>
+      <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Syllabus Library</h1>
+          <p className="mt-2 max-w-2xl text-muted-foreground">
             Browse official syllabus outlines published by FWU departments —
             organized by program and semester, with downloadable PDFs.
           </p>
-        </header>
+        </div>
         <PublicSyllabusLibrary />
       </section>
     </PublicLayout>

@@ -30,12 +30,6 @@ const ROLE_HOMES: Record<Me["role"], string> = {
   ADMIN: "/dashboard",
 };
 
-const ROLE_ICON_BG: Record<Me["role"], string> = {
-  STUDENT: "#0284c7",
-  TEACHER: "#0ea5e9",
-  ADMIN: "#dc2626",
-};
-
 /**
  * Shell for the shared /profile and /directory pages. Works for every role:
  * resolves the session for the top nav and shows Profile/Directory sidebar
@@ -80,7 +74,6 @@ export function ProfileShell({
         brandTitle: "College-ERP",
         brandSubtitle: `${ROLE_LABELS[me.role]} Portal`,
         brandHomeHref: ROLE_HOMES[me.role],
-        brandIconBg: ROLE_ICON_BG[me.role],
         userName: `${me.firstName} ${me.lastName}`.trim(),
         userSubtitle: ROLE_LABELS[me.role],
       }}

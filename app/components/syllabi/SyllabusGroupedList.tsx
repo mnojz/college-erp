@@ -6,72 +6,95 @@ import { type SyllabusDto } from "@/app/lib/syllabi-shared";
 type Syllabus = SyllabusDto;
 type Program = { id: string; name: string; code: string; departmentName: string };
 
-export interface GroupedByDepartment {
-  department: string;
-  programs: Array<{
-    program: { label: string; id: string | null } | null;
-    bySemester: Map<number, Syllabus[]>;
-  }>;
+export interface ProgramGroup {
+  /** Stable React key: program id, or "__unassigned__" for rows without a program. */
+  key: string;
+  program: { id: string | null; name: string; code: string; departmentName: string } | null;
+  bySemester: Map<number, Syllabus[]>;
 }
 
 /**
- * Groups a flat syllabus list into department → program → semester(1..8)
- * so each semester slot can render 1-8 lists. Programs with no syllabi
- * are omitted; every program that has at least one syllabus shows all 8
- * semester slots (empty ones render a placeholder).
+ * Groups a flat syllabus list into PROGRAM sections (Computer, Civil,
+ * Architecture, …). Each program owning at least one syllabus becomes its own
+ * section showing all 8 semester slots (empty slots render a placeholder).
+ * Program-less rows land in a final "Unassigned" section. Known programs are
+ * sorted by department then name, so newly added programs automatically get
+ * their own section without further changes.
  */
-export function useSyllabusGroups(
+export function useSyllabusProgramGroups(
   syllabi: Syllabus[],
   programs: Program[],
-): GroupedByDepartment[] {
+): ProgramGroup[] {
   return useMemo(() => {
-    const byDept = new Map<string, Syllabus[]>();
+    const knownById = new Map(programs.map((p) => [p.id, p]));
+    const byProgram = new Map<string, { program: ProgramGroup["program"]; items: Syllabus[] }>();
+
     for (const s of syllabi) {
-      // Defensive: a row without a department would create an `undefined`
-      // group key (React key warning) — park it under a visible label instead.
-      const dept = s.departmentName ?? "Unassigned";
-      const arr = byDept.get(dept) ?? [];
-      arr.push(s);
-      byDept.set(dept, arr);
+      const pid = s.programId ?? "";
+      let entry = byProgram.get(pid);
+      if (!entry) {
+        let program: ProgramGroup["program"] = null;
+        if (pid) {
+          const known = knownById.get(pid);
+          program = known
+            ? {
+                id: known.id,
+                name: known.name,
+                code: known.code,
+                departmentName: known.departmentName,
+              }
+            : {
+                // Orphan row: syllabus references a program missing from meta,
+                // so fall back to whatever the row itself carries.
+                id: pid,
+                name: s.programName ?? "Other program",
+                code: s.programCode ?? "—",
+                departmentName: s.departmentName ?? "Other",
+              };
+        }
+        entry = { program, items: [] };
+        byProgram.set(pid, entry);
+      }
+      entry.items.push(s);
     }
 
-    const result: GroupedByDepartment[] = [];
-    for (const [department, items] of byDept) {
-      const byProgram = new Map<string | null, Syllabus[]>();
-      for (const s of items) {
-        const key = s.programId ?? "__none__";
-        const arr = byProgram.get(key) ?? [];
-        arr.push(s);
-        byProgram.set(key, arr);
-      }
+    // Known programs with syllabi, sorted by department then name.
+    type Bucket = { program: ProgramGroup["program"]; items: Syllabus[] };
+    const known: Array<{ pid: string; entry: Bucket }> = [];
+    for (const [pid, entry] of byProgram) {
+      if (pid && entry.program && knownById.has(pid)) known.push({ pid, entry });
+    }
+    known.sort((a, b) => {
+      const x = a.entry.program!;
+      const y = b.entry.program!;
+      return (
+        x.departmentName.localeCompare(y.departmentName) || x.name.localeCompare(y.name)
+      );
+    });
 
-      const programGroups: GroupedByDepartment["programs"] = [];
+    const groups: ProgramGroup[] = known.map(({ pid, entry }) => ({
+      key: pid,
+      program: entry.program,
+      bySemester: indexBySemester(entry.items),
+    }));
 
-      // Programs (with a program link) first, then department-wide syllabi.
-      const programIds = [
-        ...new Set(items.filter((s) => s.programId).map((s) => s.programId as string)),
-      ];
-      for (const pid of programIds) {
-        const progItems = byProgram.get(pid) ?? [];
-        const bySemester = indexBySemester(progItems);
-        const prog = programs.find((p) => p.id === pid);
-        programGroups.push({
-          program: prog
-            ? { label: `${prog.code} — ${prog.name}`, id: pid }
-            : { label: pid, id: pid },
-          bySemester,
-        });
-      }
-
-      const noneItems = byProgram.get("__none__");
-      if (noneItems && noneItems.length > 0) {
-        programGroups.push({ program: null, bySemester: indexBySemester(noneItems) });
-      }
-
-      result.push({ department, programs: programGroups });
+    // Orphan groups: program id unknown to meta, plus program-less rows last.
+    const orphans: Array<{ pid: string; entry: Bucket }> = [];
+    for (const [pid, entry] of byProgram) {
+      if (!pid || !knownById.has(pid)) orphans.push({ pid, entry });
+    }
+    orphans.sort((a, b) =>
+      (a.entry.program?.name ?? "").localeCompare(b.entry.program?.name ?? ""),
+    );
+    for (const { pid, entry } of orphans) {
+      groups.push({
+        key: pid || "__unassigned__",
+        program: entry.program,
+        bySemester: indexBySemester(entry.items),
+      });
     }
 
-    return result.sort((a, b) => a.department.localeCompare(b.department));
+    return groups;
   }, [syllabi, programs]);
 }
 

@@ -12,6 +12,7 @@ import {
 import { NoticePostCard } from "@/app/components/common/NoticePostCard";
 import { AdminModal } from "@/app/components/admin/AdminModal";
 import { ImageUploadCrop } from "@/app/components/common/ImageUploadCrop";
+import { Button } from "@/components/ui/button";
 import {
   IconLayoutList,
   IconPhone,
@@ -315,8 +316,8 @@ export default function StudentPage() {
       });
   }, [router]);
 
-  if (error) return <main className="profile-error">{error}</main>;
-  if (!profile) return <main className="profile-loading">Loading profile...</main>;
+  if (error) return <main className="p-6 text-sm text-destructive">{error}</main>;
+  if (!profile) return <main className="p-6 text-sm text-muted-foreground">Loading profile...</main>;
 
   const fullName = `${profile.user.firstName} ${profile.user.lastName}`;
   const programName = profile.program?.name || "Not assigned";
@@ -346,7 +347,7 @@ export default function StudentPage() {
         profileImageUrl={profile.profileImageUrl}
         onEdit={openEditModal}
       />
-      <div className="profile-card-grid">
+      <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <InfoCard
           title="Personal Information"
           icon={IconUser}
@@ -418,41 +419,28 @@ export default function StudentPage() {
       </div>
 
       {announcements.length > 0 && (
-        <section style={{ marginTop: "28px" }}>
-          <header
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-              marginBottom: 14,
-            }}
-          >
+        <section className="mt-7">
+          <header className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 700 }}>Announcements</h2>
-              <p style={{ margin: "2px 0 0", fontSize: 13, color: "var(--ink-soft)" }}>
+              <h2 className="text-lg font-semibold tracking-tight">Announcements</h2>
+              <p className="text-sm text-muted-foreground">
                 Campus updates and notices from your teachers
               </p>
             </div>
-            <button
+            <Button
               type="button"
-              className="btn-ghost"
+              variant="ghost"
               onClick={() => setShowAll(true)}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                whiteSpace: "nowrap",
-              }}
+              aria-label="View all announcements"
             >
               <IconLayoutList size={16} aria-hidden="true" />
               View All ({announcements.length})
-            </button>
+            </Button>
           </header>
 
           {/* Latest announcements — a single responsive row of 3–4 cards.
               The View All popup lists everything. */}
-          <div className="notice-latest-row">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {announcements.slice(0, 4).map((a) => (
               <NoticePostCard
                 key={a.id}
@@ -471,7 +459,7 @@ export default function StudentPage() {
           onClose={() => setShowAll(false)}
           wide
         >
-          <div className="notice-all-modal-list">
+          <div className="flex flex-col gap-3">
             {announcements.map((a) => (
               <NoticePostCard
                 key={a.id}
@@ -485,23 +473,23 @@ export default function StudentPage() {
 
       {showEdit && editForm && (
         <AdminModal title="Edit Profile" onClose={() => setShowEdit(false)}>
-          <form className="modal-form" onSubmit={handleSaveProfile}>
+          <form className="flex flex-col gap-4" onSubmit={handleSaveProfile}>
             <ImageUploadCrop
               label="Profile Photo"
               value={editForm.profileImageUrl}
               onChange={(val) => setEditForm({ ...editForm, profileImageUrl: val })}
             />
 
-            <p className="form-hint" style={{ marginTop: 2 }}>
+            <p className="text-sm text-muted-foreground" style={{ marginTop: 2 }}>
               You can update your photo, contact and guardian details below. Critical records —
               name, gender, registration number, nationality, category, religion, program — are
               managed by the college office and cannot be changed here.
             </p>
 
-            <div className="inline-pair">
-              <label>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="form-field">
                 Blood Group
-                <select
+                <select className="form-control"
                   value={editForm.bloodGroup}
                   onChange={(e) => setEditForm({ ...editForm, bloodGroup: e.target.value })}
                 >
@@ -513,9 +501,9 @@ export default function StudentPage() {
                   ))}
                 </select>
               </label>
-              <label>
+              <label className="form-field">
                 Email Address
-                <input
+                <input className="form-control"
                   type="email"
                   value={editForm.email}
                   onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
@@ -524,19 +512,19 @@ export default function StudentPage() {
               </label>
             </div>
 
-            <div className="inline-pair">
-              <label>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="form-field">
                 Phone Number
-                <input
+                <input className="form-control"
                   type="tel"
                   placeholder="e.g. 98XXXXXXXX"
                   value={editForm.phone}
                   onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                 />
               </label>
-              <label>
+              <label className="form-field">
                 Emergency Contact
-                <input
+                <input className="form-control"
                   type="tel"
                   placeholder="Person to call in an emergency"
                   value={editForm.emergencyContact}
@@ -552,15 +540,15 @@ export default function StudentPage() {
                 fontWeight: 700,
                 textTransform: "uppercase",
                 letterSpacing: "0.04em",
-                color: "var(--ink-soft, #64748b)",
+                color: "var(--muted-foreground)",
               }}
             >
               Permanent Address
             </h3>
-            <div className="inline-pair">
-              <label>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="form-field">
                 Province
-                <select
+                <select className="form-control"
                   value={editForm.permProvinceId ?? ""}
                   onChange={(e) =>
                     setEditForm({
@@ -577,9 +565,9 @@ export default function StudentPage() {
                   ))}
                 </select>
               </label>
-              <label>
+              <label className="form-field">
                 District
-                <select
+                <select className="form-control"
                   value={editForm.permDistrictId ?? ""}
                   onChange={(e) =>
                     setEditForm({
@@ -598,10 +586,10 @@ export default function StudentPage() {
                 </select>
               </label>
             </div>
-            <div className="inline-pair">
-              <label>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="form-field">
                 Municipality / Rural Municipality
-                <select
+                <select className="form-control"
                   value={editForm.permLocalLevelId ?? ""}
                   onChange={(e) =>
                     setEditForm({
@@ -619,9 +607,9 @@ export default function StudentPage() {
                     ))}
                 </select>
               </label>
-              <label>
+              <label className="form-field">
                 Ward Number
-                <select
+                <select className="form-control"
                   value={editForm.permWard ?? ""}
                   onChange={(e) =>
                     setEditForm({
@@ -651,9 +639,9 @@ export default function StudentPage() {
                 </select>
               </label>
             </div>
-            <label>
+            <label className="form-field">
               Tole / Street
-              <input
+              <input className="form-control"
                 type="text"
                 placeholder="Your tole or street name"
                 value={editForm.permTole}
@@ -668,7 +656,7 @@ export default function StudentPage() {
                 fontWeight: 700,
                 textTransform: "uppercase",
                 letterSpacing: "0.04em",
-                color: "var(--ink-soft, #64748b)",
+                color: "var(--muted-foreground)",
               }}
             >
               Current Address
@@ -680,12 +668,12 @@ export default function StudentPage() {
                 gap: 8,
                 fontSize: 13,
                 fontWeight: 500,
-                color: "var(--ink-soft, #64748b)",
+                color: "var(--muted-foreground)",
                 cursor: "pointer",
                 margin: "4px 0 8px",
               }}
             >
-              <input
+              <input className="size-4 accent-foreground"
                 type="checkbox"
                 checked={editForm.currSameAsPerm}
                 onChange={(e) =>
@@ -712,10 +700,10 @@ export default function StudentPage() {
                 pointerEvents: editForm.currSameAsPerm ? "none" : "auto",
               }}
             >
-              <div className="inline-pair">
-                <label>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="form-field">
                   Province
-                  <select
+                  <select className="form-control"
                     value={editForm.currProvinceId ?? ""}
                     onChange={(e) =>
                       setEditForm({
@@ -733,9 +721,9 @@ export default function StudentPage() {
                     ))}
                   </select>
                 </label>
-                <label>
+                <label className="form-field">
                   District
-                  <select
+                  <select className="form-control"
                     value={editForm.currDistrictId ?? ""}
                     onChange={(e) =>
                       setEditForm({
@@ -754,10 +742,10 @@ export default function StudentPage() {
                   </select>
                 </label>
               </div>
-              <div className="inline-pair">
-                <label>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="form-field">
                   Municipality / Rural Municipality
-                  <select
+                  <select className="form-control"
                     value={editForm.currLocalLevelId ?? ""}
                     onChange={(e) =>
                       setEditForm({
@@ -775,9 +763,9 @@ export default function StudentPage() {
                       ))}
                   </select>
                 </label>
-                <label>
+                <label className="form-field">
                   Ward Number
-                  <select
+                  <select className="form-control"
                     value={editForm.currWard ?? ""}
                     onChange={(e) =>
                       setEditForm({
@@ -807,9 +795,9 @@ export default function StudentPage() {
                   </select>
                 </label>
               </div>
-              <label>
+              <label className="form-field">
                 Tole / Street
-                <input
+                <input className="form-control"
                   type="text"
                   placeholder="Your tole or street name"
                   value={editForm.currTole}
@@ -826,32 +814,32 @@ export default function StudentPage() {
                 fontWeight: 700,
                 textTransform: "uppercase",
                 letterSpacing: "0.04em",
-                color: "var(--ink-soft, #64748b)",
+                color: "var(--muted-foreground)",
               }}
             >
               Parent / Guardian Details
             </h3>
-            <label>
+            <label className="form-field">
               Guardian&apos;s Name
-              <input
+              <input className="form-control"
                 type="text"
                 value={editForm.guardianName}
                 onChange={(e) => setEditForm({ ...editForm, guardianName: e.target.value })}
               />
             </label>
 
-            <div className="inline-pair">
-              <label>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="form-field">
                 Guardian Phone
-                <input
+                <input className="form-control"
                   type="tel"
                   value={editForm.guardianPhone}
                   onChange={(e) => setEditForm({ ...editForm, guardianPhone: e.target.value })}
                 />
               </label>
-              <label>
+              <label className="form-field">
                 Guardian Email
-                <input
+                <input className="form-control"
                   type="email"
                   value={editForm.guardianEmail}
                   onChange={(e) => setEditForm({ ...editForm, guardianEmail: e.target.value })}
@@ -859,9 +847,9 @@ export default function StudentPage() {
               </label>
             </div>
 
-            <label>
+            <label className="form-field">
               Relation with Guardian
-              <select
+              <select className="form-control"
                 value={editForm.guardianRelation}
                 onChange={(e) => setEditForm({ ...editForm, guardianRelation: e.target.value })}
               >
@@ -881,15 +869,15 @@ export default function StudentPage() {
                 fontWeight: 700,
                 textTransform: "uppercase",
                 letterSpacing: "0.04em",
-                color: "var(--ink-soft, #64748b)",
+                color: "var(--muted-foreground)",
               }}
             >
               Security
             </h3>
-            <div className="inline-pair">
-              <label>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="form-field">
                 Current Password
-                <input
+                <input className="form-control"
                   type="password"
                   placeholder="Required to change email / password"
                   value={editForm.currentPassword}
@@ -897,9 +885,9 @@ export default function StudentPage() {
                   autoComplete="current-password"
                 />
               </label>
-              <label>
+              <label className="form-field">
                 New Password
-                <input
+                <input className="form-control"
                   type="password"
                   placeholder="Optional — min 8 characters"
                   value={editForm.newPassword}
@@ -914,13 +902,13 @@ export default function StudentPage() {
               <p style={{ margin: 0, fontSize: 13, color: "#15803d" }}>{editSuccess}</p>
             )}
 
-            <div className="modal-actions">
-              <button className="btn-primary" type="submit" disabled={savingProfile}>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button type="submit" disabled={savingProfile}>
                 {savingProfile ? "Saving…" : "Save Changes"}
-              </button>
-              <button className="btn-ghost" type="button" onClick={() => setShowEdit(false)}>
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setShowEdit(false)}>
                 Cancel
-              </button>
+              </Button>
             </div>
           </form>
         </AdminModal>

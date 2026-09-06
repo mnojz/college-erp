@@ -3,6 +3,7 @@
 import { useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
 import { IconFileText, IconUpload, IconX } from "@tabler/icons-react";
 import { formatBytes } from "@/app/lib/syllabi-shared";
+import { cn } from "cn";
 
 type FileDropzoneProps = {
   id: string;
@@ -23,11 +24,6 @@ type FileDropzoneProps = {
   fileIcon?: ReactNode;
 };
 
-/**
- * Shared professional upload/dropzone input: accent dashed border,
- * drag-and-drop + hover state, and a selected-file state with a remove
- * action. Backed by the `syllabus-dropzone` styles in globals.css.
- */
 export function FileDropzone({
   id,
   accept,
@@ -60,7 +56,12 @@ export function FileDropzone({
 
   return (
     <div
-      className={`syllabus-dropzone${dragOver ? " drag" : ""}${file ? " has-file" : ""}`}
+      className={cn(
+        "relative flex flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed px-6 py-8 text-center transition-colors",
+        dragOver ? "border-ring bg-accent/40" : "border-border hover:border-ring/60 hover:bg-muted/30",
+        disabled && "cursor-not-allowed opacity-60",
+        !disabled && "cursor-pointer"
+      )}
       role="button"
       tabIndex={0}
       aria-disabled={disabled}
@@ -85,20 +86,20 @@ export function FileDropzone({
         accept={accept}
         onChange={handleInputChange}
         disabled={disabled}
-        className="syllabus-dropzone-input"
+        className="sr-only"
       />
       {file ? (
         <>
-          <span className="syllabus-dropzone-icon">
+          <span className="flex size-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
             {fileIcon ?? <IconFileText size={26} aria-hidden="true" />}
           </span>
-          <strong className="syllabus-dropzone-name">{file.name}</strong>
-          <small className="syllabus-dropzone-hint">
+          <strong className="max-w-full truncate text-sm font-semibold">{file.name}</strong>
+          <small className="text-xs text-muted-foreground">
             {formatBytes(file.size)} · click or drop to replace
           </small>
           <button
             type="button"
-            className="syllabus-dropzone-remove"
+            className="mt-1 inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             aria-label="Remove selected file"
             title="Remove file"
             onClick={(e) => {
@@ -107,18 +108,17 @@ export function FileDropzone({
             }}
             disabled={disabled}
           >
-            <IconX size={16} aria-hidden="true" />
+            <IconX size={14} aria-hidden="true" />
+            Remove
           </button>
         </>
       ) : (
         <>
-          <span className="syllabus-dropzone-icon">
+          <span className="flex size-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
             {emptyIcon ?? <IconUpload size={26} aria-hidden="true" />}
           </span>
-          <strong className="syllabus-dropzone-name">
-            {dragOver ? dropLabel : label}
-          </strong>
-          <small className="syllabus-dropzone-hint">{hint}</small>
+          <strong className="text-sm font-semibold">{dragOver ? dropLabel : label}</strong>
+          <small className="text-xs text-muted-foreground">{hint}</small>
         </>
       )}
     </div>

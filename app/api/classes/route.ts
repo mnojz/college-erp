@@ -16,8 +16,7 @@ type ClassBody = {
   group?: unknown;
 };
 
-const SLOT_TYPES = ["Lecture", "Practical", "Lunch"] as const;
-const LUNCH_SUBJECT_CODE = "LUNCH";
+const SLOT_TYPES = ["Lecture", "Practical"] as const;
 const days = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"] as const;
 
 function parseType(value: unknown) {
@@ -26,24 +25,14 @@ function parseType(value: unknown) {
     : "Lecture";
 }
 
-/** The single shared "Lunch Break" subject. Created on first use. */
-async function ensureLunchSubject(programId: string, semester: number) {
-  return prisma.subject.upsert({
-    where: { code: LUNCH_SUBJECT_CODE },
-    update: {},
-    create: { code: LUNCH_SUBJECT_CODE, name: "Lunch Break", programId, semester },
-  });
-}
-
-/** The lunch slot for a program+semester table (at most one). */
-async function findLunchClass(programId: string, semester: number, excludeId?: string) {
-  return prisma.class.findFirst({
-    where: {
-      programId,
-      semester,
-      type: "Lunch",
-      ...(excludeId ? { id: { not: excludeId } } : {}),
-    },
+/**
+ * The break window for a program+semester timetable (at most one, see the
+ * Break model). No class slot on ANY weekday may overlap it.
+ */
+async function findBreakWindow(programId: string, semester: number) {
+  return prisma.break.findUnique({
+    where: { programId_semester: { programId, semester } },
+    select: { id: true, startTime: true, endTime: true },
   });
 }
 
@@ -73,8 +62,6 @@ function isConflict(
   group: string | null,
 ): boolean {
   const candidateType = candidate.type ?? "Lecture";
-  // The lunch break is not a class — it never conflicts with anything.
-  if (candidateType === "Lunch" || type === "Lunch") return false;
   if (candidate.teacherId === teacherId) return true;
   // Different slot types (Lecture vs Practical/Lab) may overlap.
   if (candidateType !== type) return false;
@@ -82,6 +69,24 @@ function isConflict(
   const differentGroups = !!candidate.group && !!group && candidate.group !== group;
   if (type === "Practical" && differentGroups) return false;
   return true;
+}
+
+function formatHHMM(d: Date) {
+  return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+/**
+ * The break is a daily reserved window: a class overlapping it is rejected no
+ * matter which weekday it falls on (see the Break model).
+ */
+async function rejectBreakOverlap(programId: string, semester: number, startTime: Date, endTime: Date) {
+  const breakWindow = await findBreakWindow(programId, semester);
+  if (!breakWindow) return null;
+  const overlaps = startTime < breakWindow.endTime && endTime > breakWindow.startTime;
+  if (!overlaps) return null;
+  return `This time overlaps the break (${formatHHMM(breakWindow.startTime)}–${formatHHMM(
+    breakWindow.endTime,
+  )}). No class can be scheduled during the break on any day.`;
 }
 
 type ResolvedTeacher = { teacherId: string | null; error?: string };
@@ -135,6 +140,92 @@ async function resolveTeacherForSubject(
   return { teacherId: best.teacherId };
 }
 
+type CheckedSlot = { teacherId: string | null; error?: string; status?: number };
+
+/**
+ * Full server-side validation for a would-be class slot, shared by POST and
+ * PUT:
+ *  1. The break window (Break model) is reserved on EVERY weekday — a class
+ *     overlapping it is rejected no matter which day it falls on.
+ *  2. The subject must belong to the slot's program+semester.
+ *  3. The teacher is derived from the subject's assignments.
+ *  4. Type-aware overlap rules (see isConflict).
+ */
+async function validateClassSlot(opts: {
+  ignoreClassId?: string; // PUT: skip the slot being edited
+  subjectId: string;
+  requestedTeacherId: string | null;
+  programId: string;
+  semester: number;
+  dayOfWeek: DayOfWeek;
+  startTime: Date;
+  endTime: Date;
+  type: string;
+  group: string | null;
+}): Promise<CheckedSlot> {
+  const { subjectId, programId, semester, dayOfWeek, startTime, endTime, type, group } = opts;
+
+  // 1) The break is a daily reserved window — no class may overlap it.
+  const breakError = await rejectBreakOverlap(programId, semester, startTime, endTime);
+  if (breakError) return { teacherId: null, error: breakError, status: 409 };
+
+  // 2) The subject must belong to the slot's program+semester.
+  const subject = await prisma.subject.findFirst({ where: { id: subjectId, programId, semester } });
+  if (!subject) {
+    return { teacherId: null, error: "Subject does not match program and semester" };
+  }
+
+  // 3) The teacher comes from the subject's assignments — validate an explicit
+  // choice or auto-resolve the assigned teacher for this slot.
+  const resolved = await resolveTeacherForSubject(subjectId, opts.requestedTeacherId ?? "");
+  if (resolved.error || !resolved.teacherId) {
+    return { teacherId: null, error: resolved.error ?? "No teacher is assigned to this subject." };
+  }
+
+  // 4) Conflict detection: the assigned teacher cannot be in two places at
+  // once, same-type slots (Lecture+Lecture / Practical+Practical) cannot
+  // overlap in this program+semester (except parallel practical groups),
+  // while a Lecture and a Lab may run concurrently.
+  const candidates = await prisma.class.findMany({
+    where: {
+      ...(opts.ignoreClassId ? { id: { not: opts.ignoreClassId } } : {}),
+      dayOfWeek,
+      startTime: { lt: endTime },
+      endTime: { gt: startTime },
+      OR: [{ teacherId: resolved.teacherId }, { programId, semester }],
+    },
+    select: {
+      startTime: true,
+      endTime: true,
+      type: true,
+      teacherId: true,
+      group: true,
+      subject: { select: { code: true, name: true } },
+      teacher: { select: { user: { select: { firstName: true, lastName: true } } } },
+    },
+  });
+
+  const clash = candidates.find((c) => isConflict(c, resolved.teacherId, type, group));
+  if (clash) {
+    const slot = `${formatHHMM(clash.startTime)}–${formatHHMM(clash.endTime)}${clash.group ? ` (${clash.group})` : ""}`;
+    if (clash.teacherId === resolved.teacherId && clash.teacher) {
+      const t = clash.teacher.user;
+      return {
+        teacherId: null,
+        error: `Schedule conflict: ${t.firstName} ${t.lastName} already teaches ${clash.subject.code} — ${clash.subject.name} on ${dayOfWeek.toLowerCase()} at ${slot}.`,
+        status: 409,
+      };
+    }
+    return {
+      teacherId: null,
+      error: `Schedule conflict: this semester already has ${clash.subject.code} — ${clash.subject.name} on ${dayOfWeek.toLowerCase()} at ${slot}.`,
+      status: 409,
+    };
+  }
+
+  return { teacherId: resolved.teacherId };
+}
+
 export async function GET() {
   try {
     const classes = await prisma.class.findMany({
@@ -183,8 +274,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  let subjectId = typeof body.subjectId === "string" ? body.subjectId : "";
-  let teacherId: string | null = typeof body.teacherId === "string" ? body.teacherId : "";
+  const subjectId = typeof body.subjectId === "string" ? body.subjectId : "";
+  const requestedTeacherId = typeof body.teacherId === "string" ? body.teacherId : "";
   const programId = typeof body.programId === "string" ? body.programId : "";
   const semester = typeof body.semester === "number" ? body.semester : Number(body.semester);
   const dayOfWeek = typeof body.dayOfWeek === "string" ? (body.dayOfWeek as DayOfWeek) : null;
@@ -192,9 +283,8 @@ export async function POST(request: Request) {
   const endTime = parseTime(body.endTime);
   const type = parseType(body.type);
   const group = parseGroup(body.group);
-  const isLunch = type === "Lunch";
 
-  if ((!isLunch && !subjectId) || !programId || !Number.isInteger(semester) || !dayOfWeek || !startTime || !endTime) {
+  if (!subjectId || !programId || !Number.isInteger(semester) || !dayOfWeek || !startTime || !endTime) {
     return NextResponse.json(
       { error: "Subject, program, semester, day, start time, and end time are required" },
       { status: 400 },
@@ -204,84 +294,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid day of week or invalid time range" }, { status: 400 });
   }
 
-  if (isLunch) {
-    // Lunch break — stored like any other class slot but with no teacher,
-    // no conflicts, and at most one per program+semester table.
-    const existing = await findLunchClass(programId, semester);
-    if (existing) {
-      return NextResponse.json(
-        { error: "A lunch break is already set for this timetable. Click the lunch block to edit it." },
-        { status: 409 },
-      );
-    }
-    const lunchSubject = await ensureLunchSubject(programId, semester);
-    subjectId = lunchSubject.id;
-    teacherId = null;
-  } else {
-    const subject = await prisma.subject.findFirst({ where: { id: subjectId, programId, semester } });
-    if (!subject) {
-      return NextResponse.json({ error: "Subject does not match program and semester" }, { status: 400 });
-    }
-
-    // The teacher comes from the subject's assignments — validate an explicit
-    // choice or auto-resolve the assigned teacher for this slot.
-    const resolved = await resolveTeacherForSubject(subjectId, teacherId);
-    if (resolved.error || !resolved.teacherId) {
-      return NextResponse.json(
-        { error: resolved.error ?? "No teacher is assigned to this subject." },
-        { status: 400 },
-      );
-    }
-
-    // Conflict detection: the assigned teacher cannot be in two places at
-    // once, same-type slots (Lecture+Lecture / Practical+Practical) cannot
-    // overlap in this program+semester (except parallel practical groups),
-    // while a Lecture and a Lab may run concurrently.
-    const candidates = await prisma.class.findMany({
-      where: {
-        dayOfWeek,
-        startTime: { lt: endTime },
-        endTime: { gt: startTime },
-        OR: [{ teacherId }, { programId, semester }],
-      },
-      select: {
-        startTime: true,
-        endTime: true,
-        type: true,
-        teacherId: true,
-        group: true,
-        subject: { select: { code: true, name: true } },
-        teacher: { select: { user: { select: { firstName: true, lastName: true } } } },
-      },
-    });
-
-    const clash = candidates.find((c) => isConflict(c, teacherId, type, group));
-
-    if (clash) {
-      const fmt = (d: Date) =>
-        `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
-      const slot = `${fmt(clash.startTime)}–${fmt(clash.endTime)}${clash.group ? ` (${clash.group})` : ""}`;
-      if (clash.teacherId === teacherId && clash.teacher) {
-        const t = clash.teacher.user;
-        return NextResponse.json(
-          {
-            error: `Schedule conflict: ${t.firstName} ${t.lastName} already teaches ${clash.subject.code} — ${clash.subject.name} on ${dayOfWeek.toLowerCase()} at ${slot}.`,
-          },
-          { status: 409 },
-        );
-      }
-      return NextResponse.json(
-        {
-          error: `Schedule conflict: this semester already has ${clash.subject.code} — ${clash.subject.name} on ${dayOfWeek.toLowerCase()} at ${slot}.`,
-        },
-        { status: 409 },
-      );
-    }
+  // Shared validation: break-window reservation, subject↔program match,
+  // teacher resolution and type-aware overlap rules.
+  const checked = await validateClassSlot({
+    subjectId,
+    requestedTeacherId,
+    programId,
+    semester,
+    dayOfWeek,
+    startTime,
+    endTime,
+    type,
+    group,
+  });
+  if (checked.error) {
+    return NextResponse.json({ error: checked.error }, { status: checked.status ?? 400 });
   }
 
   try {
     const classItem = await prisma.class.create({
-      data: { subjectId, teacherId, programId, semester, dayOfWeek, startTime, endTime, type, group },
+      data: { subjectId, teacherId: checked.teacherId, programId, semester, dayOfWeek, startTime, endTime, type, group },
       select: {
         id: true, dayOfWeek: true, startTime: true, endTime: true, subjectId: true, teacherId: true, programId: true, semester: true, type: true, group: true,
         subject: { select: { name: true, code: true } },
@@ -310,8 +342,8 @@ export async function PUT(request: Request) {
   }
 
   const id = typeof body.id === "string" ? body.id.trim() : "";
-  let subjectId = typeof body.subjectId === "string" ? body.subjectId : "";
-  let teacherId: string | null = typeof body.teacherId === "string" ? body.teacherId : "";
+  const subjectId = typeof body.subjectId === "string" ? body.subjectId : "";
+  const requestedTeacherId = typeof body.teacherId === "string" ? body.teacherId : "";
   const programId = typeof body.programId === "string" ? body.programId : "";
   const semester = typeof body.semester === "number" ? body.semester : Number(body.semester);
   const dayOfWeek = typeof body.dayOfWeek === "string" ? (body.dayOfWeek as DayOfWeek) : null;
@@ -319,9 +351,8 @@ export async function PUT(request: Request) {
   const endTime = parseTime(body.endTime);
   const type = parseType(body.type);
   const group = parseGroup(body.group);
-  const isLunch = type === "Lunch";
 
-  if (!id || (!isLunch && !subjectId) || !programId || !Number.isInteger(semester) || !dayOfWeek || !startTime || !endTime) {
+  if (!id || !subjectId || !programId || !Number.isInteger(semester) || !dayOfWeek || !startTime || !endTime) {
     return NextResponse.json(
       { error: "Class ID, subject, program, semester, day, and times are required" },
       { status: 400 },
@@ -332,82 +363,28 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Invalid day of week or invalid time range" }, { status: 400 });
   }
 
-  if (isLunch) {
-    // Editing the single lunch-break slot for this table.
-    const existing = await findLunchClass(programId, semester, id);
-    if (existing) {
-      return NextResponse.json(
-        { error: "Only one lunch break may exist per timetable." },
-        { status: 409 },
-      );
-    }
-    const lunchSubject = await ensureLunchSubject(programId, semester);
-    subjectId = lunchSubject.id;
-    teacherId = null;
-  } else {
-    const subject = await prisma.subject.findFirst({ where: { id: subjectId, programId, semester } });
-    if (!subject) {
-      return NextResponse.json({ error: "Subject does not match chosen program and semester" }, { status: 400 });
-    }
-
-    // Keep the teacher derived from the subject's assignments (see POST).
-    const resolved = await resolveTeacherForSubject(subjectId, teacherId);
-    if (resolved.error || !resolved.teacherId) {
-      return NextResponse.json(
-        { error: resolved.error ?? "No teacher is assigned to this subject." },
-        { status: 400 },
-      );
-    }
-
-    // Conflict detection (ignores the slot being edited). Same-type overlaps are
-    // rejected; Lecture + Lab may overlap; parallel practical groups may overlap.
-    const candidates = await prisma.class.findMany({
-      where: {
-        id: { not: id },
-        dayOfWeek,
-        startTime: { lt: endTime },
-        endTime: { gt: startTime },
-        OR: [{ teacherId }, { programId, semester }],
-      },
-      select: {
-        startTime: true,
-        endTime: true,
-        type: true,
-        teacherId: true,
-        group: true,
-        subject: { select: { code: true, name: true } },
-        teacher: { select: { user: { select: { firstName: true, lastName: true } } } },
-      },
-    });
-
-    const clash = candidates.find((c) => isConflict(c, teacherId, type, group));
-
-    if (clash) {
-      const fmt = (d: Date) =>
-        `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
-      const slot = `${fmt(clash.startTime)}–${fmt(clash.endTime)}${clash.group ? ` (${clash.group})` : ""}`;
-      if (clash.teacherId === teacherId && clash.teacher) {
-        const t = clash.teacher.user;
-        return NextResponse.json(
-          {
-            error: `Schedule conflict: ${t.firstName} ${t.lastName} already teaches ${clash.subject.code} — ${clash.subject.name} on ${dayOfWeek.toLowerCase()} at ${slot}.`,
-          },
-          { status: 409 },
-        );
-      }
-      return NextResponse.json(
-        {
-          error: `Schedule conflict: this semester already has ${clash.subject.code} — ${clash.subject.name} on ${dayOfWeek.toLowerCase()} at ${slot}.`,
-        },
-        { status: 409 },
-      );
-    }
+  // Shared validation: break-window reservation, subject↔program match,
+  // teacher resolution and type-aware overlap rules (skips this slot itself).
+  const checked = await validateClassSlot({
+    ignoreClassId: id,
+    subjectId,
+    requestedTeacherId,
+    programId,
+    semester,
+    dayOfWeek,
+    startTime,
+    endTime,
+    type,
+    group,
+  });
+  if (checked.error) {
+    return NextResponse.json({ error: checked.error }, { status: checked.status ?? 400 });
   }
 
   try {
     const updatedClass = await prisma.class.update({
       where: { id },
-      data: { subjectId, teacherId, programId, semester, dayOfWeek, startTime, endTime, type, group },
+      data: { subjectId, teacherId: checked.teacherId, programId, semester, dayOfWeek, startTime, endTime, type, group },
       select: {
         id: true, dayOfWeek: true, startTime: true, endTime: true, subjectId: true, teacherId: true, programId: true, semester: true, type: true, group: true,
         subject: { select: { name: true, code: true } },

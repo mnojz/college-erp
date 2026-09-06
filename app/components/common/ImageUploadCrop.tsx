@@ -1,4 +1,11 @@
 "use client";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
@@ -7,7 +14,6 @@ import {
   IconRefresh,
   IconTrash,
   IconUserCircle,
-  IconX,
   IconZoomIn,
   IconZoomOut,
 } from "@tabler/icons-react";
@@ -196,8 +202,8 @@ export function ImageUploadCrop({
   };
 
   return (
-    <div className="image-upload">
-      <span className="image-upload-label">{label}</span>
+    <div className="grid gap-2">
+      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
 
       <input
         ref={fileInputRef}
@@ -213,7 +219,9 @@ export function ImageUploadCrop({
         role="button"
         tabIndex={disabled ? -1 : 0}
         aria-disabled={disabled}
-        className={`image-upload-zone${value ? " has-image" : ""}`}
+        className={`group relative flex w-full cursor-pointer items-center gap-3.5 rounded-xl border px-3.5 py-3 text-left transition-colors focus-visible:border-ring focus-visible:outline-none aria-disabled:cursor-not-allowed aria-disabled:opacity-60 ${
+          value ? "border-solid bg-card" : "border-dashed hover:border-ring"
+        }`}
         onClick={() => {
           if (!disabled) fileInputRef.current?.click();
         }}
@@ -224,11 +232,11 @@ export function ImageUploadCrop({
           }
         }}
       >
-        <span className="image-upload-avatar">
+        <span className="relative grid size-13 shrink-0 place-items-center overflow-hidden rounded-full border-2 bg-muted text-muted-foreground transition-colors group-hover:border-ring [&_img]:size-full [&_img]:object-cover">
           {value ? (
             <>
               <img src={value} alt="Profile photo preview" />
-              <span className="image-upload-avatar-overlay">
+              <span className="absolute inset-0 grid place-items-center bg-slate-900/55 text-white opacity-0 transition-opacity group-hover:opacity-100">
                 <IconCamera size={18} aria-hidden="true" />
               </span>
             </>
@@ -237,7 +245,7 @@ export function ImageUploadCrop({
           )}
         </span>
 
-        <span className="image-upload-text">
+        <span className="grid min-w-0 flex-1 gap-0.5 [&_strong]:text-[13px] [&_strong]:font-semibold [&_small]:text-[11px] [&_small]:text-muted-foreground">
           {value ? (
             <>
               <strong>Profile photo ready</strong>
@@ -251,10 +259,11 @@ export function ImageUploadCrop({
           )}
         </span>
 
-        <span className="image-upload-actions">
-          <button
+        <span className="flex shrink-0 gap-2">
+          <Button
             type="button"
-            className="image-upload-btn"
+            variant="outline"
+            size="sm"
             disabled={disabled}
             onClick={(e) => {
               e.stopPropagation();
@@ -263,11 +272,12 @@ export function ImageUploadCrop({
           >
             <IconCamera size={14} aria-hidden="true" />
             {value ? "Change" : "Choose Image"}
-          </button>
+          </Button>
           {value && (
-            <button
+            <Button
               type="button"
-              className="image-upload-btn danger"
+              variant="destructive"
+              size="sm"
               disabled={disabled}
               onClick={(e) => {
                 e.stopPropagation();
@@ -276,33 +286,25 @@ export function ImageUploadCrop({
             >
               <IconTrash size={14} aria-hidden="true" />
               Remove
-            </button>
+            </Button>
           )}
         </span>
       </div>
 
       {/* Interactive Crop Modal */}
       {modalOpen && (
-        <div className="modal-backdrop">
-          <div className="crop-modal" role="dialog" aria-modal="true" aria-labelledby="crop-modal-title">
-            <button
-              className="modal-close"
-              type="button"
-              onClick={() => setModalOpen(false)}
-              aria-label="Close crop dialog"
-            >
-              <IconX size={18} aria-hidden="true" />
-            </button>
-
-            <h2 id="crop-modal-title">Crop &amp; Resize Photo</h2>
-
-            <div className="crop-modal-body">
-              <p style={{ margin: 0, fontSize: "12px", color: "var(--ink-soft)" }}>
+        <Dialog open onOpenChange={(open) => !open && setModalOpen(false)}>
+          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-135">
+            <DialogHeader>
+              <DialogTitle>Crop &amp; Resize Photo</DialogTitle>
+              <p className="text-xs text-muted-foreground">
                 Drag to center your face or photo and adjust zoom to fit inside the square.
               </p>
+            </DialogHeader>
 
+            <div className="grid gap-4">
               {/* Canvas Viewport */}
-              <div className="crop-modal-viewport">
+              <div className="grid place-items-center overflow-hidden rounded-xl bg-slate-900 p-2 dark:bg-slate-950">
                 <canvas
                   ref={canvasRef}
                   width={CROP_SIZE}
@@ -326,21 +328,22 @@ export function ImageUploadCrop({
               </div>
 
               {/* Zoom Controls */}
-              <div className="crop-zoom">
-                <div className="crop-zoom-header">
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>Zoom</span>
-                  <span className="crop-zoom-badge">{zoom.toFixed(1)}x</span>
+                  <span className="inline-block min-w-11 text-right text-xs font-bold tabular-nums">{zoom.toFixed(1)}x</span>
                 </div>
-                <div className="crop-zoom-controls">
-                  <button
+                <div className="flex items-center gap-2.5">
+                  <Button
                     type="button"
-                    className="crop-zoom-btn"
+                    variant="outline"
+                    size="icon-sm"
                     title="Zoom out"
                     aria-label="Zoom out"
                     onClick={() => setZoom((z) => Math.max(1, Number((z - 0.2).toFixed(2))))}
                   >
                     <IconZoomOut size={16} aria-hidden="true" />
-                  </button>
+                  </Button>
                   <input
                     type="range"
                     min="1"
@@ -349,19 +352,22 @@ export function ImageUploadCrop({
                     value={zoom}
                     onChange={(e) => setZoom(parseFloat(e.target.value))}
                     aria-label="Zoom level"
+                    className="flex-1 accent-primary"
                   />
-                  <button
+                  <Button
                     type="button"
-                    className="crop-zoom-btn"
+                    variant="outline"
+                    size="icon-sm"
                     title="Zoom in"
                     aria-label="Zoom in"
                     onClick={() => setZoom((z) => Math.min(3.5, Number((z + 0.2).toFixed(2))))}
                   >
                     <IconZoomIn size={16} aria-hidden="true" />
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
-                    className="crop-zoom-btn"
+                    variant="outline"
+                    size="icon-sm"
                     title="Reset zoom and position"
                     aria-label="Reset zoom and position"
                     onClick={() => {
@@ -370,28 +376,28 @@ export function ImageUploadCrop({
                     }}
                   >
                     <IconRefresh size={16} aria-hidden="true" />
-                  </button>
+                  </Button>
                 </div>
               </div>
 
               {/* Modal Actions */}
-              <div className="crop-modal-actions">
-                <button type="button" className="btn-ghost" onClick={() => setModalOpen(false)}>
+              <div className="mt-1.5 flex justify-end gap-2.5">
+                <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
-                  className="btn-primary"
+                 
                   onClick={handleCropApply}
                   style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
                 >
                   <IconCheck size={15} aria-hidden="true" />
                   Apply Photo
-                </button>
+                </Button>
               </div>
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
