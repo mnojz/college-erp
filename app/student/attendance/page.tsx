@@ -142,7 +142,7 @@ export default function StudentAttendancePage() {
           <Card>
             <CardContent className="p-5">
               <p className="text-xs font-medium text-muted-foreground">Overall Attendance</p>
-              <p className={cn("mt-1 text-3xl font-bold", eligible ? "text-emerald-600 dark:text-emerald-400" : "text-destructive")}>
+              <p className={cn("mt-1 text-3xl font-bold", eligible ? "text-[var(--ctp-green)]" : "text-destructive")}>
                 {overallPercentage}%
               </p>
               <small className="text-xs text-muted-foreground">

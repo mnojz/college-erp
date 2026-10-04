@@ -13,6 +13,16 @@ import { NoticePostCard } from "@/app/components/common/NoticePostCard";
 import { AdminModal } from "@/app/components/admin/AdminModal";
 import { ImageUploadCrop } from "@/app/components/common/ImageUploadCrop";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   IconLayoutList,
   IconPhone,
@@ -25,7 +35,7 @@ import {
   getProvince,
   getDistrict,
   getLocalLevel,
-  formatAddressPartial,
+  formatAddressConcise,
 } from "@/app/lib/nepal-geo";
 
 
@@ -367,27 +377,17 @@ export default function StudentPage() {
           rows={[
             ["Email Address", profile.user.email],
             ["Phone Number", profile.phone || "Not provided"],
-            ["Current Address", formatAddressPartial({
-              provinceId: profile.currProvinceId,
-              provinceName: profile.currProvinceName,
-              districtId: profile.currDistrictId,
-              districtName: profile.currDistrictName,
-              localLevelId: profile.currLocalLevelId,
+            ["Current Address", formatAddressConcise({
               localLevelName: profile.currLocalLevelName,
               localLevelType: profile.currLocalLevelType,
               ward: profile.currWard,
-              tole: profile.currTole,
+              districtName: profile.currDistrictName,
             }) || (profile.currSameAsPerm ? "Same as permanent address" : "Not provided")],
-            ["Permanent Address", formatAddressPartial({
-              provinceId: profile.permProvinceId,
-              provinceName: profile.permProvinceName,
-              districtId: profile.permDistrictId,
-              districtName: profile.permDistrictName,
-              localLevelId: profile.permLocalLevelId,
+            ["Permanent Address", formatAddressConcise({
               localLevelName: profile.permLocalLevelName,
               localLevelType: profile.permLocalLevelType,
               ward: profile.permWard,
-              tole: profile.permTole,
+              districtName: profile.permDistrictName,
             }) || "Not provided"],
             ["Emergency Contact", profile.emergencyContact || "Not provided"],
           ]}
@@ -472,7 +472,7 @@ export default function StudentPage() {
       )}
 
       {showEdit && editForm && (
-        <AdminModal title="Edit Profile" onClose={() => setShowEdit(false)}>
+        <AdminModal title="Edit Profile" onClose={() => setShowEdit(false)} wide>
           <form className="flex flex-col gap-4" onSubmit={handleSaveProfile}>
             <ImageUploadCrop
               label="Profile Photo"
@@ -487,414 +487,415 @@ export default function StudentPage() {
             </p>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="form-field">
-                Blood Group
-                <select className="form-control"
-                  value={editForm.bloodGroup}
-                  onChange={(e) => setEditForm({ ...editForm, bloodGroup: e.target.value })}
+              <div className="grid gap-1.5">
+                <Label htmlFor="edit-blood-group">Blood Group</Label>
+                <Select
+                  value={editForm.bloodGroup || undefined}
+                  onValueChange={(value) => setEditForm({ ...editForm, bloodGroup: value })}
                 >
-                  <option value="">Not specified</option>
-                  {BLOOD_GROUPS.map((group) => (
-                    <option key={group} value={group}>
-                      {group}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="form-field">
-                Email Address
-                <input className="form-control"
+                  <SelectTrigger id="edit-blood-group" className="w-full">
+                    <SelectValue placeholder="Not specified" />
+                  </SelectTrigger>
+                  <SelectContent position="popper">
+                    <SelectItem value="">Not specified</SelectItem>
+                    {BLOOD_GROUPS.map((group) => (
+                      <SelectItem key={group} value={group}>
+                        {group}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="edit-email">Email Address</Label>
+                <Input
+                  id="edit-email"
                   type="email"
                   value={editForm.email}
                   onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
                   required
                 />
-              </label>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="form-field">
-                Phone Number
-                <input className="form-control"
+              <div className="grid gap-1.5">
+                <Label htmlFor="edit-phone">Phone Number</Label>
+                <Input
+                  id="edit-phone"
                   type="tel"
                   placeholder="e.g. 98XXXXXXXX"
                   value={editForm.phone}
                   onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                 />
-              </label>
-              <label className="form-field">
-                Emergency Contact
-                <input className="form-control"
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="edit-emergency">Emergency Contact</Label>
+                <Input
+                  id="edit-emergency"
                   type="tel"
                   placeholder="Person to call in an emergency"
                   value={editForm.emergencyContact}
                   onChange={(e) => setEditForm({ ...editForm, emergencyContact: e.target.value })}
                 />
-              </label>
+              </div>
             </div>
 
-            <h3
-              style={{
-                margin: "6px 0 0",
-                fontSize: 13,
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.04em",
-                color: "var(--muted-foreground)",
-              }}
-            >
+            <h3 className="mt-1.5 text-[13px] font-bold uppercase tracking-wide text-muted-foreground">
               Permanent Address
             </h3>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="form-field">
-                Province
-                <select className="form-control"
-                  value={editForm.permProvinceId ?? ""}
-                  onChange={(e) =>
+              <div className="grid gap-1.5">
+                <Label htmlFor="edit-perm-province">Province</Label>
+                <Select
+                  value={editForm.permProvinceId?.toString() ?? ""}
+                  onValueChange={(value) =>
                     setEditForm({
                       ...editForm,
-                      permProvinceId: e.target.value ? Number(e.target.value) : null,
+                      permProvinceId: value ? Number(value) : null,
                       permDistrictId: null,
                       permLocalLevelId: null,
                     })
                   }
                 >
-                  <option value="">Select province</option>
-                  {getProvinces().map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="form-field">
-                District
-                <select className="form-control"
-                  value={editForm.permDistrictId ?? ""}
-                  onChange={(e) =>
+                  <SelectTrigger id="edit-perm-province" className="w-full">
+                    <SelectValue placeholder="Select province" />
+                  </SelectTrigger>
+                  <SelectContent position="popper">
+                    {getProvinces().map((p) => (
+                      <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="edit-perm-district">District</Label>
+                <Select
+                  value={editForm.permDistrictId?.toString() ?? ""}
+                  onValueChange={(value) =>
                     setEditForm({
                       ...editForm,
-                      permDistrictId: e.target.value ? Number(e.target.value) : null,
+                      permDistrictId: value ? Number(value) : null,
                       permLocalLevelId: null,
                     })
                   }
                   disabled={!editForm.permProvinceId}
                 >
-                  <option value="">Select district</option>
-                  {editForm.permProvinceId &&
-                    getProvince(editForm.permProvinceId)?.districts.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                </select>
-              </label>
+                  <SelectTrigger id="edit-perm-district" className="w-full">
+                    <SelectValue placeholder="Select district" />
+                  </SelectTrigger>
+                  <SelectContent position="popper">
+                    {editForm.permProvinceId &&
+                      getProvince(editForm.permProvinceId)?.districts.map((d) => (
+                        <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="form-field">
-                Municipality / Rural Municipality
-                <select className="form-control"
-                  value={editForm.permLocalLevelId ?? ""}
-                  onChange={(e) =>
+              <div className="grid gap-1.5">
+                <Label htmlFor="edit-perm-local-level">Municipality / Rural Municipality</Label>
+                <Select
+                  value={editForm.permLocalLevelId?.toString() ?? ""}
+                  onValueChange={(value) =>
                     setEditForm({
                       ...editForm,
-                      permLocalLevelId: e.target.value ? Number(e.target.value) : null,
+                      permLocalLevelId: value ? Number(value) : null,
                     })
                   }
                   disabled={!editForm.permDistrictId}
                 >
-                  <option value="">Select local level</option>
-                  {editForm.permProvinceId &&
-                    editForm.permDistrictId &&
-                    getDistrict(editForm.permProvinceId, editForm.permDistrictId)?.localLevels.map((l) => (
-                      <option key={l.id} value={l.id}>{l.name} ({l.type})</option>
-                    ))}
-                </select>
-              </label>
-              <label className="form-field">
-                Ward Number
-                <select className="form-control"
-                  value={editForm.permWard ?? ""}
-                  onChange={(e) =>
+                  <SelectTrigger id="edit-perm-local-level" className="w-full">
+                    <SelectValue placeholder="Select local level" />
+                  </SelectTrigger>
+                  <SelectContent position="popper">
+                    {editForm.permProvinceId &&
+                      editForm.permDistrictId &&
+                      getDistrict(editForm.permProvinceId, editForm.permDistrictId)?.localLevels.map((l) => (
+                        <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="edit-perm-ward">Ward Number</Label>
+                <Select
+                  value={editForm.permWard?.toString() ?? ""}
+                  onValueChange={(value) =>
                     setEditForm({
                       ...editForm,
-                      permWard: e.target.value ? Number(e.target.value) : null,
+                      permWard: value ? Number(value) : null,
                     })
                   }
                   disabled={!editForm.permLocalLevelId}
                 >
-                  <option value="">Select ward</option>
-                  {editForm.permProvinceId &&
-                    editForm.permDistrictId &&
-                    editForm.permLocalLevelId &&
-                    (() => {
-                      const ll = getLocalLevel(
-                        editForm.permProvinceId,
-                        editForm.permDistrictId,
-                        editForm.permLocalLevelId
-                      );
-                      if (!ll?.totalWard) return null;
-                      return Array.from({ length: ll.totalWard }, (_, i) => (
-                        <option key={i + 1} value={i + 1}>
-                          Ward {i + 1}
-                        </option>
-                      ));
-                    })()}
-                </select>
-              </label>
+                  <SelectTrigger id="edit-perm-ward" className="w-full">
+                    <SelectValue placeholder="Select ward" />
+                  </SelectTrigger>
+                  <SelectContent position="popper">
+                    {editForm.permProvinceId &&
+                      editForm.permDistrictId &&
+                      editForm.permLocalLevelId &&
+                      (() => {
+                        const ll = getLocalLevel(
+                          editForm.permProvinceId,
+                          editForm.permDistrictId,
+                          editForm.permLocalLevelId
+                        );
+                        if (!ll?.totalWard) return null;
+                        return Array.from({ length: ll.totalWard }, (_, i) => (
+                          <SelectItem key={i + 1} value={(i + 1).toString()}>
+                            {i + 1}
+                          </SelectItem>
+                        ));
+                      })()}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <label className="form-field">
-              Tole / Street
-              <input className="form-control"
+            <div className="grid gap-1.5">
+              <Label htmlFor="edit-perm-tole">Tole / Street</Label>
+              <Input
+                id="edit-perm-tole"
                 type="text"
                 placeholder="Your tole or street name"
                 value={editForm.permTole}
                 onChange={(e) => setEditForm({ ...editForm, permTole: e.target.value })}
               />
-            </label>
+            </div>
 
-            <h3
-              style={{
-                margin: "6px 0 0",
-                fontSize: 13,
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.04em",
-                color: "var(--muted-foreground)",
-              }}
-            >
+            <h3 className="mt-1.5 text-[13px] font-bold uppercase tracking-wide text-muted-foreground">
               Current Address
             </h3>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 13,
-                fontWeight: 500,
-                color: "var(--muted-foreground)",
-                cursor: "pointer",
-                margin: "4px 0 8px",
-              }}
-            >
-              <input className="size-4 accent-foreground"
-                type="checkbox"
+            <div className="flex items-center gap-2 py-1">
+              <Checkbox
+                id="edit-curr-same-as-perm"
                 checked={editForm.currSameAsPerm}
-                onChange={(e) =>
+                onCheckedChange={(checked) =>
                   setEditForm({
                     ...editForm,
-                    currSameAsPerm: e.target.checked,
-                    currProvinceId: e.target.checked ? editForm.permProvinceId : null,
-                    currDistrictId: e.target.checked ? editForm.permDistrictId : null,
-                    currLocalLevelId: e.target.checked ? editForm.permLocalLevelId : null,
-                    currWard: e.target.checked ? editForm.permWard : null,
-                    currTole: e.target.checked ? editForm.permTole : "",
+                    currSameAsPerm: !!checked,
+                    currProvinceId: checked ? editForm.permProvinceId : null,
+                    currDistrictId: checked ? editForm.permDistrictId : null,
+                    currLocalLevelId: checked ? editForm.permLocalLevelId : null,
+                    currWard: checked ? editForm.permWard : null,
+                    currTole: checked ? editForm.permTole : "",
                   })
                 }
-                style={{ width: 16, height: 16, cursor: "pointer" }}
               />
-              Same as permanent address
-            </label>
+              <Label htmlFor="edit-curr-same-as-perm" className="cursor-pointer font-normal">
+                Same as permanent address
+              </Label>
+            </div>
             <div
+              className="grid gap-3"
               style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
                 opacity: editForm.currSameAsPerm ? 0.5 : 1,
                 pointerEvents: editForm.currSameAsPerm ? "none" : "auto",
               }}
             >
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="form-field">
-                  Province
-                  <select className="form-control"
-                    value={editForm.currProvinceId ?? ""}
-                    onChange={(e) =>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="edit-curr-province">Province</Label>
+                  <Select
+                    value={editForm.currProvinceId?.toString() ?? ""}
+                    onValueChange={(value) =>
                       setEditForm({
                         ...editForm,
-                        currProvinceId: e.target.value ? Number(e.target.value) : null,
+                        currProvinceId: value ? Number(value) : null,
                         currDistrictId: null,
                         currLocalLevelId: null,
                       })
                     }
-                    disabled={editForm.currSameAsPerm}
                   >
-                    <option value="">Select province</option>
-                    {getProvinces().map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="form-field">
-                  District
-                  <select className="form-control"
-                    value={editForm.currDistrictId ?? ""}
-                    onChange={(e) =>
+                    <SelectTrigger id="edit-curr-province" className="w-full">
+                      <SelectValue placeholder="Select province" />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      {getProvinces().map((p) => (
+                        <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="edit-curr-district">District</Label>
+                  <Select
+                    value={editForm.currDistrictId?.toString() ?? ""}
+                    onValueChange={(value) =>
                       setEditForm({
                         ...editForm,
-                        currDistrictId: e.target.value ? Number(e.target.value) : null,
+                        currDistrictId: value ? Number(value) : null,
                         currLocalLevelId: null,
                       })
                     }
-                    disabled={editForm.currSameAsPerm || !editForm.currProvinceId}
+                    disabled={!editForm.currProvinceId}
                   >
-                    <option value="">Select district</option>
-                    {editForm.currProvinceId &&
-                      getProvince(editForm.currProvinceId)?.districts.map((d) => (
-                        <option key={d.id} value={d.id}>{d.name}</option>
-                      ))}
-                  </select>
-                </label>
+                    <SelectTrigger id="edit-curr-district" className="w-full">
+                      <SelectValue placeholder="Select district" />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      {editForm.currProvinceId &&
+                        getProvince(editForm.currProvinceId)?.districts.map((d) => (
+                          <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="form-field">
-                  Municipality / Rural Municipality
-                  <select className="form-control"
-                    value={editForm.currLocalLevelId ?? ""}
-                    onChange={(e) =>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="edit-curr-local-level">Municipality / Rural Municipality</Label>
+                  <Select
+                    value={editForm.currLocalLevelId?.toString() ?? ""}
+                    onValueChange={(value) =>
                       setEditForm({
                         ...editForm,
-                        currLocalLevelId: e.target.value ? Number(e.target.value) : null,
+                        currLocalLevelId: value ? Number(value) : null,
                       })
                     }
-                    disabled={editForm.currSameAsPerm || !editForm.currDistrictId}
+                    disabled={!editForm.currDistrictId}
                   >
-                    <option value="">Select local level</option>
-                    {editForm.currProvinceId &&
-                      editForm.currDistrictId &&
-                      getDistrict(editForm.currProvinceId, editForm.currDistrictId)?.localLevels.map((l) => (
-                        <option key={l.id} value={l.id}>{l.name} ({l.type})</option>
-                      ))}
-                  </select>
-                </label>
-                <label className="form-field">
-                  Ward Number
-                  <select className="form-control"
-                    value={editForm.currWard ?? ""}
-                    onChange={(e) =>
+                    <SelectTrigger id="edit-curr-local-level" className="w-full">
+                      <SelectValue placeholder="Select local level" />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      {editForm.currProvinceId &&
+                        editForm.currDistrictId &&
+                        getDistrict(editForm.currProvinceId, editForm.currDistrictId)?.localLevels.map((l) => (
+                          <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="edit-curr-ward">Ward Number</Label>
+                  <Select
+                    value={editForm.currWard?.toString() ?? ""}
+                    onValueChange={(value) =>
                       setEditForm({
                         ...editForm,
-                        currWard: e.target.value ? Number(e.target.value) : null,
+                        currWard: value ? Number(value) : null,
                       })
                     }
-                    disabled={editForm.currSameAsPerm || !editForm.currLocalLevelId}
+                    disabled={!editForm.currLocalLevelId}
                   >
-                    <option value="">Select ward</option>
-                    {editForm.currProvinceId &&
-                      editForm.currDistrictId &&
-                      editForm.currLocalLevelId &&
-                      (() => {
-                        const ll = getLocalLevel(
-                          editForm.currProvinceId,
-                          editForm.currDistrictId,
-                          editForm.currLocalLevelId
-                        );
-                        if (!ll?.totalWard) return null;
-                        return Array.from({ length: ll.totalWard }, (_, i) => (
-                          <option key={i + 1} value={i + 1}>
-                            Ward {i + 1}
-                          </option>
-                        ));
-                      })()}
-                  </select>
-                </label>
+                    <SelectTrigger id="edit-curr-ward" className="w-full">
+                      <SelectValue placeholder="Select ward" />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      {editForm.currProvinceId &&
+                        editForm.currDistrictId &&
+                        editForm.currLocalLevelId &&
+                        (() => {
+                          const ll = getLocalLevel(
+                            editForm.currProvinceId,
+                            editForm.currDistrictId,
+                            editForm.currLocalLevelId
+                          );
+                          if (!ll?.totalWard) return null;
+                          return Array.from({ length: ll.totalWard }, (_, i) => (
+                            <SelectItem key={i + 1} value={(i + 1).toString()}>
+                              {i + 1}
+                            </SelectItem>
+                          ));
+                        })()}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <label className="form-field">
-                Tole / Street
-                <input className="form-control"
+              <div className="grid gap-1.5">
+                <Label htmlFor="edit-curr-tole">Tole / Street</Label>
+                <Input
+                  id="edit-curr-tole"
                   type="text"
                   placeholder="Your tole or street name"
                   value={editForm.currTole}
                   onChange={(e) => setEditForm({ ...editForm, currTole: e.target.value })}
-                  disabled={editForm.currSameAsPerm}
                 />
-              </label>
+              </div>
             </div>
 
-            <h3
-              style={{
-                margin: "6px 0 0",
-                fontSize: 13,
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.04em",
-                color: "var(--muted-foreground)",
-              }}
-            >
+            <h3 className="mt-1.5 text-[13px] font-bold uppercase tracking-wide text-muted-foreground">
               Parent / Guardian Details
             </h3>
-            <label className="form-field">
-              Guardian&apos;s Name
-              <input className="form-control"
+            <div className="grid gap-1.5">
+              <Label htmlFor="edit-guardian-name">Guardian&apos;s Name</Label>
+              <Input
+                id="edit-guardian-name"
                 type="text"
                 value={editForm.guardianName}
                 onChange={(e) => setEditForm({ ...editForm, guardianName: e.target.value })}
               />
-            </label>
+            </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="form-field">
-                Guardian Phone
-                <input className="form-control"
+              <div className="grid gap-1.5">
+                <Label htmlFor="edit-guardian-phone">Guardian Phone</Label>
+                <Input
+                  id="edit-guardian-phone"
                   type="tel"
                   value={editForm.guardianPhone}
                   onChange={(e) => setEditForm({ ...editForm, guardianPhone: e.target.value })}
                 />
-              </label>
-              <label className="form-field">
-                Guardian Email
-                <input className="form-control"
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="edit-guardian-email">Guardian Email</Label>
+                <Input
+                  id="edit-guardian-email"
                   type="email"
                   value={editForm.guardianEmail}
                   onChange={(e) => setEditForm({ ...editForm, guardianEmail: e.target.value })}
                 />
-              </label>
+              </div>
             </div>
 
-            <label className="form-field">
-              Relation with Guardian
-              <select className="form-control"
-                value={editForm.guardianRelation}
-                onChange={(e) => setEditForm({ ...editForm, guardianRelation: e.target.value })}
+            <div className="grid gap-1.5">
+              <Label htmlFor="edit-guardian-relation">Relation with Guardian</Label>
+              <Select
+                value={editForm.guardianRelation || undefined}
+                onValueChange={(value) => setEditForm({ ...editForm, guardianRelation: value })}
               >
-                <option value="">Not specified</option>
-                {GUARDIAN_RELATIONS.map((relation) => (
-                  <option key={relation} value={relation}>
-                    {relation}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <SelectTrigger id="edit-guardian-relation" className="w-full">
+                  <SelectValue placeholder="Not specified" />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  {GUARDIAN_RELATIONS.map((relation) => (
+                    <SelectItem key={relation} value={relation}>
+                      {relation}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-            <h3
-              style={{
-                margin: "6px 0 0",
-                fontSize: 13,
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.04em",
-                color: "var(--muted-foreground)",
-              }}
-            >
+            <h3 className="mt-1.5 text-[13px] font-bold uppercase tracking-wide text-muted-foreground">
               Security
             </h3>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="form-field">
-                Current Password
-                <input className="form-control"
+              <div className="grid gap-1.5">
+                <Label htmlFor="edit-current-password">Current Password</Label>
+                <Input
+                  id="edit-current-password"
                   type="password"
                   placeholder="Required to change email / password"
                   value={editForm.currentPassword}
                   onChange={(e) => setEditForm({ ...editForm, currentPassword: e.target.value })}
                   autoComplete="current-password"
                 />
-              </label>
-              <label className="form-field">
-                New Password
-                <input className="form-control"
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="edit-new-password">New Password</Label>
+                <Input
+                  id="edit-new-password"
                   type="password"
                   placeholder="Optional — min 8 characters"
                   value={editForm.newPassword}
                   onChange={(e) => setEditForm({ ...editForm, newPassword: e.target.value })}
                   autoComplete="new-password"
                 />
-              </label>
+              </div>
             </div>
 
             {editError && <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{editError}</p>}

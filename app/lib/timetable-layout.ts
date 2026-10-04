@@ -27,17 +27,22 @@ export const SLOT_GAP = 6; // px gap between two stacked blocks in one slot
 export const FALLBACK_START = 9 * 60;
 export const FALLBACK_END = 15 * 60;
 
+/**
+ * Accent colors for timetable subject blocks. These resolve through the
+ * theme-aware Catppuccin accent variables (Latte on light, Mocha on dark),
+ * so one palette renders correctly in both themes.
+ */
 export const PALETTE = [
-  "#0ea5e9",
-  "#8b5cf6",
-  "#f59e0b",
-  "#10b981",
-  "#ef4444",
-  "#3b82f6",
-  "#ec4899",
-  "#14b8a6",
-  "#f97316",
-  "#6366f1",
+  "var(--ctp-blue)",
+  "var(--ctp-mauve)",
+  "var(--ctp-peach)",
+  "var(--ctp-green)",
+  "var(--ctp-red)",
+  "var(--ctp-sapphire)",
+  "var(--ctp-pink)",
+  "var(--ctp-teal)",
+  "var(--ctp-yellow)",
+  "var(--ctp-lavender)",
 ];
 
 const TIME_RE = /^(\d{1,2}):(\d{2})$/;

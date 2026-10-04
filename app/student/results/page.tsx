@@ -279,7 +279,7 @@ export default function StudentResultsPage() {
                           {marks} / {maxMarks}
                         </TableCell>
                         <TableCell>
-                          <span className={isPassing ? "font-semibold text-emerald-600 dark:text-emerald-400" : "font-semibold text-destructive"}>
+                          <span className={isPassing ? "font-semibold text-[var(--ctp-green)]" : "font-semibold text-destructive"}>
                             {pct}%
                           </span>
                         </TableCell>

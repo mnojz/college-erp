@@ -23,16 +23,55 @@ export function materialTypeLabel(value: string): string {
   return MATERIAL_TYPES.find((t) => t.value === value)?.label ?? value;
 }
 
-/** Short monogram + accent tint per type. Tint is a Tailwind class pair (light/dark) so chips stay legible in both themes. */
+/**
+ * Short monogram + accent tint per type. Colors resolve through the
+ * theme-aware Catppuccin accent variables, so chips stay legible in both
+ * Latte (light) and Mocha (dark).
+ */
 export const MATERIAL_TYPE_STYLE: Record<string, { monogram: string; bg: string; color: string; tint: string }> = {
-  LECTURE_NOTES: { monogram: "LN", bg: "#e0f2fe", color: "#0369a1", tint: "bg-sky-500/10 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300" },
-  SLIDES: { monogram: "SL", bg: "#ede9fe", color: "#6d28d9", tint: "bg-violet-500/10 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300" },
-  QUESTION_BANK: { monogram: "QB", bg: "#fef3c7", color: "#b45309", tint: "bg-amber-500/10 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300" },
-  LAB_MANUAL: { monogram: "LB", bg: "#dcfce7", color: "#15803d", tint: "bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" },
-  ASSIGNMENT: { monogram: "AS", bg: "#ffe4e6", color: "#be123c", tint: "bg-rose-500/10 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300" },
-  REFERENCE_MATERIAL: { monogram: "RF", bg: "#ccfbf1", color: "#0f766e", tint: "bg-teal-500/10 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300" },
-  PAST_PAPER: { monogram: "PP", bg: "#f1f5f9", color: "#475569", tint: "bg-slate-500/10 text-slate-700 dark:bg-slate-500/20 dark:text-slate-300" },
-  OTHER: { monogram: "OT", bg: "#e2e8f0", color: "#334155", tint: "bg-muted text-muted-foreground" },
+  LECTURE_NOTES: {
+    monogram: "LN",
+    bg: "color-mix(in oklab, var(--ctp-sky) 15%, transparent)",
+    color: "var(--ctp-sky)",
+    tint: "bg-[color-mix(in_oklab,var(--ctp-sky)_15%,transparent)] text-[var(--ctp-sky)]",
+  },
+  SLIDES: {
+    monogram: "SL",
+    bg: "color-mix(in oklab, var(--ctp-mauve) 15%, transparent)",
+    color: "var(--ctp-mauve)",
+    tint: "bg-[color-mix(in_oklab,var(--ctp-mauve)_15%,transparent)] text-[var(--ctp-mauve)]",
+  },
+  QUESTION_BANK: {
+    monogram: "QB",
+    bg: "color-mix(in oklab, var(--ctp-yellow) 15%, transparent)",
+    color: "var(--ctp-yellow)",
+    tint: "bg-[color-mix(in_oklab,var(--ctp-yellow)_15%,transparent)] text-[var(--ctp-yellow)]",
+  },
+  LAB_MANUAL: {
+    monogram: "LB",
+    bg: "color-mix(in oklab, var(--ctp-green) 15%, transparent)",
+    color: "var(--ctp-green)",
+    tint: "bg-[color-mix(in_oklab,var(--ctp-green)_15%,transparent)] text-[var(--ctp-green)]",
+  },
+  ASSIGNMENT: {
+    monogram: "AS",
+    bg: "color-mix(in oklab, var(--ctp-red) 15%, transparent)",
+    color: "var(--ctp-red)",
+    tint: "bg-[color-mix(in_oklab,var(--ctp-red)_15%,transparent)] text-[var(--ctp-red)]",
+  },
+  REFERENCE_MATERIAL: {
+    monogram: "RF",
+    bg: "color-mix(in oklab, var(--ctp-teal) 15%, transparent)",
+    color: "var(--ctp-teal)",
+    tint: "bg-[color-mix(in_oklab,var(--ctp-teal)_15%,transparent)] text-[var(--ctp-teal)]",
+  },
+  PAST_PAPER: {
+    monogram: "PP",
+    bg: "color-mix(in oklab, var(--ctp-sapphire) 15%, transparent)",
+    color: "var(--ctp-sapphire)",
+    tint: "bg-[color-mix(in_oklab,var(--ctp-sapphire)_15%,transparent)] text-[var(--ctp-sapphire)]",
+  },
+  OTHER: { monogram: "OT", bg: "var(--muted)", color: "var(--muted-foreground)", tint: "bg-muted text-muted-foreground" },
 };
 
 export const VISIBILITY_OPTIONS = [

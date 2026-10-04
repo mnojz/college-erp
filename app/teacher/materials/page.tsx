@@ -269,9 +269,9 @@ export default function TeacherMaterialsPage() {
                     <span className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${style.tint}`}>
                       {materialTypeLabel(m.materialType)}
                     </span>
-                    {m.subject && <span className="inline-block rounded-full bg-sky-500/10 px-2.5 py-0.5 text-[11px] font-bold text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">{m.subject.code}</span>}
-                    {m.semester != null && <span className="inline-block rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">Sem {m.semester}</span>}
-                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${m.visibility === "EVERYONE" ? "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400" : "bg-amber-500/10 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400"}`}>
+                    {m.subject && <span className="inline-block rounded-full bg-[color-mix(in_oklab,var(--ctp-sky)_15%,transparent)] px-2.5 py-0.5 text-[11px] font-bold text-[var(--ctp-sky)]">{m.subject.code}</span>}
+                    {m.semester != null && <span className="inline-block rounded-full bg-[color-mix(in_oklab,var(--ctp-green)_15%,transparent)] px-2.5 py-0.5 text-[11px] font-bold text-[var(--ctp-green)]">Sem {m.semester}</span>}
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${m.visibility === "EVERYONE" ? "bg-[color-mix(in_oklab,var(--ctp-green)_15%,transparent)] text-[var(--ctp-green)]" : "bg-[color-mix(in_oklab,var(--ctp-yellow)_15%,transparent)] text-[var(--ctp-yellow)]"}`}>
                       <IconLock size={12} aria-hidden="true" />
                       {VISIBILITY_LABELS[m.visibility] ?? m.visibility}
                     </span>

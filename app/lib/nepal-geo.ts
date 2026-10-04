@@ -158,3 +158,18 @@ export function formatAddressPartial(addr: AddressInput): string | null {
 
   return parts.length > 0 ? parts.join(", ") : null;
 }
+
+/**
+ * Formats a concise address for dashboard display.
+ * Format: "Municipality - WardNo, District" (no tole, no province).
+ * Ward is shown as a plain number (e.g. "16" not "Ward 16").
+ */
+export function formatAddressConcise(addr: AddressInput): string | null {
+  const localLevel = addr.localLevelName ?? "";
+  const ward = addr.ward ? ` - ${addr.ward}` : "";
+  const district = addr.districtName ?? "";
+
+  if (!localLevel && !district) return null;
+
+  return `${localLevel}${ward}${district ? `, ${district}` : ""}`;
+}

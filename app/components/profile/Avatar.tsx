@@ -1,12 +1,12 @@
 const AVATAR_COLORS = [
-  "#0ea5e9",
-  "#10b981",
-  "#f59e0b",
-  "#8b5cf6",
-  "#ef4444",
-  "#14b8a6",
-  "#f97316",
-  "#6366f1",
+  "#1e66f5", // blue
+  "#179299", // teal
+  "#df8e1d", // yellow
+  "#8839ef", // mauve
+  "#d20f39", // red
+  "#fe640b", // peach
+  "#209fb5", // sapphire
+  "#40a02b", // green
 ];
 
 export type AvatarProps = {

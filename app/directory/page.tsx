@@ -121,8 +121,8 @@ export default function DirectoryPage() {
                 variant="outline"
                 className={cn(
                   entry.role === "STUDENT"
-                    ? "border-sky-600/30 bg-sky-500/10 text-sky-700 dark:text-sky-300"
-                    : "border-emerald-600/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                    ? "border-[color-mix(in_oklab,var(--ctp-blue)_45%,transparent)] bg-[color-mix(in_oklab,var(--ctp-blue)_15%,transparent)] text-[var(--ctp-blue)]"
+                    : "border-[color-mix(in_oklab,var(--ctp-green)_45%,transparent)] bg-[color-mix(in_oklab,var(--ctp-green)_15%,transparent)] text-[var(--ctp-green)]"
                 )}
               >
                 {entry.role === "STUDENT" ? "Student" : "Faculty"}

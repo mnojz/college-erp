@@ -5,76 +5,111 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ─────────────────────────────────────────────
-   shadcn-ui default theme (neutral palette)
-   Light mode lives on :root, dark mode on .dark
+   Catppuccin theme — 🌻 Latte (light) on :root,
+   🌿 Mocha (dark) on .dark.  Accent: Blue.
+   Palette: https://catppuccin.com/palette
+   Values are hsl()-wrapped for Tailwind v4.
    ───────────────────────────────────────────── */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --background: hsl(220 23.08% 94.9%); /* base */
+  --foreground: hsl(234 16.02% 35.49%); /* text */
+  --card: hsl(220 23.08% 94.9%); /* base */
+  --card-foreground: hsl(234 16.02% 35.49%); /* text */
+  --popover: hsl(220 23.08% 94.9%); /* base */
+  --popover-foreground: hsl(234 16.02% 35.49%); /* text */
+  --primary: hsl(220 91.49% 53.92%); /* blue */
+  --primary-foreground: hsl(220 23.08% 94.9%); /* base */
+  --secondary: hsl(223 15.91% 82.75%); /* surface0 */
+  --secondary-foreground: hsl(234 16.02% 35.49%); /* text */
+  --muted: hsl(223 15.91% 82.75%); /* surface0 */
+  --muted-foreground: hsl(233 12.8% 41.37%); /* subtext1 */
+  --accent: hsl(223 15.91% 82.75%); /* surface0 */
+  --accent-foreground: hsl(234 16.02% 35.49%); /* text */
+  --destructive: hsl(347 86.67% 44.12%); /* red */
+  --border: hsl(225 13.56% 76.86%); /* surface1 */
+  --input: hsl(225 13.56% 76.86%); /* surface1 */
+  --ring: hsl(234 16.02% 35.49%); /* text */
+  --chart-1: hsl(347 86.67% 44.12%); /* red */
+  --chart-2: hsl(183 74.36% 33.33%); /* teal */
+  --chart-3: hsl(220 91.49% 53.92%); /* blue */
+  --chart-4: hsl(35 76.96% 49.41%); /* yellow */
+  --chart-5: hsl(115 58.19% 39.8%); /* green */
+  --sidebar: hsl(218 25.1% 93.73%); /* mantle */
+  --sidebar-foreground: hsl(234 16.02% 35.49%); /* text */
+  --sidebar-primary: hsl(220 91.49% 53.92%); /* blue */
+  --sidebar-primary-foreground: hsl(220 23.08% 94.9%); /* base */
+  --sidebar-accent: hsl(223 15.91% 82.75%); /* surface0 */
+  --sidebar-accent-foreground: hsl(234 16.02% 35.49%); /* text */
+  --sidebar-border: hsl(225 13.56% 76.86%); /* surface1 */
+  --sidebar-ring: hsl(225 13.56% 76.86%); /* surface1 */
   --radius: 0.625rem;
+
+  /* Catppuccin accents — reusable via var(--ctp-*) in components,
+     arbitrary Tailwind values, and inline styles. */
+  --ctp-rosewater: #dc8a78;
+  --ctp-flamingo: #dd7878;
+  --ctp-pink: #ea76cb;
+  --ctp-mauve: #8839ef;
+  --ctp-red: #d20f39;
+  --ctp-maroon: #e64553;
+  --ctp-peach: #fe640b;
+  --ctp-yellow: #df8e1d;
+  --ctp-green: #40a02b;
+  --ctp-teal: #179299;
+  --ctp-sky: #04a5e5;
+  --ctp-sapphire: #209fb5;
+  --ctp-blue: #1e66f5;
+  --ctp-lavender: #7287fd;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: hsl(240 21.05% 14.9%); /* base */
+  --foreground: hsl(226 63.93% 88.04%); /* text */
+  --card: hsl(240 21.05% 14.9%); /* base */
+  --card-foreground: hsl(226 63.93% 88.04%); /* text */
+  --popover: hsl(240 21.05% 14.9%); /* base */
+  --popover-foreground: hsl(226 63.93% 88.04%); /* text */
+  --primary: hsl(217 91.87% 75.88%); /* blue */
+  --primary-foreground: hsl(240 21.05% 14.9%); /* base */
+  --secondary: hsl(237 16.24% 22.94%); /* surface0 */
+  --secondary-foreground: hsl(226 63.93% 88.04%); /* text */
+  --muted: hsl(237 16.24% 22.94%); /* surface0 */
+  --muted-foreground: hsl(227 35.29% 80%); /* subtext1 */
+  --accent: hsl(237 16.24% 22.94%); /* surface0 */
+  --accent-foreground: hsl(226 63.93% 88.04%); /* text */
+  --destructive: hsl(343 81.25% 74.9%); /* red */
+  --border: hsl(234 13.21% 31.18%); /* surface1 */
+  --input: hsl(234 13.21% 31.18%); /* surface1 */
+  --ring: hsl(226 63.93% 88.04%); /* text */
+  --chart-1: hsl(343 81.25% 74.9%); /* red */
+  --chart-2: hsl(170 57.42% 73.33%); /* teal */
+  --chart-3: hsl(217 91.87% 75.88%); /* blue */
+  --chart-4: hsl(41 86.32% 83.14%); /* yellow */
+  --chart-5: hsl(115 53.88% 76.08%); /* green */
+  --sidebar: hsl(240 21.18% 14.12%); /* mantle */
+  --sidebar-foreground: hsl(226 63.93% 88.04%); /* text */
+  --sidebar-primary: hsl(217 91.87% 75.88%); /* blue */
+  --sidebar-primary-foreground: hsl(240 21.05% 14.9%); /* base */
+  --sidebar-accent: hsl(237 16.24% 22.94%); /* surface0 */
+  --sidebar-accent-foreground: hsl(226 63.93% 88.04%); /* text */
+  --sidebar-border: hsl(234 13.21% 31.18%); /* surface1 */
+  --sidebar-ring: hsl(234 13.21% 31.18%); /* surface1 */
+
+  /* Catppuccin accents (Mocha) */
+  --ctp-rosewater: #f5e0dc;
+  --ctp-flamingo: #f2cdcd;
+  --ctp-pink: #f5c2e7;
+  --ctp-mauve: #cba6f7;
+  --ctp-red: #f38ba8;
+  --ctp-maroon: #eba0ac;
+  --ctp-peach: #fab387;
+  --ctp-yellow: #f9e2af;
+  --ctp-green: #a6e3a1;
+  --ctp-teal: #94e2d5;
+  --ctp-sky: #89dceb;
+  --ctp-sapphire: #74c7ec;
+  --ctp-blue: #89b4fa;
+  --ctp-lavender: #b4befe;
 }
 
 @theme inline {
@@ -183,7 +218,13 @@
 
   select.form-control {
     @apply appearance-none bg-no-repeat pr-8;
-    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    /* Caret stroke = Catppuccin subtext0 (Latte). */
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236c6f85' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     background-position: right 0.6rem center;
+  }
+
+  /* Caret stroke = Catppuccin subtext0 (Mocha). */
+  .dark select.form-control {
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a6adc8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   }
 }

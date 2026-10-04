@@ -188,7 +188,7 @@ export function TimetableGrid({
                     top: b.top,
                     height: b.height,
                     borderLeftColor: b.color,
-                    background: `linear-gradient(to right, ${b.color}26, ${b.color}12)`,
+                    background: `linear-gradient(to right, color-mix(in oklab, ${b.color} 15%, transparent), color-mix(in oklab, ${b.color} 7%, transparent))`,
                   } as CSSProperties;
 
                   const inner = (

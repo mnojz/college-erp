@@ -209,7 +209,7 @@ export default function StudentSchedulesPage() {
             </div>
 
             {isOwnRoutine ? (
-              <Badge className="gap-1.5 bg-sky-500/10 px-3 py-1.5 text-sky-700 hover:bg-sky-500/10 dark:text-sky-300">
+              <Badge className="gap-1.5 bg-[color-mix(in_oklab,var(--ctp-sky)_15%,transparent)] px-3 py-1.5 text-[var(--ctp-sky)] hover:bg-[color-mix(in_oklab,var(--ctp-sky)_22%,transparent)]">
                 <IconRosetteDiscountCheck size={15} aria-hidden="true" />
                 Your routine
               </Badge>

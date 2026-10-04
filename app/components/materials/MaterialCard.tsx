@@ -47,7 +47,7 @@ export function MaterialCard({ material, onToggleBookmark, onOpenDetails }: Mate
             onClick={() => onToggleBookmark(material.id)}
             aria-label={material.bookmarked ? "Remove bookmark" : "Bookmark this material"}
             title={material.bookmarked ? "Remove bookmark" : "Bookmark"}
-            className={material.bookmarked ? "text-amber-500" : "text-muted-foreground"}
+            className={material.bookmarked ? "text-[var(--ctp-yellow)]" : "text-muted-foreground"}
           >
             {material.bookmarked ? (
               <IconStarFilled size={16} aria-hidden="true" />

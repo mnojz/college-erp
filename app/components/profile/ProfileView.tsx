@@ -13,9 +13,21 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const ROLE_BADGES: Record<RoleName, { label: string; className: string }> = {
-  STUDENT: { label: "Student", className: "bg-sky-500/10 text-sky-700 dark:text-sky-300" },
-  TEACHER: { label: "Faculty", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" },
-  ADMIN: { label: "Admin", className: "bg-red-500/10 text-red-700 dark:text-red-300" },
+  STUDENT: {
+    label: "Student",
+    className:
+      "bg-[color-mix(in_oklab,var(--ctp-blue)_15%,transparent)] text-[var(--ctp-blue)]",
+  },
+  TEACHER: {
+    label: "Faculty",
+    className:
+      "bg-[color-mix(in_oklab,var(--ctp-green)_15%,transparent)] text-[var(--ctp-green)]",
+  },
+  ADMIN: {
+    label: "Admin",
+    className:
+      "bg-[color-mix(in_oklab,var(--ctp-red)_15%,transparent)] text-[var(--ctp-red)]",
+  },
 };
 
 function VisibilityBadge({

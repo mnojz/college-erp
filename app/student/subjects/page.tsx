@@ -299,7 +299,7 @@ export default function StudentSubjectsPage() {
 
                     <div className="mb-3 flex flex-wrap gap-1.5">
                       {materialCount > 0 ? (
-                        <Badge variant="outline" className="gap-1 border-sky-600/30 bg-sky-500/10 text-sky-700 dark:text-sky-300">
+                        <Badge variant="outline" className="gap-1 border-[color-mix(in_oklab,var(--ctp-sky)_45%,transparent)] bg-[color-mix(in_oklab,var(--ctp-sky)_15%,transparent)] text-[var(--ctp-sky)]">
                           <IconNotes size={13} stroke={1.8} aria-hidden="true" /> {materialCount} material{materialCount === 1 ? "" : "s"}
                         </Badge>
                       ) : (
