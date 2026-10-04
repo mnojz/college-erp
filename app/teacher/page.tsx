@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
+import { formatTime } from "@/app/lib/timetable-layout";
 import { Badge } from "@/components/ui/badge";
 import {
   IconArrowRight,
@@ -281,10 +282,10 @@ export default function TeacherOverviewPage() {
                   </div>
                   <div className="text-right">
                     <span className="text-sm font-bold text-primary">
-                      {new Date(cls.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      {formatTime(cls.startTime)}
                     </span>
                     <small className="block text-[0.75rem] text-muted-foreground">
-                      to {new Date(cls.endTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      to {formatTime(cls.endTime)}
                     </small>
                   </div>
                 </div>

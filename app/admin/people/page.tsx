@@ -149,6 +149,17 @@ function titleCaseStatus(status: string) {
   return status.charAt(0) + status.slice(1).toLowerCase();
 }
 
+/**
+ * Options for the students Status filter.
+ *
+ * This is deliberately the binary account state (UserStatus: ACTIVE /
+ * INACTIVE — i.e. can this student sign in?), not the 5-value StudentStatus
+ * enrollment lifecycle. The lifecycle (Graduated / Suspended / Withdrawn)
+ * still renders as a badge in the table, so excluding it from the filter
+ * never hides a student — every student matches Active or Inactive.
+ */
+const ACCOUNT_STATUS_OPTIONS = ["ACTIVE", "INACTIVE"] as const;
+
 /** Neutral account-status badge (replaces the old unstyled .badge classes). */
 function AccountStatusBadge({ status }: { status: string }) {
   return status === "ACTIVE" ? (
@@ -426,8 +437,13 @@ export default function AdminPeoplePage() {
   const [loading, setLoading] = useState(true);
 
   // Filters
+  // Teachers: free-text search only.
   const [searchQuery, setSearchQuery] = useState("");
+  // Students: program + semester + status + free-text search.
   const [selectedProgramFilter, setSelectedProgramFilter] = useState("ALL");
+  const [selectedSemesterFilter, setSelectedSemesterFilter] = useState("ALL");
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState("ALL");
+  const [studentSearch, setStudentSearch] = useState("");
 
   // Create Modals
   const [showTeacherModal, setShowTeacherModal] = useState(false);
@@ -505,23 +521,66 @@ export default function AdminPeoplePage() {
     });
   }, [teachers, searchQuery]);
 
-  // Filtered students
+  /**
+   * Semester options for the students filter. Derived from the students of the
+   * currently selected program (across all statuses) so the list can never
+   * offer a semester that matches nothing. Deliberately NOT narrowed by the
+   * semester/status filters themselves, so the options stay stable while the
+   * admin drills in.
+   */
+  const studentSemesterOptions = useMemo(() => {
+    const semesters = new Set<number>();
+    for (const s of students) {
+      if (selectedProgramFilter !== "ALL" && s.programId !== selectedProgramFilter) continue;
+      if (s.currentSemester != null) semesters.add(s.currentSemester);
+    }
+    return [...semesters].sort((a, b) => a - b);
+  }, [students, selectedProgramFilter]);
+
+  // Filtered students — program + semester + status + free-text search.
   const filteredStudents = useMemo(() => {
+    const q = studentSearch.trim().toLowerCase();
     return students.filter((s) => {
-      const matchProgram = selectedProgramFilter === "ALL" || s.programId === selectedProgramFilter;
-      if (!matchProgram) return false;
-      if (!searchQuery) return true;
-      const q = searchQuery.toLowerCase();
+      if (selectedProgramFilter !== "ALL" && s.programId !== selectedProgramFilter) return false;
+      if (
+        selectedSemesterFilter !== "ALL" &&
+        String(s.currentSemester ?? "") !== selectedSemesterFilter
+      ) {
+        return false;
+      }
+      // Status filter = account status, not the enrollment lifecycle.
+      if (selectedStatusFilter !== "ALL" && s.user.status !== selectedStatusFilter) return false;
+      if (!q) return true;
       return (
         s.user.firstName.toLowerCase().includes(q) ||
         s.user.lastName.toLowerCase().includes(q) ||
         s.user.email.toLowerCase().includes(q) ||
         s.enrollmentNumber.toLowerCase().includes(q) ||
         s.registrationId.toLowerCase().includes(q) ||
-        (s.rollNumber && s.rollNumber.toLowerCase().includes(q))
+        (s.rollNumber ? s.rollNumber.toLowerCase().includes(q) : false)
       );
     });
-  }, [students, searchQuery, selectedProgramFilter]);
+  }, [
+    students,
+    studentSearch,
+    selectedProgramFilter,
+    selectedSemesterFilter,
+    selectedStatusFilter,
+  ]);
+
+  /** Number of active student filters — drives the "Reset (n)" affordance. */
+  const studentFilterCount =
+    (selectedProgramFilter !== "ALL" ? 1 : 0) +
+    (selectedSemesterFilter !== "ALL" ? 1 : 0) +
+    (selectedStatusFilter !== "ALL" ? 1 : 0) +
+    (studentSearch.trim() ? 1 : 0);
+
+  function resetStudentFilters() {
+    setSelectedProgramFilter("ALL");
+    setSelectedSemesterFilter("ALL");
+    setSelectedStatusFilter("ALL");
+    setStudentSearch("");
+  }
 
   // Open Edit Teacher modal
   function openEditTeacher(teacher: TeacherItem) {
@@ -848,45 +907,116 @@ export default function AdminPeoplePage() {
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            {activeTab === "students" && (
-              <Select
-                value={selectedProgramFilter}
-                onValueChange={setSelectedProgramFilter}
-              >
-                <SelectTrigger className="w-full sm:w-56">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent position="popper">
-                  <SelectItem value="ALL">All Programs</SelectItem>
-                  {programs.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.code} · {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-
-            <div className="relative w-full sm:w-64">
-              <IconSearch
-                size={15}
-                aria-hidden="true"
-                className="pointer-events-none absolute top-1/2 left-2.5 z-[1] -translate-y-1/2 text-muted-foreground"
-              />
-              <Input
-                type="text"
-                placeholder={
-                  activeTab === "teachers"
-                    ? "Search teacher name, emp #, email…"
-                    : "Search student, roll, reg #…"
-                }
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8"
-              />
+          {/* Tab-scoped filter bar */}
+          {activeTab === "teachers" ? (
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="relative w-full sm:w-72">
+                <IconSearch
+                  size={15}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-1/2 left-2.5 z-[1] -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
+                  type="text"
+                  placeholder="Search teacher name, emp #, email…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+              {searchQuery && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setSearchQuery("")}>
+                  Reset
+                </Button>
+              )}
             </div>
-          </div>
+          ) : (
+            <div className="flex flex-col gap-3 rounded-xl border bg-muted/20 p-3.5">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <Select
+                  value={selectedProgramFilter}
+                  onValueChange={(value) => {
+                    setSelectedProgramFilter(value);
+                    // Semesters are program-specific — drop a stale selection.
+                    setSelectedSemesterFilter("ALL");
+                  }}
+                >
+                  <SelectTrigger className="w-full sm:w-56" aria-label="Filter by program">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper">
+                    <SelectItem value="ALL">All programs</SelectItem>
+                    {programs.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.code} · {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={selectedSemesterFilter}
+                  onValueChange={setSelectedSemesterFilter}
+                  disabled={studentSemesterOptions.length === 0}
+                >
+                  <SelectTrigger className="w-full sm:w-36" aria-label="Filter by semester">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper">
+                    <SelectItem value="ALL">All semesters</SelectItem>
+                    {studentSemesterOptions.map((sem) => (
+                      <SelectItem key={sem} value={String(sem)}>
+                        Semester {sem}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={selectedStatusFilter} onValueChange={setSelectedStatusFilter}>
+                  <SelectTrigger className="w-full sm:w-40" aria-label="Filter by status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper">
+                    <SelectItem value="ALL">All statuses</SelectItem>
+                    {ACCOUNT_STATUS_OPTIONS.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {titleCaseStatus(status)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <div className="relative w-full sm:w-64">
+                  <IconSearch
+                    size={15}
+                    aria-hidden="true"
+                    className="pointer-events-none absolute top-1/2 left-2.5 z-[1] -translate-y-1/2 text-muted-foreground"
+                  />
+                  <Input
+                    type="text"
+                    placeholder="Search name, roll, reg #…"
+                    value={studentSearch}
+                    onChange={(e) => setStudentSearch(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+
+                {studentFilterCount > 0 && (
+                  <Button type="button" variant="ghost" size="sm" onClick={resetStudentFilters}>
+                    Reset ({studentFilterCount})
+                  </Button>
+                )}
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Showing{" "}
+                <strong className="font-semibold text-foreground">
+                  {filteredStudents.length}
+                </strong>{" "}
+                of {students.length} students
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Tab 1: Faculty table */}
@@ -1063,7 +1193,24 @@ export default function AdminPeoplePage() {
                 ) : filteredStudents.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
-                      No student records found. Click <strong className="font-medium text-foreground">Add Student</strong> to enroll students.
+                      {studentFilterCount > 0 ? (
+                        <>
+                          No students match the current filters.{" "}
+                          <button
+                            type="button"
+                            onClick={resetStudentFilters}
+                            className="font-medium text-primary underline-offset-4 hover:underline"
+                          >
+                            Clear filters
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          No student records found. Click{" "}
+                          <strong className="font-medium text-foreground">Add Student</strong> to
+                          enroll students.
+                        </>
+                      )}
                     </TableCell>
                   </TableRow>
                 ) : (

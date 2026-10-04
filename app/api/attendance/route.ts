@@ -105,7 +105,7 @@ export async function GET(request: Request) {
                 rollNumber: true,
                 profileImageUrl: true,
                 currentSemester: true,
-                user: { select: { firstName: true, lastName: true } },
+                user: { select: { firstName: true, lastName: true, status: true } },
               },
             },
           },
@@ -151,15 +151,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Class not found" }, { status: 404 });
   }
 
-  const studentIds = (
-    await prisma.student.findMany({
-        where: { programId: classRecord.programId, status: "ACTIVE" },
-      select: { id: true },
-    })
-  ).map((s) => s.id);
+  // Roster for this class program. `Student.status === "ACTIVE"` keeps
+  // graduated/suspended/withdrawn students off the roll; a student whose USER
+  // ACCOUNT was deactivated stays listed but can never be marked present.
+  const roster = await prisma.student.findMany({
+    where: { programId: classRecord.programId, status: "ACTIVE" },
+    select: { id: true, user: { select: { status: true } } },
+  });
+  const studentIds = roster.map((s) => s.id);
+  /** Students whose account is still active — the only ones markable PRESENT. */
+  const markableIds = roster.filter((s) => s.user.status === "ACTIVE").map((s) => s.id);
 
   if (present.some((id) => !studentIds.includes(id))) {
     return NextResponse.json({ error: "Students must belong to the class program" }, { status: 400 });
+  }
+
+  if (present.some((id) => !markableIds.includes(id))) {
+    return NextResponse.json(
+      { error: "One or more selected students have a deactivated account and cannot be marked present" },
+      { status: 400 },
+    );
   }
 
   try {
@@ -170,7 +181,9 @@ export async function POST(request: Request) {
         records: {
           create: studentIds.map((studentId) => ({
             studentId,
-            status: present.includes(studentId) ? "PRESENT" : "ABSENT",
+            // Deactivated accounts can never record PRESENT.
+            status:
+              markableIds.includes(studentId) && present.includes(studentId) ? "PRESENT" : "ABSENT",
           })),
         },
       },
@@ -258,15 +271,26 @@ export async function PUT(request: Request) {
     );
   }
 
-  const studentIds = (
-    await prisma.student.findMany({
-      where: { programId: classRecord.programId, status: "ACTIVE" },
-      select: { id: true },
-    })
-  ).map((s) => s.id);
+  // Roster for this class program. `Student.status === "ACTIVE"` keeps
+  // graduated/suspended/withdrawn students off the roll; a student whose USER
+  // ACCOUNT was deactivated stays listed but can never be marked present.
+  const roster = await prisma.student.findMany({
+    where: { programId: classRecord.programId, status: "ACTIVE" },
+    select: { id: true, user: { select: { status: true } } },
+  });
+  const studentIds = roster.map((s) => s.id);
+  /** Students whose account is still active — the only ones markable PRESENT. */
+  const markableIds = roster.filter((s) => s.user.status === "ACTIVE").map((s) => s.id);
 
   if (present.some((id) => !studentIds.includes(id))) {
     return NextResponse.json({ error: "Students must belong to the class program" }, { status: 400 });
+  }
+
+  if (present.some((id) => !markableIds.includes(id))) {
+    return NextResponse.json(
+      { error: "One or more selected students have a deactivated account and cannot be marked present" },
+      { status: 400 },
+    );
   }
 
   try {
@@ -276,7 +300,9 @@ export async function PUT(request: Request) {
         data: studentIds.map((studentId) => ({
           sessionId: session.id,
           studentId,
-          status: present.includes(studentId) ? "PRESENT" : "ABSENT",
+          // Deactivated accounts can never record PRESENT.
+          status:
+            markableIds.includes(studentId) && present.includes(studentId) ? "PRESENT" : "ABSENT",
         })),
       });
       return tx.attendanceSession.findUnique({

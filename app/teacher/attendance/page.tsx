@@ -17,7 +17,8 @@ type Student = {
   enrollmentNumber: string;
   rollNumber: string | null;
   profileImageUrl: string | null;
-  user: { firstName: string; lastName: string };
+  /** `user.status` — INACTIVE means an admin deactivated this account. */
+  user: { firstName: string; lastName: string; status: string };
 };
 
 type ClassItem = {
@@ -52,6 +53,16 @@ const DAY_ORDER: Record<string, number> = {
 /** Get the base subject code without the practical group suffix (e.g. "EX 365-P" → "EX 365"). */
 function baseSubjectCode(code: string): string {
   return code.replace(/-P$/, "");
+}
+
+/**
+ * A student whose ACCOUNT was deactivated (User.status !== "ACTIVE"). They
+ * stay listed on the roll - you need to see them - but can never be marked
+ * present. The enrollment lifecycle (graduated/suspended/withdrawn) is already
+ * filtered out server-side, so it never reaches this list.
+ */
+function isAccountInactive(student: Student) {
+  return student.user.status !== "ACTIVE";
 }
 
 /** Time-of-day (in minutes since midnight) extracted straight from the ISO string. */
@@ -158,6 +169,18 @@ export default function TeacherAttendancePage() {
     : null;
   const isLocked = Boolean(editWindowEndsAt && now !== null && now >= editWindowEndsAt.getTime());
 
+  /**
+   * Live "time left" on the edit window, e.g. "4:37". Null until the client
+   * clock has ticked once, so the first paint stays hydration-safe.
+   */
+  const remainingLabel =
+    editWindowEndsAt && now !== null
+      ? (() => {
+          const ms = Math.max(0, editWindowEndsAt.getTime() - now);
+          return `${Math.floor(ms / 60_000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
+        })()
+      : null;
+
   const selectedClass = useMemo(
     () => classes.find((c) => c.id === selectedClassId),
     [classes, selectedClassId],
@@ -238,10 +261,16 @@ export default function TeacherAttendancePage() {
           return;
         }
 
-        setClasses(attResult.classes ?? []);
+        const loadedClasses: ClassItem[] = attResult.classes ?? [];
+        setClasses(loadedClasses);
         // Smart-default: find the class currently in session (by day + time),
         // falling back to the first class in sorted order.
-        setSelectedClassId(findCurrentClassId(attResult.classes ?? []) || "");
+        const initialClassId = findCurrentClassId(loadedClasses) || "";
+        setSelectedClassId(initialClassId);
+        // Hydrate attendance already saved for that class TODAY, so returning to
+        // this page (or refreshing it) restores the marks, the 5-minute
+        // countdown and the "Edit Attendance" button instead of a blank form.
+        await loadExistingSession(initialClassId);
 
         if (profRes.ok && profResult.teacher) {
           setTeacherInfo({
@@ -259,6 +288,9 @@ export default function TeacherAttendancePage() {
     }
 
     loadData();
+    // loadExistingSession is re-created on every render, so it cannot be a
+    // dependency: this effect must hydrate exactly once per mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   // Keep the client clock fresh while a session is submitted (and not yet
@@ -276,6 +308,9 @@ export default function TeacherAttendancePage() {
   }, [submittedAt, isLocked]);
 
   function toggleStudent(studentId: string) {
+    // Deactivated accounts are read-only on the roll (the server rejects them too).
+    const target = selectedClass?.program.students.find((s) => s.id === studentId);
+    if (target && isAccountInactive(target)) return;
     setPresentStudentIds((current) => {
       const next = new Set(current);
       if (next.has(studentId)) next.delete(studentId);
@@ -330,7 +365,9 @@ export default function TeacherAttendancePage() {
 
   function selectAll() {
     if (!selectedClass) return;
-    setPresentStudentIds(new Set(selectedClass.program.students.map((s) => s.id)));
+    setPresentStudentIds(
+      new Set(selectedClass.program.students.filter((s) => !isAccountInactive(s)).map((s) => s.id)),
+    );
   }
 
   function clearAll() {
@@ -340,27 +377,46 @@ export default function TeacherAttendancePage() {
   /** Loads any attendance already saved today for this class so the UI can
    *  restore its submitted/locked state (server decides editability). */
   async function loadExistingSession(classId: string) {
-    setSessionStatus("idle");
-    setSubmittedAt(null);
-    setPresentStudentIds(new Set());
-    if (!classId) return;
+    const resetToIdle = () => {
+      setSessionStatus("idle");
+      setSubmittedAt(null);
+      setPresentStudentIds(new Set());
+    };
+    if (!classId) {
+      resetToIdle();
+      return;
+    }
     try {
       const res = await fetch(`/api/attendance?classId=${classId}&date=${todayISO}`);
-      if (!res.ok) return;
+      if (!res.ok) {
+        resetToIdle();
+        return;
+      }
       const data = await res.json();
       if (data.session) {
         setSubmittedAt(data.session.createdAt ?? null);
         setSessionStatus("submitted");
+        // Drop any PRESENT record belonging to a since-deactivated account so it
+        // can never come back pre-checked.
+        const inactiveIds = new Set(
+          (classes.find((c) => c.id === classId)?.program.students ?? [])
+            .filter(isAccountInactive)
+            .map((s) => s.id),
+        );
         setPresentStudentIds(
           new Set(
             (data.session.records ?? [])
               .filter((r: { status: string }) => r.status === "PRESENT")
-              .map((r: { studentId: string }) => r.studentId),
+              .map((r: { studentId: string }) => r.studentId)
+              .filter((studentId: string) => !inactiveIds.has(studentId)),
           ),
         );
+      } else {
+        resetToIdle();
       }
     } catch {
-      /* A failed pre-fetch is non-fatal — the roster still renders empty. */
+      /* A failed pre-fetch is non-fatal - the roster still renders empty. */
+      resetToIdle();
     }
   }
 
@@ -386,12 +442,11 @@ export default function TeacherAttendancePage() {
       const result = await response.json();
       if (!response.ok) {
         setError(result.error ?? "Unable to submit attendance");
-        // Someone already saved this session (or the window closed) — reflect it.
-        if (result.session) {
-          setSubmittedAt(result.session.createdAt ?? null);
-          setSessionStatus("submitted");
-        } else if (result.locked) {
-          setSessionStatus("submitted");
+        // Someone already saved this session (or the window closed): rebuild the
+        // whole UI from the server so the saved marks AND the countdown come
+        // back, instead of just flipping the button label.
+        if (result.session || result.locked) {
+          await loadExistingSession(selectedClass.id);
         }
         return;
       }
@@ -721,7 +776,7 @@ export default function TeacherAttendancePage() {
             <Button
               type="button"
               onClick={selectAll}
-              disabled={!selectedClass || totalStudents === 0}
+              disabled={!selectedClass || totalStudents === 0 || isLocked}
               style={{
                 padding: "6px 12px",
                 borderRadius: "6px",
@@ -738,7 +793,7 @@ export default function TeacherAttendancePage() {
             <Button
               type="button"
               onClick={clearAll}
-              disabled={!selectedClass || totalStudents === 0}
+              disabled={!selectedClass || totalStudents === 0 || isLocked}
               style={{
                 padding: "6px 12px",
                 borderRadius: "6px",
@@ -771,19 +826,29 @@ export default function TeacherAttendancePage() {
           <div style={{ display: "grid", gap: "8px", marginTop: "16px" }}>
             {filteredStudents.map((student) => {
               const isPresent = presentStudentIds.has(student.id);
+              // Deactivated account: still listed on the roll, never markable.
+              const inactive = isAccountInactive(student);
+              const readOnly = inactive || isLocked;
               return (
                 <div
                   key={student.id}
-                  onClick={() => toggleStudent(student.id)}
+                  onClick={() => {
+                    // Locked sessions and deactivated accounts are both read-only;
+                    // the server rejects edits to either.
+                    if (readOnly) return;
+                    toggleStudent(student.id);
+                  }}
                   style={{
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
                     padding: "12px 16px",
                     borderRadius: "10px",
-                    border: `1px solid ${isPresent ? "color-mix(in srgb, #10b981 30%, transparent)" : "var(--border)"}`,
-                    background: isPresent ? "color-mix(in srgb, #10b981 7%, transparent)" : "var(--card)",
-                    cursor: "pointer",
+                    border: `1px solid ${isPresent ? "color-mix(in oklab, var(--ctp-green) 35%, transparent)" : "var(--border)"}`,
+                    background: isPresent ? "color-mix(in oklab, var(--ctp-green) 10%, transparent)" : "var(--card)",
+                    // Greyed out while the account is deactivated.
+                    opacity: inactive ? 0.5 : 1,
+                    cursor: readOnly ? "default" : "pointer",
                     transition: "all 120ms ease",
                   }}
                 >
@@ -793,8 +858,8 @@ export default function TeacherAttendancePage() {
                         width: "38px",
                         height: "38px",
                         borderRadius: "50%",
-                        background: isPresent ? "color-mix(in srgb, #10b981 14%, transparent)" : "var(--muted)",
-                        color: isPresent ? "#059669" : "var(--muted-foreground)",
+                        background: isPresent ? "color-mix(in oklab, var(--ctp-green) 16%, transparent)" : "var(--muted)",
+                        color: isPresent ? "var(--ctp-green)" : "var(--muted-foreground)",
                         display: "grid",
                         placeItems: "center",
                         fontSize: "0.85rem",
@@ -818,14 +883,23 @@ export default function TeacherAttendancePage() {
                     <span
                       className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-bold tracking-wide ${
                         isPresent
-                          ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:border-emerald-400/30 dark:bg-emerald-400/15 dark:text-emerald-400"
+                          ? "border-[color-mix(in_oklab,var(--ctp-green)_35%,transparent)] bg-[color-mix(in_oklab,var(--ctp-green)_15%,transparent)] text-[var(--ctp-green)]"
                           : "border-destructive/25 bg-destructive/10 text-destructive dark:border-destructive/40 dark:bg-destructive/20"
                       }`}
                     >
                       {isPresent ? "PRESENT" : "ABSENT"}
                     </span>
+                    {inactive && (
+                      <span
+                        className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-bold tracking-wide text-muted-foreground"
+                        title="This student's account was deactivated by an admin - they cannot be marked present"
+                      >
+                        INACTIVE
+                      </span>
+                    )}
                     <Checkbox
                       checked={isPresent}
+                      disabled={readOnly}
                       onCheckedChange={() => toggleStudent(student.id)}
                       onClick={(e) => e.stopPropagation()}
                       aria-label={`Mark ${student.user.firstName} ${student.user.lastName} ${isPresent ? "absent" : "present"}`}
@@ -853,16 +927,21 @@ export default function TeacherAttendancePage() {
         >
           <span style={{ fontSize: "0.82rem", color: "var(--muted-foreground)" }}>
             Unchecked students are marked Absent automatically.
-            {sessionStatus !== "idle" && !isLocked && editWindowEndsAt && (
+            {!isLocked && sessionStatus !== "idle" && editWindowEndsAt && remainingLabel && (
               <>
-                {" "}· Editable until{" "}
-                <strong>{editWindowEndsAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</strong>
+                {" "}· Editable for <strong>{remainingLabel}</strong> remaining (until{" "}
+                <strong>
+                  {editWindowEndsAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </strong>
+                )
               </>
             )}
           </span>
           <Button
-            className="primary-button"
             type="button"
+            variant={isLocked ? "secondary" : "default"}
+            size="lg"
+            className="px-6 font-semibold"
             onClick={() => {
               // First press after a submission switches into edit mode; the
               // next press actually updates the session on the server.
@@ -874,20 +953,6 @@ export default function TeacherAttendancePage() {
               void submitAttendance();
             }}
             disabled={!selectedClass || isSubmitting || totalStudents === 0 || isLocked}
-            style={{
-              padding: "10px 24px",
-              borderRadius: "8px",
-              background: isLocked ? "var(--border)" : "var(--accent)",
-              color: "#fff",
-              fontWeight: "700",
-              fontSize: "0.85rem",
-              border: 0,
-              cursor: isLocked ? "not-allowed" : "pointer",
-              opacity: isLocked ? 0.7 : 1,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "7px",
-            }}
           >
             {isLocked ? (
               <>

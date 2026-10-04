@@ -68,13 +68,24 @@ export function minutesToHHMM(totalMinutes: number) {
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 }
 
-/** ISO/date or "HH:MM" → 12-hour display clock. */
+/**
+ * ISO/date or "HH:MM" → 12-hour display clock.
+ *
+ * Class/break times are wall-clock values: they are stored in Time columns
+ * and read back with getUTCHours (see /api/classes). Formatting must
+ * therefore stay in UTC — toLocaleTimeString alone applies the machine's
+ * local offset, which is what rendered 09:00 as "02:30 pm".
+ */
 export function formatTime(value: string) {
   const mins = timeToMinutes(value);
   if (mins === null) return value;
-  const d = new Date(0);
-  d.setUTCHours(Math.floor(mins / 60), mins % 60, 0, 0);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
+  const d = new Date(Date.UTC(1970, 0, 1, Math.floor(mins / 60), mins % 60));
+  return d.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "UTC",
+  });
 }
 
 export function colorIndexFor(code: string) {

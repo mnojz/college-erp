@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
+import { formatTime } from "@/app/lib/timetable-layout";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "cn";
 
@@ -188,7 +189,7 @@ export default function TeacherSchedulePage() {
 
                       <div className="text-right">
                         <div className="text-sm font-bold text-primary">
-                          {new Date(item.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} – {new Date(item.endTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          {formatTime(item.startTime)} – {formatTime(item.endTime)}
                         </div>
                         <span className="text-[0.75rem] text-muted-foreground">
                           Lecture Hall

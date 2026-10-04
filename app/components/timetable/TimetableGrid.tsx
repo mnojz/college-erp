@@ -191,25 +191,27 @@ export function TimetableGrid({
                     background: `linear-gradient(to right, color-mix(in oklab, ${b.color} 15%, transparent), color-mix(in oklab, ${b.color} 7%, transparent))`,
                   } as CSSProperties;
 
+                  // The slot's time is already expressed by its position on the
+                  // grid (and precisely in the hover tooltip), so no time text
+                  // inside the block. The subject NAME is the primary line and
+                  // the code/type/group are secondary.
                   const inner = (
                     <>
-                      <strong className="block truncate text-[11px] leading-tight">
-                        {b.subject.code}
-                        {b.type === "Practical" ? " · Lab" : ""}
+                      <strong className="flex items-start gap-1 text-[12px] leading-snug font-semibold">
+                        <span className="min-w-0 flex-1 truncate">{b.subject.name}</span>
                         {b.conflict && (
                           <IconAlertTriangle
-                            size={11}
-                            className="inline-block align-text-bottom text-destructive"
+                            size={12}
+                            className="mt-px shrink-0 text-destructive"
                             aria-hidden="true"
                           />
                         )}
                       </strong>
-                      <span className="block truncate text-[10px] leading-tight opacity-80">
-                        {b.group ? `${b.group} · ${b.subject.name}` : b.subject.name}
-                      </span>
                       {!b.sm && (
                         <span className="mt-0.5 block truncate text-[10px] leading-tight opacity-70">
-                          {formatTime(b.startTime)} – {formatTime(b.endTime)}
+                          {b.subject.code}
+                          {b.type === "Practical" ? " · Lab" : ""}
+                          {b.group ? ` · ${b.group}` : ""}
                         </span>
                       )}
                     </>
