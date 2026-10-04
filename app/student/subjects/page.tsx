@@ -3,17 +3,19 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  IconArrowRight,
-  IconFileText,
-  IconNotes,
-  IconSpeakerphone,
-  IconUser,
-} from "@tabler/icons-react";
+import { IconArrowRight, IconFileText } from "@tabler/icons-react";
 import { StudentShell } from "@/app/components/student/StudentShell";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -53,7 +55,6 @@ type ClassSlot = {
 };
 
 type MaterialRow = { id: string; subjectId: string | null };
-type NoticeRow = { id: string; subject: { id: string } | null };
 
 export default function StudentSubjectsPage() {
   const router = useRouter();
@@ -61,7 +62,6 @@ export default function StudentSubjectsPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [classes, setClasses] = useState<ClassSlot[]>([]);
   const [materials, setMaterials] = useState<MaterialRow[]>([]);
-  const [notices, setNotices] = useState<NoticeRow[]>([]);
   const [semesterChoice, setSemesterChoice] = useState("AUTO");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -69,12 +69,11 @@ export default function StudentSubjectsPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [profileRes, subjectsRes, classesRes, materialsRes, noticesRes] = await Promise.all([
+        const [profileRes, subjectsRes, classesRes, materialsRes] = await Promise.all([
           fetch("/api/student/profile"),
           fetch("/api/subjects"),
           fetch("/api/classes"),
           fetch("/api/materials"),
-          fetch("/api/announcements"),
         ]);
 
         if (profileRes.status === 401 || profileRes.status === 403) {
@@ -97,10 +96,6 @@ export default function StudentSubjectsPage() {
         if (materialsRes.ok) {
           const materialsData = await materialsRes.json();
           setMaterials(materialsData.materials ?? []);
-        }
-        if (noticesRes.ok) {
-          const noticesData = await noticesRes.json();
-          setNotices(noticesData.announcements ?? []);
         }
       } catch {
         setError("Unable to reach the server");
@@ -146,15 +141,6 @@ export default function StudentSubjectsPage() {
     }
     return map;
   }, [materials]);
-
-  const noticeCountBySubject = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const n of notices) {
-      if (!n.subject?.id) continue;
-      map.set(n.subject.id, (map.get(n.subject.id) ?? 0) + 1);
-    }
-    return map;
-  }, [notices]);
 
   const visibleStats = useMemo(() => {
     const ids = new Set(visibleSubjects.map((s) => s.id));
@@ -257,6 +243,7 @@ export default function StudentSubjectsPage() {
           </Select>
         </div>
 
+        {/* One row per subject: code · name · semester · materials action. */}
         {visibleSubjects.length === 0 ? (
           <div className="rounded-md border bg-muted/40 px-4 py-12 text-center">
             <p className="text-sm text-muted-foreground">
@@ -265,72 +252,60 @@ export default function StudentSubjectsPage() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {visibleSubjects.map((sub) => {
-              const materialCount = materialCountBySubject.get(sub.id) ?? 0;
-              const noticeCount = noticeCountBySubject.get(sub.id) ?? 0;
-              const teachers = sub.subjectTeachers.map(
-                (st) => `${st.teacher.user.firstName} ${st.teacher.user.lastName}`,
-              );
-
-              return (
-                <Card key={sub.id} className="flex h-full flex-col">
-                  <CardContent className="flex flex-1 flex-col p-5">
-                    <div className="mb-2 flex items-start justify-between gap-2">
-                      <span className="rounded bg-muted px-2 py-0.5 font-mono text-xs font-semibold">
-                        {sub.code}
-                      </span>
-                      <Badge variant="secondary">Semester {sub.semester}</Badge>
-                    </div>
-                    <h3 className="mb-3 text-base font-semibold">{sub.name}</h3>
-
-                    <div className="mb-3 text-sm">
-                      <div className="flex items-start gap-2">
-                        <IconUser size={16} stroke={1.8} className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                        <span className="min-w-0">
-                          {teachers.length > 0 ? (
-                            <strong>{teachers.join(", ")}</strong>
-                          ) : (
-                            "Teacher not assigned yet"
-                          )}
+          <div className="overflow-hidden rounded-xl border">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="w-32">Code</TableHead>
+                  <TableHead>Subject</TableHead>
+                  <TableHead className="w-32">Semester</TableHead>
+                  <TableHead className="w-48 text-right">Study Materials</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visibleSubjects.map((sub) => {
+                  const hasMaterials = (materialCountBySubject.get(sub.id) ?? 0) > 0;
+                  return (
+                    <TableRow key={sub.id}>
+                      <TableCell>
+                        <span className="rounded bg-muted px-2 py-0.5 font-mono text-xs font-semibold">
+                          {sub.code}
                         </span>
-                      </div>
-                    </div>
-
-                    <div className="mb-3 flex flex-wrap gap-1.5">
-                      {materialCount > 0 ? (
-                        <Badge variant="outline" className="gap-1 border-[color-mix(in_oklab,var(--ctp-sky)_45%,transparent)] bg-[color-mix(in_oklab,var(--ctp-sky)_15%,transparent)] text-[var(--ctp-sky)]">
-                          <IconNotes size={13} stroke={1.8} aria-hidden="true" /> {materialCount} material{materialCount === 1 ? "" : "s"}
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="gap-1">
-                          <IconNotes size={13} stroke={1.8} aria-hidden="true" /> No materials yet
-                        </Badge>
-                      )}
-                      {noticeCount > 0 ? (
-                        <Badge variant="outline" className="gap-1 border-emerald-600/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
-                          <IconSpeakerphone size={13} stroke={1.8} aria-hidden="true" /> {noticeCount} notice{noticeCount === 1 ? "" : "s"}
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="gap-1">
-                          <IconSpeakerphone size={13} stroke={1.8} aria-hidden="true" /> No notices
-                        </Badge>
-                      )}
-                    </div>
-
-                    <div className="mt-auto border-t pt-2.5">
-                      <Link
-                        href={`/student/notes?subjectId=${sub.id}`}
-                        className="flex items-center gap-2 rounded-md px-1 py-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                      >
-                        <IconFileText size={15} stroke={1.8} aria-hidden="true" /> Study materials
-                        <IconArrowRight size={14} stroke={1.8} className="ml-auto" aria-hidden="true" />
-                      </Link>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                      </TableCell>
+                      <TableCell>
+                        <span className="block max-w-[46ch] truncate font-medium" title={sub.name}>
+                          {sub.name}
+                        </span>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        Semester {sub.semester}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {hasMaterials ? (
+                          <Button asChild size="sm" variant="outline">
+                            <Link href={`/student/notes?subjectId=${sub.id}`}>
+                              <IconFileText size={15} stroke={1.8} aria-hidden="true" />
+                              Study Materials
+                              <IconArrowRight size={14} stroke={1.8} aria-hidden="true" />
+                            </Link>
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled
+                            title="No study materials have been uploaded for this subject yet"
+                          >
+                            <IconFileText size={15} stroke={1.8} aria-hidden="true" />
+                            Study Materials
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
           </div>
         )}
       </div>

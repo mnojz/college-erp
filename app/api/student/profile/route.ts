@@ -130,8 +130,10 @@ export async function GET() {
 /**
  * PATCH /api/student/profile — student edits their own profile.
  *
- * Only keys present in SELF_EDITABLE are honoured (plus `email` and changing
- * the password on the linked User account). Anything else in the body — name,
+ * Only keys present in SELF_EDITABLE are honoured (plus changing the password
+ * on the linked User account). The college EMAIL is deliberately NOT
+ * self-editable: it is the student's account identity, so an attempt to change
+ * it is rejected. Anything else in the body — name,
  * gender, nationality, category, religion, registration data, program, etc. —
  * is silently ignored, so a student can never modify admin-controlled data.
  */
@@ -162,9 +164,6 @@ export async function PATCH(request: Request) {
   if (newPassword && newPassword.length < 8) {
     return NextResponse.json({ error: "New password must be at least 8 characters" }, { status: 400 });
   }
-  if (!newPassword && email !== undefined && !currentPassword) {
-    return NextResponse.json({ error: "Enter your current password to change your email" }, { status: 400 });
-  }
   if (newPassword && !currentPassword) {
     return NextResponse.json({ error: "Enter your current password to change it" }, { status: 400 });
   }
@@ -179,6 +178,18 @@ try {
     });
     if (!existing) {
       return NextResponse.json({ error: "Student profile not found" }, { status: 404 });
+    }
+
+    // The college email is the account identity — a student may never change it.
+    // (Admins can still correct it from the People directory.)
+    if (email !== undefined && email !== existing.user.email.toLowerCase()) {
+      return NextResponse.json(
+        {
+          error:
+            "Your college email address cannot be changed. Contact the administration office to have it corrected.",
+        },
+        { status: 400 },
+      );
     }
 
     // If a password (or email) change was requested, verify the current password.

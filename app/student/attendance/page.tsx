@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { StudentShell } from "@/app/components/student/StudentShell";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -33,6 +32,8 @@ type Profile = {
 };
 
 type AttendanceRecord = {
+  /** Stable row key — a subject can have two slots on the same day. */
+  id: string;
   status: "PRESENT" | "ABSENT";
   session: {
     sessionDate: string;
@@ -42,6 +43,17 @@ type AttendanceRecord = {
     };
   };
 };
+
+/**
+ * Catppuccin accents used for the per-subject squares in the log + legend.
+ * Scoped to this page rather than reusing the timetable PALETTE, so every
+ * subject a student has records for gets its own colour and the legend stays
+ * unambiguous even with 40+ subjects across a full program.
+ */
+const SUBJECT_COLORS = [
+  "blue", "green", "peach", "mauve", "teal", "red", "yellow",
+  "lavender", "pink", "sapphire", "maroon", "sky", "flamingo", "rosewater",
+] as const;
 
 export default function StudentAttendancePage() {
   const router = useRouter();
@@ -125,6 +137,49 @@ export default function StudentAttendancePage() {
     selectedSubject === "ALL"
       ? records
       : records.filter((r) => r.session.class.subject.code === selectedSubject);
+
+  /**
+   * One colour per subject, assigned in first-seen order across ALL records
+   * (not the filtered subset) so a colour never shifts when filtering changes.
+   */
+  const subjectColorByCode = new Map<string, string>();
+  for (const record of records) {
+    const code = record.session.class.subject.code;
+    if (!subjectColorByCode.has(code)) {
+      subjectColorByCode.set(
+        code,
+        `var(--ctp-${SUBJECT_COLORS[subjectColorByCode.size % SUBJECT_COLORS.length]})`,
+      );
+    }
+  }
+
+  /**
+   * The log is grouped by date: one row per session date, each holding that
+   * day's subject chips. Newest date first.
+   */
+  const recordsByDate = new Map<string, AttendanceRecord[]>();
+  for (const record of filteredRecords) {
+    const date = record.session.sessionDate;
+    const bucket = recordsByDate.get(date);
+    if (bucket) bucket.push(record);
+    else recordsByDate.set(date, [record]);
+  }
+  const datedLogs = Array.from(recordsByDate.entries()).sort((a, b) =>
+    b[0].localeCompare(a[0]),
+  );
+
+  /** Subjects that actually appear in the log — drives the colour legend. */
+  const legendSubjects = Array.from(
+    new Map(
+      filteredRecords.map((r) => [
+        r.session.class.subject.code,
+        {
+          code: r.session.class.subject.code,
+          name: r.session.class.subject.name,
+        },
+      ]),
+    ).values(),
+  );
 
   const eligible = Number(overallPercentage) >= 75;
 
@@ -232,7 +287,30 @@ export default function StudentAttendancePage() {
           </div>
         )}
 
-        {/* Daily Attendance Log Table */}
+        {/* Colour legend: maps each subject's square colour to the subject. */}
+        {legendSubjects.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border bg-muted/20 px-4 py-3">
+            <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              Subjects
+            </span>
+            {legendSubjects.map((subject) => (
+              <span key={subject.code} className="inline-flex items-center gap-1.5 text-xs">
+                <span
+                  className="size-2.5 shrink-0 rounded-[4px]"
+                  style={{ background: subjectColorByCode.get(subject.code) }}
+                  aria-hidden="true"
+                />
+                <span className="font-mono font-semibold">{subject.code}</span>
+                <span className="text-muted-foreground">{subject.name}</span>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Daily Attendance Log — one row per date, subject chips inside.
+            A chip's square carries the subject colour (see the legend) while
+            the chip's border + background carry PRESENT (green) / ABSENT
+            (neutral). */}
         {filteredRecords.length === 0 ? (
           <div className="rounded-md border bg-muted/40 px-4 py-12 text-center">
             <p className="text-sm text-muted-foreground">No attendance sessions recorded yet.</p>
@@ -243,40 +321,52 @@ export default function StudentAttendancePage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Semester</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead className="w-56">Date</TableHead>
+                    <TableHead>Subjects</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredRecords.map((item, idx) => {
-                    const isPresent = item.status === "PRESENT";
-                    return (
-                      <TableRow key={idx}>
-                        <TableCell className="font-medium">
-                          {new Date(item.session.sessionDate).toLocaleDateString("en-US", {
-                            weekday: "short",
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
+                  {datedLogs.map(([date, dayRecords]) => (
+                    <TableRow key={date}>
+                      <TableCell className="align-top font-medium whitespace-nowrap">
+                        {new Date(date).toLocaleDateString("en-US", {
+                          weekday: "short",
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1.5">
+                          {dayRecords.map((item) => {
+                            const present = item.status === "PRESENT";
+                            const subject = item.session.class.subject;
+                            return (
+                              <span
+                                key={item.id}
+                                title={`${subject.name} — ${present ? "Present" : "Absent"}`}
+                                className={cn(
+                                  "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-semibold",
+                                  present
+                                    ? "border-[color-mix(in_oklab,var(--ctp-green)_45%,transparent)] bg-[color-mix(in_oklab,var(--ctp-green)_15%,transparent)] text-[var(--ctp-green)]"
+                                    : "border-border bg-muted/40 text-muted-foreground",
+                                )}
+                              >
+                                <span
+                                  className="size-2.5 shrink-0 rounded-[4px]"
+                                  style={{
+                                    background: subjectColorByCode.get(subject.code),
+                                  }}
+                                  aria-hidden="true"
+                                />
+                                {subject.code}
+                              </span>
+                            );
                           })}
-                        </TableCell>
-                        <TableCell>
-                          <strong>{item.session.class.subject.code}</strong>
-                          <div className="text-xs text-muted-foreground">{item.session.class.subject.name}</div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {item.session.class.semester ? `Sem ${item.session.class.semester}` : "—"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={isPresent ? "default" : "destructive"}>
-                            {isPresent ? "PRESENT" : "ABSENT"}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </div>

@@ -94,7 +94,6 @@ type Profile = {
 type EditFormState = {
   profileImageUrl: string;
   bloodGroup: string;
-  email: string;
   phone: string;
   // Permanent address (structured)
   permProvinceId: number | null;
@@ -197,7 +196,6 @@ export default function StudentPage() {
     setEditForm({
       profileImageUrl: profile.profileImageUrl ?? "",
       bloodGroup: profile.bloodGroup ?? "",
-      email: profile.user.email,
       phone: profile.phone ?? "",
       // Permanent address
       permProvinceId: profile.permProvinceId ?? null,
@@ -226,20 +224,16 @@ export default function StudentPage() {
   /**
    * Save the self-service profile edits. Only student-editable fields are sent —
    * name, gender, registration data, etc. never leave this page. Changing the
-   * email or the password additionally requires the current password, which the
-   * API verifies against the stored hash.
+   * password additionally requires the current password, which the API verifies
+   * against the stored hash. The college email is NOT self-editable: it is the
+   * account identity, so the field is read-only and never submitted.
    */
   async function handleSaveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!profile || !editForm) return;
 
-    const emailChanged = editForm.email.trim().toLowerCase() !== profile.user.email.toLowerCase();
     const changingPassword = editForm.newPassword !== "";
 
-    if (emailChanged && !editForm.currentPassword) {
-      setEditError("Enter your current password to change your email address.");
-      return;
-    }
     if (changingPassword && editForm.newPassword.length < 8) {
       setEditError("New password must be at least 8 characters.");
       return;
@@ -275,8 +269,7 @@ export default function StudentPage() {
       guardianEmail: editForm.guardianEmail,
       guardianRelation: editForm.guardianRelation,
     };
-    if (emailChanged) body.email = editForm.email.trim();
-    if (emailChanged || changingPassword) body.currentPassword = editForm.currentPassword;
+    if (changingPassword) body.currentPassword = editForm.currentPassword;
     if (changingPassword) body.newPassword = editForm.newPassword;
 
     try {
@@ -505,16 +498,6 @@ export default function StudentPage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="edit-email">Email Address</Label>
-                <Input
-                  id="edit-email"
-                  type="email"
-                  value={editForm.email}
-                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                  required
-                />
               </div>
             </div>
 
@@ -879,7 +862,7 @@ export default function StudentPage() {
                 <Input
                   id="edit-current-password"
                   type="password"
-                  placeholder="Required to change email / password"
+                  placeholder="Required to change your password"
                   value={editForm.currentPassword}
                   onChange={(e) => setEditForm({ ...editForm, currentPassword: e.target.value })}
                   autoComplete="current-password"

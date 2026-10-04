@@ -164,8 +164,8 @@ export default function StudentSchedulesPage() {
       <div className="flex flex-col gap-5">
         {/* Toolbar: pick any program + semester (read-only view). */}
         <Card>
-          <CardContent className="flex flex-wrap items-end gap-4 p-4">
-            <div className="grid min-w-60 flex-1 gap-1.5">
+          <CardContent className="flex flex-wrap items-end gap-3 p-4">
+            <div className="grid w-full gap-1.5 sm:w-80">
               <Label>Program</Label>
               <Select
                 value={selectedProgramId || undefined}
@@ -175,7 +175,7 @@ export default function StudentSchedulesPage() {
                 }}
                 disabled={programs.length === 0}
               >
-                <SelectTrigger aria-label="Program">
+                <SelectTrigger aria-label="Program" className="h-10 w-full">
                   <SelectValue placeholder="Select program" />
                 </SelectTrigger>
                 <SelectContent>
@@ -188,14 +188,14 @@ export default function StudentSchedulesPage() {
               </Select>
             </div>
 
-            <div className="grid w-44 gap-1.5">
+            <div className="grid w-full gap-1.5 sm:w-56">
               <Label>Semester</Label>
               <Select
                 value={selectedSemester || undefined}
                 onValueChange={setSelectedSemester}
                 disabled={!selectedProgramId}
               >
-                <SelectTrigger aria-label="Semester">
+                <SelectTrigger aria-label="Semester" className="h-10 w-full">
                   <SelectValue placeholder="Select semester" />
                 </SelectTrigger>
                 <SelectContent>
@@ -208,17 +208,19 @@ export default function StudentSchedulesPage() {
               </Select>
             </div>
 
-            {isOwnRoutine ? (
-              <Badge className="gap-1.5 bg-[color-mix(in_oklab,var(--ctp-sky)_15%,transparent)] px-3 py-1.5 text-[var(--ctp-sky)] hover:bg-[color-mix(in_oklab,var(--ctp-sky)_22%,transparent)]">
-                <IconRosetteDiscountCheck size={15} aria-hidden="true" />
-                Your routine
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="gap-1.5 px-3 py-1.5">
-                <IconUsers size={15} aria-hidden="true" />
-                Viewing a public routine
-              </Badge>
-            )}
+            <div className="sm:ml-1 sm:pb-1">
+              {isOwnRoutine ? (
+                <Badge className="gap-1.5 bg-[color-mix(in_oklab,var(--ctp-sky)_15%,transparent)] px-3 py-1.5 text-[var(--ctp-sky)] hover:bg-[color-mix(in_oklab,var(--ctp-sky)_22%,transparent)]">
+                  <IconRosetteDiscountCheck size={15} aria-hidden="true" />
+                  Your routine
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="gap-1.5 px-3 py-1.5">
+                  <IconUsers size={15} aria-hidden="true" />
+                  Viewing a public routine
+                </Badge>
+              )}
+            </div>
           </CardContent>
         </Card>
 

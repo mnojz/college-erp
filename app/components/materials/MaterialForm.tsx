@@ -1,5 +1,16 @@
 "use client";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 import { useMemo, useState } from "react";
 import {
@@ -8,6 +19,17 @@ import {
   semestersForDuration,
   type ProgramsMeta,
 } from "@/app/lib/materials-shared";
+import { cn } from "cn";
+
+/** Radix Select forbids empty-string values, so "not specific" uses a sentinel. */
+const NONE = "NONE";
+
+/** Compact labels for the inline visibility radio row (full text is in the tooltip). */
+const VISIBILITY_SHORT: Record<string, string> = {
+  EVERYONE: "Everyone",
+  DEPARTMENT_PROGRAM: "Program",
+  CLASSES: "Classes",
+};
 
 export type MaterialSubmitValues = {
   title: string;
@@ -161,92 +183,124 @@ export function MaterialForm({
 
   return (
     <form className="grid gap-4" onSubmit={handleSubmit}>
-      <label>
-        Title *
-        <input
-          type="text"
+      <div className="grid gap-1.5">
+        <Label htmlFor="material-title">Title *</Label>
+        <Input
+          id="material-title"
           value={values.title}
           onChange={(e) => set("title", e.target.value)}
           placeholder="e.g. Unit 4 — Sequential Circuits Notes"
           required
           maxLength={200}
         />
-      </label>
+      </div>
 
-      <label>
-        Description
-        <textarea
+      <div className="grid gap-1.5">
+        <Label htmlFor="material-description">Description</Label>
+        <Textarea
+          id="material-description"
           value={values.description}
           onChange={(e) => set("description", e.target.value)}
           rows={3}
           placeholder="What does this material cover?"
         />
-      </label>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label>
-          Material Type *
-          <select value={values.materialType} onChange={(e) => set("materialType", e.target.value)} required>
-            {MATERIAL_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-        </label>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label>
-          Program
-          <select value={values.programId} onChange={(e) => handleProgramChange(e.target.value)}>
-            <option value="">Not specific</option>
-            {meta.programs.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.code} — {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="grid gap-1.5">
+          <Label htmlFor="material-type">Material Type *</Label>
+          <Select value={values.materialType} onValueChange={(v) => set("materialType", v)}>
+            <SelectTrigger id="material-type" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MATERIAL_TYPES.map((t) => (
+                <SelectItem key={t.value} value={t.value}>
+                  {t.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="grid gap-1.5">
+          <Label htmlFor="material-program">Program</Label>
+          <Select
+            value={values.programId || NONE}
+            onValueChange={(v) => handleProgramChange(v === NONE ? "" : v)}
+          >
+            <SelectTrigger id="material-program" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>Not specific</SelectItem>
+              {meta.programs.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.code} — {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label>
-          Semester
-          <select
-            value={values.semester}
-            onChange={(e) => setValues((v) => ({ ...v, semester: e.target.value, subjectId: "" }))}
+        <div className="grid gap-1.5">
+          <Label htmlFor="material-semester">Semester</Label>
+          <Select
+            value={values.semester || NONE}
+            onValueChange={(v) =>
+              setValues((prev) => ({
+                ...prev,
+                semester: v === NONE ? "" : v,
+                subjectId: "",
+              }))
+            }
             disabled={semesterOptions.length === 0}
           >
-            <option value="">Not specific</option>
-            {semesterOptions.map((s) => (
-              <option key={s} value={String(s)}>
-                Semester {s}
-              </option>
-            ))}
-          </select>
-        </label>
+            <SelectTrigger id="material-semester" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>Not specific</SelectItem>
+              {semesterOptions.map((s) => (
+                <SelectItem key={s} value={String(s)}>
+                  Semester {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-        <label>
-          Subject
-          <select value={values.subjectId} onChange={(e) => handleSubjectChange(e.target.value)}>
-            <option value="">General / Not subject-specific</option>
-            {filteredSubjects.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.code} — {s.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="grid gap-1.5">
+          <Label htmlFor="material-subject">Subject</Label>
+          <Select
+            value={values.subjectId || NONE}
+            onValueChange={(v) => handleSubjectChange(v === NONE ? "" : v)}
+          >
+            <SelectTrigger id="material-subject" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>General / Not subject-specific</SelectItem>
+              {filteredSubjects.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.code} — {s.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <div className="grid gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Visibility *</span>
-        <div className="grid gap-2">
+      <div className="grid gap-1.5">
+        <Label htmlFor="material-visibility">Visibility *</Label>
+        <div className="grid grid-cols-3 gap-2" id="material-visibility">
           {VISIBILITY_OPTIONS.map((opt) => (
             <label
               key={opt.value}
-              className="flex cursor-pointer items-start gap-2.5 rounded-[10px] border bg-background px-3.5 py-3 transition-colors hover:border-primary/60 has-checked:border-primary has-checked:bg-primary/5 [&_span]:grid [&_span]:gap-1 [&_strong]:text-[13px] [&_small]:text-[11.5px] [&_small]:leading-snug [&_small]:text-muted-foreground [&_input]:mt-1"
+              title={opt.hint}
+              className="flex cursor-pointer items-center gap-2 rounded-lg border bg-background px-2.5 py-1.5 text-[12.5px] font-medium transition-colors hover:border-primary/50 has-checked:border-primary has-checked:bg-primary/10 has-checked:font-semibold"
             >
               <input
                 type="radio"
@@ -254,10 +308,10 @@ export function MaterialForm({
                 value={opt.value}
                 checked={values.visibility === opt.value}
                 onChange={() => set("visibility", opt.value)}
+                aria-label={opt.label}
+                className="size-3.5 shrink-0 accent-primary"
               />
-              <span>
-                <strong>{opt.label}</strong>
-              </span>
+              <span className="truncate">{VISIBILITY_SHORT[opt.value] ?? opt.label}</span>
             </label>
           ))}
         </div>
@@ -265,7 +319,9 @@ export function MaterialForm({
 
       {values.visibility === "CLASSES" && (
         <div className="grid gap-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Select classes *</span>
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Select classes *
+          </span>
           {classGroups.length === 0 ? (
             <p className="m-0 text-[12.5px] leading-relaxed text-muted-foreground">
               No teaching groups found. Add classes to your schedule first to target them here.
@@ -274,10 +330,25 @@ export function MaterialForm({
             <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2">
               {classGroups.map((g) => {
                 const selected =
-                  g.classIds.length > 0 && g.classIds.every((id) => values.selectedClassIds.includes(id));
+                  g.classIds.length > 0 &&
+                  g.classIds.every((id) => values.selectedClassIds.includes(id));
                 return (
-                  <label key={g.key} className={`notes-class-option${selected ? " selected" : ""}`}>
-                    <input type="checkbox" checked={selected} onChange={() => toggleClass(g.key)} />
+                  <label
+                    key={g.key}
+                    onClick={() => toggleClass(g.key)}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2.5 rounded-lg border bg-background px-3 py-2.5 text-[12.5px] font-semibold transition-colors",
+                      "hover:border-[color-mix(in_oklab,var(--ctp-sky)_55%,transparent)]",
+                      selected &&
+                        "border-[var(--ctp-sky)] bg-[color-mix(in_oklab,var(--ctp-sky)_12%,transparent)]",
+                    )}
+                  >
+                    <Checkbox
+                      checked={selected}
+                      onCheckedChange={() => toggleClass(g.key)}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label={g.label}
+                    />
                     <span>{g.label}</span>
                   </label>
                 );
@@ -287,16 +358,19 @@ export function MaterialForm({
         </div>
       )}
 
-      <label>
-        File *{" "}
-        {mode === "edit" && (
-          <small style={{ textTransform: "none", fontWeight: 500 }}>
-            (leave empty to keep current file)
-          </small>
-        )}
+      <div className="grid gap-1.5">
+        <Label htmlFor="material-file">
+          File *
+          {mode === "edit" && (
+            <span className="ml-1 font-medium text-muted-foreground normal-case">
+              (leave empty to keep current file)
+            </span>
+          )}
+        </Label>
         <input
+          id="material-file"
           type="file"
-          className="w-full cursor-pointer rounded-lg border border-dashed bg-transparent px-3 py-2.5 text-[13px] file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-foreground"
+          className="w-full cursor-pointer rounded-lg border border-dashed border-input bg-transparent px-3 py-2.5 text-[13px] file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-foreground"
           accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.md,.zip,.rar,.jpg,.jpeg,.png,.gif,.webp"
           onChange={(e) => {
             const selected = e.target.files?.[0] ?? null;
@@ -306,13 +380,23 @@ export function MaterialForm({
           required={mode === "create"}
           disabled={submitting}
         />
-        {fileName && <span className="mt-1.5 inline-block text-xs font-semibold text-primary">Selected: {fileName}</span>}
-        {!fileName && mode === "edit" && (
-          <span className="mt-1.5 inline-block text-xs font-medium text-muted-foreground">Keeping the existing file.</span>
+        {fileName && (
+          <span className="mt-1.5 inline-block text-xs font-semibold text-primary">
+            Selected: {fileName}
+          </span>
         )}
-      </label>
+        {!fileName && mode === "edit" && (
+          <span className="mt-1.5 inline-block text-xs font-medium text-muted-foreground">
+            Keeping the existing file.
+          </span>
+        )}
+      </div>
 
-      {error && <p className="rounded-lg border border-destructive/20 bg-destructive/10 px-3.5 py-2.5 text-[13px] font-medium text-destructive">{error}</p>}
+      {error && (
+        <p className="rounded-lg border border-destructive/20 bg-destructive/10 px-3.5 py-2.5 text-[13px] font-medium text-destructive">
+          {error}
+        </p>
+      )}
 
       <div className="flex flex-wrap justify-end gap-2.5">
         <Button type="submit" disabled={submitting}>
