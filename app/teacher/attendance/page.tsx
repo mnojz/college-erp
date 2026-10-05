@@ -49,12 +49,6 @@ const DAY_ORDER: Record<string, number> = {
   SUNDAY: 7,
 };
 
-/** Get the base subject code without the practical group suffix (e.g. "EX 365-P" → "EX 365"). */
-/** Get the base subject code without the practical group suffix (e.g. "EX 365-P" → "EX 365"). */
-function baseSubjectCode(code: string): string {
-  return code.replace(/-P$/, "");
-}
-
 /**
  * A student whose ACCOUNT was deactivated (User.status !== "ACTIVE"). They
  * stay listed on the roll - you need to see them - but can never be marked
@@ -188,7 +182,7 @@ export default function TeacherAttendancePage() {
 
   /** Dropdown value: the distinct-subject key the selected class belongs to. */
   const selectedSubjectKey = selectedClass
-    ? `${selectedClass.program.id}|${selectedClass.semester}|${baseSubjectCode(selectedClass.subject.code)}`
+    ? `${selectedClass.program.id}|${selectedClass.semester}|${selectedClass.subject.code}`
     : "";
 
   /** Distinct programs for the filter dropdown (sorted by code). */
@@ -340,7 +334,7 @@ export default function TeacherAttendancePage() {
       (c) =>
         c.program.id === progId &&
         c.semester === Number(semStr) &&
-        baseSubjectCode(c.subject.code) === base,
+        c.subject.code === base,
     );
     if (candidates.length === 0) return;
     selectClass(findCurrentClassId(candidates) || candidates[0].id);
@@ -529,26 +523,24 @@ export default function TeacherAttendancePage() {
                 // One option per SUBJECT — weekday/time never appear here.
                 // Those only power the smart suggestion; the concrete slot is
                 // resolved automatically (today's schedule, else first weekly
-                // slot) when recording. Practical variants (EX 365-P) collapse
-                // into their parent subject (EX 365).
+                // slot) when recording. A subject is a single entry whether it
+                // runs as a Lecture, a Practical, or both.
                 const subjects = new Map<
                   string,
                   { key: string; label: string; hasPractical: boolean }
                 >();
                 for (const c of filteredClasses) {
-                  const base = baseSubjectCode(c.subject.code);
-                  const key = `${c.program.id}|${c.semester}|${base}`;
+                  const key = `${c.program.id}|${c.semester}|${c.subject.code}`;
+                  const isPractical = c.type === "Practical";
                   const existing = subjects.get(key);
                   if (existing) {
-                    if (!existing.hasPractical && base !== c.subject.code) {
-                      existing.hasPractical = true;
-                    }
+                    if (isPractical) existing.hasPractical = true;
                     continue;
                   }
                   subjects.set(key, {
                     key,
-                    label: `[${c.program.code} · Sem ${c.semester}] ${c.subject.name} (${base})`,
-                    hasPractical: base !== c.subject.code,
+                    label: `[${c.program.code} · Sem ${c.semester}] ${c.subject.name} (${c.subject.code})`,
+                    hasPractical: isPractical,
                   });
                 }
                 return Array.from(subjects.values()).map((s) => (

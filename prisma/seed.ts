@@ -242,20 +242,6 @@ async function main() {
   await syncSubjectsFromCurriculum(prisma, bct.id);
   console.log("✅ Curriculum & subjects synced");
 
-  // Add practical lab subjects (not part of the JSON theory curriculum)
-  const practicalDefs = [
-    { code: "CT 364-P", name: "Database Management System Practical" },
-    { code: "EX 365-P", name: "Communication System Practical" },
-    { code: "CT 363-P", name: "Artificial Intelligence Practical" },
-  ];
-  for (const p of practicalDefs) {
-    await prisma.subject.upsert({
-      where: { code: p.code },
-      update: { name: p.name, programId: bct.id, semester: 6 },
-      create: { code: p.code, name: p.name, programId: bct.id, semester: 6 },
-    });
-  }
-
   // ─── Classes ────────────────────────────────────────────────
   const subjects = await prisma.subject.findMany({ where: { programId: bct.id }, select: { id: true, code: true } });
   const sub = (code: string) => subjects.find((s) => s.code === code)?.id ?? "";
@@ -274,7 +260,7 @@ async function main() {
     { d: dow.Mon, t: "12:00-13:00", subj: "EX 365", tchEmail: "kl@fwu.edu.np", type: "Lecture" },
     { d: dow.Mon, t: "13:30-14:30", subj: "CT 363", tchEmail: "gpl@fwu.edu.np", type: "Lecture" },
     { d: dow.Mon, t: "14:30-15:30", subj: "CT 361", tchEmail: "bsd@fwu.edu.np", type: "Lecture" },
-    { d: dow.Mon, t: "14:30-16:00", subj: "CT 364-P", tchEmail: "rkb@fwu.edu.np", type: "Practical", group: "Gr. B" },
+    { d: dow.Mon, t: "14:30-16:00", subj: "CT 364", tchEmail: "rkb@fwu.edu.np", type: "Practical", group: "Gr. B" },
     // Tuesday
     { d: dow.Tue, t: "09:00-10:00", subj: "CT 367", tchEmail: "pdb@fwu.edu.np", type: "Lecture" },
     { d: dow.Tue, t: "10:00-11:00", subj: "SH 366", tchEmail: "bp@fwu.edu.np", type: "Lecture" },
@@ -289,8 +275,8 @@ async function main() {
     { d: dow.Wed, t: "12:00-13:00", subj: "CT 361", tchEmail: "bsd@fwu.edu.np", type: "Lecture" },
     { d: dow.Wed, t: "13:30-14:30", subj: "CT 363", tchEmail: "gpl@fwu.edu.np", type: "Lecture" },
     { d: dow.Wed, t: "14:30-16:00", parallel: [
-      { subj: "EX 365-P", tch: "kl@fwu.edu.np", group: "Gr. A" },
-      { subj: "CT 363-P", tch: "gpl@fwu.edu.np", group: "Gr. B" },
+      { subj: "EX 365", tch: "kl@fwu.edu.np", group: "Gr. A" },
+      { subj: "CT 363", tch: "gpl@fwu.edu.np", group: "Gr. B" },
     ] },
     // Thursday
     { d: dow.Thu, t: "09:00-10:00", subj: "CT 364", tchEmail: "rkb@fwu.edu.np", type: "Lecture" },
@@ -299,8 +285,8 @@ async function main() {
     { d: dow.Thu, t: "12:00-13:00", subj: "CT 361", tchEmail: "bsd@fwu.edu.np", type: "Lecture" },
     { d: dow.Thu, t: "13:30-14:30", subj: "CT 363", tchEmail: "gpl@fwu.edu.np", type: "Lecture" },
     { d: dow.Thu, t: "14:30-16:00", parallel: [
-      { subj: "EX 365-P", tch: "kl@fwu.edu.np", group: "Gr. B" },
-      { subj: "CT 363-P", tch: "gpl@fwu.edu.np", group: "Gr. A" },
+      { subj: "EX 365", tch: "kl@fwu.edu.np", group: "Gr. B" },
+      { subj: "CT 363", tch: "gpl@fwu.edu.np", group: "Gr. A" },
     ] },
     // Friday
     { d: dow.Fri, t: "09:00-10:00", subj: "CT 364", tchEmail: "rkb@fwu.edu.np", type: "Lecture" },
@@ -308,7 +294,7 @@ async function main() {
     { d: dow.Fri, t: "11:00-12:00", subj: "EX 365", tchEmail: "kl@fwu.edu.np", type: "Lecture" },
     { d: dow.Fri, t: "12:00-13:00", subj: "CT 361", tchEmail: "bsd@fwu.edu.np", type: "Lecture" },
     { d: dow.Fri, t: "13:30-14:30", subj: "CT 363", tchEmail: "gpl@fwu.edu.np", type: "Lecture" },
-    { d: dow.Fri, t: "14:30-16:00", subj: "CT 364-P", tchEmail: "rkb@fwu.edu.np", type: "Practical", group: "Gr. A" },
+    { d: dow.Fri, t: "14:30-16:00", subj: "CT 364", tchEmail: "rkb@fwu.edu.np", type: "Practical", group: "Gr. A" },
   ];
 
   await prisma.$transaction(async (tx) => {
