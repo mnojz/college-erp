@@ -20,11 +20,18 @@ const AssessmentUpdateSchema = AssessmentBodySchema.extend({
   id: z.string().trim().min(1),
 });
 
+const PublishBodySchema = z.object({
+  id: z.string().trim().min(1),
+  published: z.boolean(),
+});
+
 const ASSESSMENT_SELECT = {
   id: true,
   name: true,
   maxMarks: true,
   assessmentDate: true,
+  publishedAt: true,
+  publishedBy: true,
   subjectId: true,
   programId: true,
   semester: true,
@@ -127,6 +134,45 @@ export async function POST(request: Request) {
     }
     console.error("POST /api/assessments error:", error);
     return NextResponse.json({ error: "Unable to create assessment" }, { status: 500 });
+  }
+}
+
+/**
+ * PATCH /api/assessments — publish or unpublish an assessment's results.
+ *
+ * Results stay provisional (publishedAt === null) until a teacher publishes
+ * them; /api/student/results only ever returns published ones, so a mistake
+ * in marks entry can be corrected before students see anything.
+ */
+export async function PATCH(request: Request) {
+  const session = await requireRole("ADMIN", "TEACHER");
+  if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const parsed = await jsonBody(request, PublishBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const { id, published } = parsed.value;
+
+  const existing = await prisma.assessment.findFirst({
+    where: { id, ...(session.role === "TEACHER" ? teacherScope(session.userId) : {}) },
+    select: { id: true },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Assessment not found or not assigned to you" }, { status: 404 });
+  }
+
+  try {
+    const assessment = await prisma.assessment.update({
+      where: { id: existing.id },
+      data: {
+        publishedAt: published ? new Date() : null,
+        publishedBy: published ? session.userId : null,
+      },
+      select: ASSESSMENT_SELECT,
+    });
+    return NextResponse.json({ assessment });
+  } catch (error) {
+    console.error("PATCH /api/assessments error:", error);
+    return NextResponse.json({ error: "Unable to update publish state" }, { status: 500 });
   }
 }
 

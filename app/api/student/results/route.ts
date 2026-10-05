@@ -23,6 +23,7 @@ const RESULT_SELECT = {
       semester: true,
       maxMarks: true,
       assessmentDate: true,
+      publishedAt: true,
       subject: { select: { id: true, code: true, name: true } },
       program: { select: { name: true } },
     },
@@ -68,6 +69,8 @@ export async function GET(request: Request) {
     }
 
     const assessmentWhere: Prisma.AssessmentWhereInput = {
+      // Provisional (unpublished) results never reach the student.
+      publishedAt: { not: null },
       ...(f.subject ? { subject: { code: f.subject } } : {}),
       ...(f.semester ? { semester: f.semester } : {}),
       ...(f.from || f.to
@@ -99,13 +102,13 @@ export async function GET(request: Request) {
       // Distinct subjects across the student's FULL result set (ignores the
       // current filters so the dropdown never hides the option in use).
       prisma.assessment.findMany({
-        where: { results: { some: { studentId: student.id } } },
+        where: { publishedAt: { not: null }, results: { some: { studentId: student.id } } },
         distinct: ["subjectId"],
         select: { subject: { select: { code: true, name: true } } },
       }),
       // Unpaginated marks for the header summary cards.
       prisma.result.findMany({
-        where: { studentId: student.id },
+        where: { studentId: student.id, assessment: { publishedAt: { not: null } } },
         select: { marks: true, assessment: { select: { maxMarks: true } } },
       }),
     ]);

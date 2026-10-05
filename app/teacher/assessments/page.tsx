@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 
 import { FormEvent, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
+import { IconEye, IconEyeOff, IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
 import { AdminModal } from "@/app/components/admin/AdminModal";
 import { gradeForMarks } from "@/app/lib/grading";
@@ -34,6 +34,8 @@ type AssessmentItem = {
   subject: { code: string; name: string };
   program: { code: string; name: string };
   _count?: { results: number };
+  /** null while the results are provisional (hidden from students). */
+  publishedAt?: string | null;
 };
 
 type TeacherInfo = {
@@ -92,6 +94,40 @@ export default function TeacherAssessmentsPage() {
   const [marksLoading, setMarksLoading] = useState(false);
   const [marksState, setMarksState] = useState<Record<string, string>>({});
   const [isSubmittingMarks, setIsSubmittingMarks] = useState(false);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
+
+  /**
+   * Publish / unpublish this assessment's results. Unpublished results are
+   * filtered out of /api/student/results, so marks can be corrected before any
+   * student sees them.
+   */
+  async function togglePublish(a: AssessmentItem) {
+    setBanner(null);
+    setPublishingId(a.id);
+    try {
+      const res = await fetch("/api/assessments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: a.id, published: !a.publishedAt }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setBanner({ kind: "error", text: data.error ?? "Unable to update publish state" });
+        return;
+      }
+      setAssessments((prev) => prev.map((x) => (x.id === a.id ? data.assessment : x)));
+      setBanner({
+        kind: "success",
+        text: data.assessment.publishedAt
+          ? "Published — results are now visible to students."
+          : "Unpublished — results are hidden from students again.",
+      });
+    } catch {
+      setBanner({ kind: "error", text: "Unable to reach the server" });
+    } finally {
+      setPublishingId(null);
+    }
+  }
 
   useEffect(() => {
     async function loadData() {
@@ -455,7 +491,41 @@ export default function TeacherAssessmentsPage() {
                   >
                     {recorded > 0 ? `${recorded} recorded` : "No marks yet"}
                   </span>
+                  <span
+                    title={
+                      a.publishedAt
+                        ? "Published — students can see these results"
+                        : "Provisional — hidden from students until you publish"
+                    }
+                    className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[0.75rem] font-bold ${
+                      a.publishedAt
+                        ? "border-[color-mix(in_oklab,var(--ctp-green)_40%,transparent)] bg-[color-mix(in_oklab,var(--ctp-green)_15%,transparent)] text-[var(--ctp-green)]"
+                        : "border-border bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {a.publishedAt ? "Published" : "Provisional"}
+                  </span>
                   <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <Button
+                      onClick={() => togglePublish(a)}
+                      variant={a.publishedAt ? "outline" : "default"}
+                      size="sm"
+                      disabled={publishingId === a.id || recorded === 0}
+                      title={
+                        recorded === 0
+                          ? "Enter some marks before publishing"
+                          : a.publishedAt
+                            ? "Hide these results from students again"
+                            : "Make these results visible to students"
+                      }
+                    >
+                      {a.publishedAt ? (
+                        <IconEyeOff size={15} aria-hidden="true" />
+                      ) : (
+                        <IconEye size={15} aria-hidden="true" />
+                      )}
+                      {a.publishedAt ? "Unpublish" : "Publish"}
+                    </Button>
                     <Button
                       onClick={() => openMarks(a)}
                       variant={isOpen ? "default" : "outline"}
