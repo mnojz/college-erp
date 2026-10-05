@@ -1,6 +1,14 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -11,6 +19,7 @@ import {
   IconPencil,
 } from "@tabler/icons-react";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
+import { CAMPUS_TIME_ZONE, campusNow, campusTodayISO } from "@/app/lib/campus-time";
 
 type Student = {
   id: string;
@@ -36,17 +45,6 @@ type ClassItem = {
     code: string;
     students: Student[];
   };
-};
-
-/** Map of DayOfWeek enum values to numeric order for day-of-week matching. */
-const DAY_ORDER: Record<string, number> = {
-  MONDAY: 1,
-  TUESDAY: 2,
-  WEDNESDAY: 3,
-  THURSDAY: 4,
-  FRIDAY: 5,
-  SATURDAY: 6,
-  SUNDAY: 7,
 };
 
 /**
@@ -86,13 +84,10 @@ function filterClassesFor(
 function findCurrentClassId(classes: ClassItem[]): string {
   if (classes.length === 0) return "";
 
-  const now = new Date();
-  // getNextBusinessDay: JS getDay() returns 0=Sun..6=Sat; our enum uses MONDAY=1..SUNDAY=7
-  const jsDay = now.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-  const todayKey = Object.keys(DAY_ORDER).find(
-    (k) => DAY_ORDER[k] === (jsDay === 0 ? 7 : jsDay),
-  );
-  const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
+  // Campus wall-clock, never the browser's timezone: class times are stored as
+  // wall-clock, so a machine set to another zone would otherwise resolve the
+  // wrong day and the wrong "current" class.
+  const { day: todayKey, minutes: currentTimeMinutes } = campusNow();
 
   // Look for a class that matches today and whose time window contains now.
   for (const c of classes) {
@@ -149,8 +144,11 @@ export default function TeacherAttendancePage() {
   const [now, setNow] = useState<number | null>(null);
 
   /** Attendance is always for the current day — shown as read-only info. */
-  const todayISO = new Date().toISOString().slice(0, 10);
+  // Campus date, not UTC: between 00:00 and the UTC offset, toISOString()
+  // hands back YESTERDAY and attendance gets filed under it.
+  const todayISO = campusTodayISO();
   const todayLabel = new Date().toLocaleDateString("en-GB", {
+    timeZone: CAMPUS_TIME_ZONE,
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -212,6 +210,30 @@ export default function TeacherAttendancePage() {
     () => filterClassesFor(classes, selectedProgram, selectedSemester),
     [classes, selectedProgram, selectedSemester],
   );
+
+  /** One dropdown entry per SUBJECT -- weekday/time never appear here. Those only
+   *  power the smart suggestion; the concrete slot is resolved automatically
+   *  (today's schedule, else first weekly slot) when recording. A subject is a
+   *  single entry whether it runs as a Lecture, a Practical, or both.
+   */
+  const subjectOptions = useMemo(() => {
+    const subjects = new Map<string, { key: string; label: string; hasPractical: boolean }>();
+    for (const c of filteredClasses) {
+      const key = `${c.program.id}|${c.semester}|${c.subject.code}`;
+      const isPractical = c.type === "Practical";
+      const existing = subjects.get(key);
+      if (existing) {
+        if (isPractical) existing.hasPractical = true;
+        continue;
+      }
+      subjects.set(key, {
+        key,
+        label: `[${c.program.code} · Sem ${c.semester}] ${c.subject.name} (${c.subject.code})`,
+        hasPractical: isPractical,
+      });
+    }
+    return Array.from(subjects.values());
+  }, [filteredClasses]);
 
   /** If the currently selected class is filtered out, fall back to the routine-suggested
    *  class. Implemented as a helper called from the filter event handlers (not an effect,
@@ -492,148 +514,80 @@ export default function TeacherAttendancePage() {
       <section className="rounded-xl border bg-card p-5 shadow-xs" style={{ padding: "22px", marginBottom: "20px" }}>
         {/* Filter bar: Program → Semester → Class → Clear. The JSX source order
             is kept, so each column sets a CSS grid `order` for visual order. */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1.1fr 0.9fr 1.7fr auto",
-            gap: "16px",
-            alignItems: "end",
-            marginBottom: "12px",
-          }}
-        >
-          <div style={{ order: 3 }}>
-            <label style={{ display: "block", marginBottom: "6px", fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-              Select Class / Subject
-            </label>
-            <select
-              value={selectedSubjectKey}
-              onChange={(e) => selectSubject(e.target.value)}
-              disabled={isLoading}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: "8px",
-                border: "1px solid var(--border)",
-                background: "var(--card)",
-                color: "inherit",
-              }}
-            >
-              {filteredClasses.length === 0 && <option value="">No matching classes found</option>}
-              {filteredClasses.length > 0 && (() => {
-                // One option per SUBJECT — weekday/time never appear here.
-                // Those only power the smart suggestion; the concrete slot is
-                // resolved automatically (today's schedule, else first weekly
-                // slot) when recording. A subject is a single entry whether it
-                // runs as a Lecture, a Practical, or both.
-                const subjects = new Map<
-                  string,
-                  { key: string; label: string; hasPractical: boolean }
-                >();
-                for (const c of filteredClasses) {
-                  const key = `${c.program.id}|${c.semester}|${c.subject.code}`;
-                  const isPractical = c.type === "Practical";
-                  const existing = subjects.get(key);
-                  if (existing) {
-                    if (isPractical) existing.hasPractical = true;
-                    continue;
-                  }
-                  subjects.set(key, {
-                    key,
-                    label: `[${c.program.code} · Sem ${c.semester}] ${c.subject.name} (${c.subject.code})`,
-                    hasPractical: isPractical,
-                  });
-                }
-                return Array.from(subjects.values()).map((s) => (
-                  <option key={s.key} value={s.key}>
-                    {s.label}
-                    {s.hasPractical ? " · incl. practical" : ""}
-                  </option>
-                ));
-              })()}
-            </select>
-          </div>
-
-          <div style={{ order: 1 }}>
-            <label style={{ display: "block", marginBottom: "6px", fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-              Program
-            </label>
-            <select
+        <div className="mb-4 grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-[0.9fr_0.9fr_1.7fr_auto]">
+          <div className="grid gap-1.5">
+            <Label htmlFor="att-filter-program">Program</Label>
+            <Select
               value={selectedProgram}
-              onChange={(e) => handleProgramChange(e.target.value)}
+              onValueChange={handleProgramChange}
               disabled={isLoading || availablePrograms.length === 0}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: "8px",
-                border: "1px solid var(--border)",
-                background: "var(--card)",
-                color: "inherit",
-              }}
             >
-              <option value="ALL">All Programs</option>
-              {availablePrograms.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.code} — {p.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="att-filter-program" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Programs</SelectItem>
+                {availablePrograms.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.code} — {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <div style={{ order: 2 }}>
-            <label style={{ display: "block", marginBottom: "6px", fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
-              Semester
-            </label>
-            <select
+          <div className="grid gap-1.5">
+            <Label htmlFor="att-filter-semester">Semester</Label>
+            <Select
               value={selectedSemester}
-              onChange={(e) => handleSemesterChange(e.target.value)}
+              onValueChange={handleSemesterChange}
               disabled={isLoading || availableSemesters.length === 0}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: "8px",
-                border: "1px solid var(--border)",
-                background: "var(--card)",
-                color: "inherit",
-              }}
             >
-              <option value="ALL">All Semesters</option>
-              {availableSemesters.map((s) => (
-                <option key={s} value={String(s)}>
-                  Semester {s}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="att-filter-semester" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Semesters</SelectItem>
+                {availableSemesters.map((s) => (
+                  <SelectItem key={s} value={String(s)}>
+                    Semester {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <div style={{ order: 4 }}>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "6px",
-                fontSize: "0.8rem",
-                visibility: "hidden",
-              }}
+          <div className="grid gap-1.5">
+            <Label htmlFor="att-filter-subject">Class / Subject</Label>
+            <Select
+              value={selectedSubjectKey || undefined}
+              onValueChange={selectSubject}
+              disabled={isLoading || filteredClasses.length === 0}
             >
-              Clear
-            </label>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={resetFilters}
-              disabled={selectedProgram === "ALL" && selectedSemester === "ALL"}
-              title="Reset the program and semester filters"
-              className="w-full"
-              style={{
-                height: "auto",
-                padding: "10px 14px",
-                fontSize: "0.85rem",
-                borderRadius: "8px",
-              }}
-            >
-              <IconFilterOff size={14} />
-              Clear Filters
-            </Button>
+              <SelectTrigger id="att-filter-subject" className="w-full">
+                <SelectValue placeholder="No matching classes found" />
+              </SelectTrigger>
+              <SelectContent>
+                {subjectOptions.map((opt) => (
+                  <SelectItem key={opt.key} value={opt.key}>
+                    {opt.label}
+                    {opt.hasPractical ? " \u00b7 incl. practical" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={resetFilters}
+            disabled={selectedProgram === "ALL" && selectedSemester === "ALL"}
+            title="Reset the program and semester filters"
+          >
+            <IconFilterOff size={15} aria-hidden="true" />
+            Clear Filters
+          </Button>
         </div>
         {/* Date is read-only info — attendance can only ever be taken today. */}
         <div
@@ -768,7 +722,7 @@ export default function TeacherAttendancePage() {
             <Button
               type="button"
               onClick={selectAll}
-              disabled={!selectedClass || totalStudents === 0 || isLocked}
+              disabled={!selectedClass || totalStudents === 0 || isLocked || sessionStatus === "submitted"}
               style={{
                 padding: "6px 12px",
                 borderRadius: "6px",
@@ -785,7 +739,7 @@ export default function TeacherAttendancePage() {
             <Button
               type="button"
               onClick={clearAll}
-              disabled={!selectedClass || totalStudents === 0 || isLocked}
+              disabled={!selectedClass || totalStudents === 0 || isLocked || sessionStatus === "submitted"}
               style={{
                 padding: "6px 12px",
                 borderRadius: "6px",
@@ -820,7 +774,10 @@ export default function TeacherAttendancePage() {
               const isPresent = presentStudentIds.has(student.id);
               // Deactivated account: still listed on the roll, never markable.
               const inactive = isAccountInactive(student);
-              const readOnly = inactive || isLocked;
+              // Marks lock as soon as the sheet is submitted. They only unlock
+              // again after "Edit Attendance" flips the session back to "editing",
+              // so a saved sheet can never be silently changed by a stray click.
+              const readOnly = inactive || isLocked || sessionStatus === "submitted";
               return (
                 <div
                   key={student.id}

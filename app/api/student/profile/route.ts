@@ -114,13 +114,25 @@ export async function GET() {
   }
 
   try {
-    const student = await prisma.student.findUnique({
-      where: { userId: session.userId },
-      select: PROFILE_SELECT,
-    });
+    const [student, currentYear] = await Promise.all([
+      prisma.student.findUnique({
+        where: { userId: session.userId },
+        select: PROFILE_SELECT,
+      }),
+      // Exam-eligibility threshold for the current academic year, so the
+      // attendance page doesn't have to hardcode it (fallback matches the
+      // column default).
+      prisma.academicYear.findFirst({
+        where: { isCurrent: true },
+        select: { minAttendancePercent: true },
+      }),
+    ]);
 
     return student
-      ? NextResponse.json({ student })
+      ? NextResponse.json({
+          student,
+          attendancePolicy: { minAttendancePercent: currentYear?.minAttendancePercent ?? 75 },
+        })
       : NextResponse.json({ error: "Student profile not found" }, { status: 404 });
   } catch (error) {
     console.error("GET /api/student/profile error:", error);
