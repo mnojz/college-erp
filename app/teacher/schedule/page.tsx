@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
+import { campusDayOfWeek } from "@/app/lib/campus-time";
 import { formatTime } from "@/app/lib/timetable-layout";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "cn";
@@ -36,16 +37,6 @@ const weekDays = [
   "THURSDAY",
   "FRIDAY",
 ];
-
-const dayMap: Record<number, string> = {
-  0: "SUNDAY",
-  1: "MONDAY",
-  2: "TUESDAY",
-  3: "WEDNESDAY",
-  4: "THURSDAY",
-  5: "FRIDAY",
-  6: "SATURDAY",
-};
 
 export default function TeacherSchedulePage() {
   const router = useRouter();
@@ -100,7 +91,7 @@ export default function TeacherSchedulePage() {
     return <main className="grid min-h-[40vh] place-items-center text-sm text-muted-foreground">Loading teaching schedule...</main>;
   }
 
-  const todayDayName = dayMap[new Date().getDay()];
+  const todayDayName = campusDayOfWeek();
 
   // Calculate stats
   const activeDays = new Set(classes.map((c) => c.dayOfWeek)).size;

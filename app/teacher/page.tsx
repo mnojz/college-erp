@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
 import { formatTime } from "@/app/lib/timetable-layout";
+import { campusDayOfWeek } from "@/app/lib/campus-time";
 import { Badge } from "@/components/ui/badge";
 import {
   IconArrowRight,
@@ -47,7 +48,7 @@ type TeacherData = {
   }>;
 };
 
-const daysOfWeek = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+
 
 export default function TeacherOverviewPage() {
   const router = useRouter();
@@ -134,7 +135,7 @@ export default function TeacherOverviewPage() {
   const departmentName = data.classes[0]?.program.departmentName || "Engineering Faculty";
 
   // Today's schedule
-  const todayDayName = daysOfWeek[new Date().getDay()];
+  const todayDayName = campusDayOfWeek();
   const todaysClasses = data.classes.filter((c) => c.dayOfWeek === todayDayName);
 
   return (

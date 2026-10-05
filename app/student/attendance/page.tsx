@@ -62,6 +62,8 @@ export default function StudentAttendancePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("ALL");
+  /** Exam-eligibility threshold, configured per academic year by an admin. */
+  const [minAttendancePercent, setMinAttendancePercent] = useState(75);
 
   useEffect(() => {
     async function loadData() {
@@ -80,6 +82,7 @@ export default function StudentAttendancePage() {
         const attData = await attRes.json();
 
         setProfile(profileData.student);
+        setMinAttendancePercent(profileData.attendancePolicy?.minAttendancePercent ?? 75);
         setRecords(attData.student?.attendanceRecords ?? []);
       } catch {
         setError("Unable to load attendance records");
@@ -181,7 +184,7 @@ export default function StudentAttendancePage() {
     ).values(),
   );
 
-  const eligible = Number(overallPercentage) >= 75;
+  const eligible = Number(overallPercentage) >= minAttendancePercent;
 
   return (
     <StudentShell
@@ -201,7 +204,9 @@ export default function StudentAttendancePage() {
                 {overallPercentage}%
               </p>
               <small className="text-xs text-muted-foreground">
-                {eligible ? "Eligible for examinations" : "Below 75% threshold"}
+                {eligible
+                  ? "Eligible for examinations"
+                  : `Below ${minAttendancePercent}% threshold`}
               </small>
             </CardContent>
           </Card>
@@ -237,7 +242,7 @@ export default function StudentAttendancePage() {
             <CardContent className="flex flex-col gap-3.5">
               {subjectStats.map((sub) => {
                 const pct = sub.total > 0 ? (sub.present / sub.total) * 100 : 0;
-                const isSafe = pct >= 75;
+                const isSafe = pct >= minAttendancePercent;
                 return (
                   <div key={sub.code}>
                     <div className="mb-1.5 flex items-center justify-between gap-2">

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma, type DayOfWeek } from "@/app/generated/prisma/client";
 import { requireAdmin } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
+import { TEACHING_DAYS, dayLabel, isTeachingDay } from "@/app/lib/teaching-days";
 
 type ClassBody = {
   id?: unknown;
@@ -17,7 +18,17 @@ type ClassBody = {
 };
 
 const SLOT_TYPES = ["Lecture", "Practical"] as const;
-const days = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"] as const;
+
+/** Rejects weekend days instead of silently storing a class nothing renders. */
+function rejectNonTeachingDay(dayOfWeek: string): NextResponse | null {
+  if (isTeachingDay(dayOfWeek)) return null;
+  return NextResponse.json(
+    {
+      error: `${dayLabel(dayOfWeek)} is not a teaching day. Classes can only be scheduled on ${TEACHING_DAYS.map((d) => dayLabel(d)).join(", ")}.`,
+    },
+    { status: 400 },
+  );
+}
 
 function parseType(value: unknown) {
   return typeof value === "string" && (SLOT_TYPES as readonly string[]).includes(value)
@@ -229,6 +240,9 @@ async function validateClassSlot(opts: {
 export async function GET() {
   try {
     const classes = await prisma.class.findMany({
+      // Slots belonging to an archived program stop appearing on timetables
+      // and in the scheduler, but the records themselves are untouched.
+      where: { program: { archivedAt: null } },
       orderBy: [
         { program: { code: "asc" } },
         { semester: "asc" },
@@ -290,8 +304,10 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  if (!days.includes(dayOfWeek) || startTime >= endTime) {
-    return NextResponse.json({ error: "Invalid day of week or invalid time range" }, { status: 400 });
+  const nonTeachingDay = rejectNonTeachingDay(dayOfWeek);
+  if (nonTeachingDay) return nonTeachingDay;
+  if (startTime >= endTime) {
+    return NextResponse.json({ error: "Invalid time range" }, { status: 400 });
   }
 
   // Shared validation: break-window reservation, subject↔program match,
@@ -359,8 +375,10 @@ export async function PUT(request: Request) {
     );
   }
 
-  if (!days.includes(dayOfWeek) || startTime >= endTime) {
-    return NextResponse.json({ error: "Invalid day of week or invalid time range" }, { status: 400 });
+  const nonTeachingDay = rejectNonTeachingDay(dayOfWeek);
+  if (nonTeachingDay) return nonTeachingDay;
+  if (startTime >= endTime) {
+    return NextResponse.json({ error: "Invalid time range" }, { status: 400 });
   }
 
   // Shared validation: break-window reservation, subject↔program match,

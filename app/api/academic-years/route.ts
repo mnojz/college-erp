@@ -11,6 +11,7 @@ const UpsertBodySchema = z.object({
   endDate: z.string().min(1),
   isCurrent: z.boolean().optional(),
   status: z.enum(["ACTIVE", "CLOSED"]).optional(),
+  minAttendancePercent: z.coerce.number().int().min(0).max(100).optional(),
 });
 
 const PatchBodySchema = z.object({
@@ -20,6 +21,7 @@ const PatchBodySchema = z.object({
   endDate: z.string().min(1).optional(),
   isCurrent: z.boolean().optional(),
   status: z.enum(["ACTIVE", "CLOSED"]).optional(),
+  minAttendancePercent: z.coerce.number().int().min(0).max(100).optional(),
 });
 
 const yearSelect = {
@@ -29,6 +31,7 @@ const yearSelect = {
   endDate: true,
   isCurrent: true,
   status: true,
+  minAttendancePercent: true,
   createdAt: true,
   updatedAt: true,
 };
@@ -85,6 +88,9 @@ export async function POST(request: Request) {
           endDate: new Date(body.endDate),
           isCurrent: body.isCurrent ?? false,
           status: body.status ?? "ACTIVE",
+          ...(body.minAttendancePercent !== undefined
+            ? { minAttendancePercent: body.minAttendancePercent }
+            : {}),
         },
         select: yearSelect,
       });
@@ -122,6 +128,9 @@ export async function PATCH(request: Request) {
           ...(body.endDate ? { endDate: new Date(body.endDate) } : {}),
           ...(body.isCurrent !== undefined ? { isCurrent: body.isCurrent } : {}),
           ...(body.status ? { status: body.status } : {}),
+          ...(body.minAttendancePercent !== undefined
+            ? { minAttendancePercent: body.minAttendancePercent }
+            : {}),
         },
         select: yearSelect,
       });

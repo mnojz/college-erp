@@ -9,16 +9,10 @@
 //    tiny gap between them so they never touch.
 //  - More than 2 overlapping blocks (rare) fall back to tighter lane stacking.
 
-// Weekday rows rendered on the timetable grid. Saturday and Sunday are
-// weekends — no classes are ever scheduled on those days, so the grid omits
-// them entirely.
-export const WORK_DAYS = [
-  "MONDAY",
-  "TUESDAY",
-  "WEDNESDAY",
-  "THURSDAY",
-  "FRIDAY",
-] as const;
+// Weekday rows rendered on the timetable grid. Derived from TEACHING_DAYS so
+// the grid, the admin day dropdowns and the /api/classes validator can never
+// disagree about which days are taught.
+export { TEACHING_DAYS as WORK_DAYS } from "@/app/lib/teaching-days";
 
 export const ROW_H = 84; // day-row (= slot) height in px
 export const SLOT_MARGIN = 4; // px between a block and the row edge
