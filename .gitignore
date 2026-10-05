@@ -5,3 +5,8 @@ node_modules
 .claude
 .windsurf
 # .env
+# TypeScript incremental build cache
+tsconfig.tsbuildinfo
+
+# One-off DB migration backups (local rollback artifacts, may contain records)
+prisma/_backup-*.json
