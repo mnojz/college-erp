@@ -4,9 +4,17 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { AdminShell } from "@/app/components/admin/AdminShell";
+import { AttendancePolicyCard } from "@/app/components/admin/AttendancePolicyCard";
 import { AdminModal } from "@/app/components/admin/AdminModal";
 import { Badge } from "@/components/ui/badge";
-import { IconAlertTriangle, IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
+import {
+  IconAlertTriangle,
+  IconArchive,
+  IconArchiveOff,
+  IconPencil,
+  IconPlus,
+  IconTrash,
+} from "@tabler/icons-react";
 
 type Department = {
   id: string;
@@ -21,6 +29,8 @@ type Program = {
   code: string;
   departmentName: string;
   durationYears: number;
+  /** Set when the program is archived — hidden from every picker, never deleted. */
+  archivedAt?: string | null;
 };
 
 const programEmpty = { name: "", code: "", durationYears: "4" };
@@ -40,6 +50,8 @@ export default function AdminSetupPage() {
   const [showCreateProgram, setShowCreateProgram] = useState(false);
   const [editingProgram, setEditingProgram] = useState<(Program & { durationYearsStr: string }) | null>(null);
   const [deletingProgram, setDeletingProgram] = useState<Program | null>(null);
+  /** Archived programs are hidden by default; this toggle reveals them read-only. */
+  const [showArchived, setShowArchived] = useState(false);
   const [programForm, setProgramForm] = useState(programEmpty);
 
   // One-time department setup
@@ -51,11 +63,21 @@ export default function AdminSetupPage() {
   const [message, setMessage] = useState("");
 
   async function refresh() {
-    const [pRes, dRes] = await Promise.all([fetch("/api/programs"), fetch("/api/departments")]);
+    const [pRes, dRes] = await Promise.all([
+      fetch(`/api/programs${showArchived ? "?includeArchived=1" : ""}`),
+      fetch("/api/departments"),
+    ]);
     const [pData, dData] = await Promise.all([pRes.json(), dRes.json()]);
     setPrograms(pData.programs ?? []);
     setDepartment(dData.department ?? null);
   }
+
+  // Re-fetch when the "Show archived" toggle changes (refresh reads showArchived).
+  useEffect(() => {
+    const sync = setTimeout(() => void refresh(), 0);
+    return () => clearTimeout(sync);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch on toggle only
+  }, [showArchived]);
 
   useEffect(() => {
     async function load() {
@@ -68,6 +90,9 @@ export default function AdminSetupPage() {
       setLoading(false);
     }
     load().catch(() => { setError("Unable to load academic structure"); setLoading(false); });
+    // refresh is re-created every render, so it cannot be a dependency here;
+    // this effect must bootstrap exactly once per mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   /* ── Department setup (single, one-time) ─────────────────────── */
@@ -152,6 +177,34 @@ export default function AdminSetupPage() {
     }
   }
 
+  /** Archive (default) or restore a program — never destructive. */
+  async function handleArchiveProgram(p: Program, archived: boolean) {
+    setError("");
+    setSaving(true);
+    try {
+      const res = await fetch("/api/programs", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: p.id, archived }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Unable to update program");
+        return;
+      }
+      await refresh();
+      setMessage(
+        archived
+          ? `Program ${p.code} archived. Nothing was deleted — restore it any time.`
+          : `Program ${p.code} restored and available again.`,
+      );
+    } catch {
+      setError("Unable to reach the server");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleDeleteProgram() {
     if (!deletingProgram) return;
     setError("");
@@ -171,7 +224,7 @@ export default function AdminSetupPage() {
   }
 
   return (
-    <AdminShell title="Department & Programs" subtitle="Academic Structure" active="/admin/setup">
+    <AdminShell title="Department & Program" subtitle="Academic Structure" active="/admin/setup">
       {/* Top bar */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
         <p className="m-0 text-[13px] text-muted-foreground">
@@ -191,9 +244,23 @@ export default function AdminSetupPage() {
             </Button>
           )}
           <Button
-            size="sm"
             type="button"
-            onClick={() => { setShowCreateProgram(true); setError(""); }}
+            variant={showArchived ? "default" : "outline"}
+            size="sm"
+            aria-pressed={showArchived}
+            title="Include archived programs in the list"
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            <IconArchive size={15} aria-hidden="true" />
+            Show archived
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => {
+              setShowCreateProgram(true);
+              setError("");
+            }}
           >
             <IconPlus size={15} aria-hidden="true" />
             Add Program
@@ -272,11 +339,18 @@ export default function AdminSetupPage() {
               </tr>
             ) : (
               programs.map((p) => (
-                <tr key={p.id}>
+                <tr key={p.id} className={p.archivedAt ? "opacity-60" : undefined}>
                   <td>
                     <Badge variant="secondary">{p.code}</Badge>
                   </td>
-                  <td className="font-semibold">{p.name}</td>
+                  <td className="font-semibold">
+                    {p.name}
+                    {p.archivedAt && (
+                      <Badge variant="outline" className="ml-2 align-middle">
+                        Archived
+                      </Badge>
+                    )}
+                  </td>
                   <td style={{ color: "var(--muted-foreground)" }}>{p.departmentName}</td>
                   <td>{p.durationYears} years</td>
                   <td>
@@ -296,18 +370,44 @@ export default function AdminSetupPage() {
                       >
                         <IconPencil size={15} />
                       </Button>
-                      <Button
-                        type="button"
-                        variant="outline" size="icon-sm" className="border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
-                        title="Delete Program"
-                        aria-label="Delete Program"
-                        onClick={() => {
-                          setError("");
-                          setDeletingProgram(p);
-                        }}
-                      >
-                        <IconTrash size={15} />
-                      </Button>
+                      {p.archivedAt ? (
+                        <Button
+                          type="button"
+                          variant="outline" size="icon-sm"
+                          title="Restore Program"
+                          aria-label="Restore Program"
+                          disabled={saving}
+                          onClick={() => void handleArchiveProgram(p, false)}
+                        >
+                          <IconArchiveOff size={15} />
+                        </Button>
+                      ) : (
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline" size="icon-sm"
+                            title="Archive Program — hides it from every picker, deletes nothing"
+                            aria-label="Archive Program"
+                            disabled={saving}
+                            onClick={() => void handleArchiveProgram(p, true)}
+                          >
+                            <IconArchive size={15} />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline" size="icon-sm" className="border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
+                            title="Delete permanently — only allowed for an unused program"
+                            aria-label="Delete Program"
+                            disabled={saving}
+                            onClick={() => {
+                              setError("");
+                              setDeletingProgram(p);
+                            }}
+                          >
+                            <IconTrash size={15} />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -316,6 +416,8 @@ export default function AdminSetupPage() {
           </tbody>
         </table>
       </div>
+
+      <AttendancePolicyCard />
 
       {/* Modal 1: Set Department (one-time) */}
       {showSetDept && (
@@ -474,11 +576,15 @@ export default function AdminSetupPage() {
         <AdminModal title={`Delete Program: ${deletingProgram.code}`} onClose={() => setDeletingProgram(null)}>
           <div className="grid gap-3 text-sm text-muted-foreground">
             <p>
-              Are you sure you want to delete the program <strong>{deletingProgram.name} ({deletingProgram.code})</strong>?
+              Permanently delete the program <strong>{deletingProgram.name} ({deletingProgram.code})</strong>?
             </p>
             <p className="m-0 flex items-start gap-2 rounded-lg bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive">
               <IconAlertTriangle size={15} aria-hidden="true" style={{ flexShrink: 0, marginTop: "2px" }} />
-              <span>Deleting this program will remove all affiliated subjects, scheduled classes, assessments, and unassign enrolled students.</span>
+              <span>
+                This cannot be undone. If the program has any students, classes or assessments, the
+                server will refuse and you should <strong>Archive</strong> it instead — archiving
+                hides it everywhere while keeping every record.
+              </span>
             </p>
             {error && <p className="m-0 text-[13px] text-destructive">{error}</p>}
             <div className="mt-5 flex flex-wrap justify-end gap-2.5">

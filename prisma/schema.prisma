@@ -116,6 +116,11 @@ model Program {
   departmentName String
   departmentId   String?
   department     Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  // Archive instead of delete: an archived program keeps all of its subjects,
+  // classes, assessments and results intact, but stops appearing anywhere it
+  // would be selected for teaching.
+  archivedAt     DateTime?
+  archivedBy     String?
   students       Student[]
   subjects       Subject[]
   classes        Class[]
@@ -340,6 +345,10 @@ model Assessment {
   name           String
   maxMarks       Decimal   @db.Decimal(6, 2)
   assessmentDate DateTime?
+  // Results are provisional until a teacher publishes them: a null
+  // publishedAt keeps them out of the student's results page.
+  publishedAt    DateTime?
+  publishedBy    String? // User id who published (null again on unpublish)
   subject        Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   program        Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
   results        Result[]
@@ -560,6 +569,9 @@ model AcademicYear {
   endDate   DateTime
   isCurrent Boolean             @default(false)
   status    AcademicYearStatus  @default(ACTIVE)
+  // Minimum attendance % required for exam eligibility this year (was a
+  // hardcoded 75 on the student attendance page).
+  minAttendancePercent Int      @default(75)
   createdAt DateTime            @default(now())
   updatedAt DateTime            @updatedAt
   semesters StudentSemester[]

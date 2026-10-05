@@ -7,6 +7,8 @@ import { prisma } from "@/app/lib/prisma";
  */
 export async function GET() {
   const subjects = await prisma.subject.findMany({
+    // Subjects of an archived program stop being offered anywhere.
+    where: { program: { archivedAt: null } },
     orderBy: [{ program: { name: "asc" } }, { semester: "asc" }, { code: "asc" }],
     select: {
       id: true,

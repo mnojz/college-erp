@@ -13,7 +13,7 @@ import {
 
 const adminLinks = [
   ["Overview", "/dashboard", IconDashboard],
-  ["Departments & Programs", "/admin/setup", IconSchool],
+  ["Department", "/admin/setup", IconSchool],
   ["Curriculum", "/admin/curriculum", IconBooks],
   ["Syllabus", "/admin/syllabus", IconFileDescription],
   ["Class Scheduling", "/admin/teaching", IconCalendarClock],
