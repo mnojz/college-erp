@@ -8,7 +8,7 @@ import {
   IconCalendarCheck,
   IconBook2,
   IconNotebook,
-  IconFileDescription,
+  IconReceipt,
   IconCalendarClock,
 } from "@tabler/icons-react";
 
@@ -16,9 +16,9 @@ const studentLinks = [
   ["Profile", "/dashboard", IconUser],
   ["Result", "/student/results", IconReport],
   ["Attendance", "/student/attendance", IconCalendarCheck],
-  ["Subjects", "/student/subjects", IconBook2],
+  ["Academics", "/student/academics", IconBook2],
   ["Notes", "/student/notes", IconNotebook],
-  ["Syllabus", "/student/syllabus", IconFileDescription],
+  ["Fees", "/student/fees", IconReceipt],
   ["Schedules", "/student/schedules", IconCalendarClock],
 ] as const;
 

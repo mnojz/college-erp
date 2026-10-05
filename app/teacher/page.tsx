@@ -11,6 +11,9 @@ import {
   IconArrowRight,
   IconBook,
   IconCalendarCheck,
+  IconFileDescription,
+  IconHierarchy2,
+  IconReceipt,
   IconReportAnalytics,
   IconUser,
 } from "@tabler/icons-react";
@@ -214,6 +217,53 @@ export default function TeacherOverviewPage() {
           <strong className="my-1 text-[34px] font-bold leading-none tracking-tight text-primary">{totalSessionsLogged}</strong>
           <small className="text-xs text-muted-foreground">Completed roll-call logs</small>
         </article>
+      </section>
+
+      {/* Read-only academic resources — the same pages the public site serves,
+          so there is no separate teacher copy to keep in sync. */}
+      <section className="mb-6">
+        <h2 className="m-0 mb-3 text-lg font-bold">Academic Resources</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {[
+            {
+              href: "/teacher/resources?tab=syllabus",
+              icon: IconFileDescription,
+              title: "Syllabus Library",
+              hint: "Official outlines by department & semester",
+            },
+            {
+              href: "/teacher/resources?tab=structure",
+              icon: IconHierarchy2,
+              title: "Course Structure",
+              hint: "Course map, credits & semesters",
+            },
+            {
+              href: "/teacher/resources?tab=fees",
+              icon: IconReceipt,
+              title: "Fee Structure",
+              hint: "Published programme & semester fees",
+            },
+          ].map((card) => (
+            <Link
+              key={card.href}
+              href={card.href}
+              className="group flex items-start gap-3 rounded-xl border bg-card p-5 shadow-xs transition-colors hover:border-ring hover:bg-accent/40"
+            >
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors group-hover:text-primary">
+                <card.icon size={18} aria-hidden="true" />
+              </span>
+              <span className="min-w-0">
+                <strong className="block text-sm font-semibold">{card.title}</strong>
+                <small className="text-xs text-muted-foreground">{card.hint}</small>
+              </span>
+              <IconArrowRight
+                size={16}
+                aria-hidden="true"
+                className="ml-auto shrink-0 self-center text-muted-foreground transition-transform group-hover:translate-x-0.5"
+              />
+            </Link>
+          ))}
+        </div>
       </section>
 
       {/* Main Grid: Today's Schedule & Teaching Subjects */}

@@ -6,7 +6,7 @@ import {
   noticeAttachmentUrl,
   type NoticeDetailData,
 } from "@/app/components/common/NoticeDetailModal";
-import { IconBook2, IconFileText, IconZoomIn } from "@tabler/icons-react";
+import { IconFileText, IconZoomIn } from "@tabler/icons-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "cn";
 
@@ -67,15 +67,6 @@ export function NoticePostCard({
               })}
             </span>
           </div>
-          {notice.scope && (
-            <span
-              className="ml-1 hidden items-center gap-1 rounded-full border bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground sm:inline-flex"
-              title={`${notice.scope.subjectName} · ${notice.scope.programName} · Semester ${notice.scope.semester}`}
-            >
-              <IconBook2 size={11} aria-hidden="true" />
-              {notice.scope.subjectCode} · {notice.scope.programCode} · Sem {notice.scope.semester}
-            </span>
-          )}
         </div>
 
         {actions && (

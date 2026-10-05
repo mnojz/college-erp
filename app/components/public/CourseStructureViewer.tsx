@@ -57,7 +57,9 @@ type Curriculum = {
   electives: CurriculumElective[];
 };
 
-export function CourseStructureViewer() {
+export function CourseStructureViewer({
+  defaultProgramId,
+}: { defaultProgramId?: string } = {}) {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
   const [error, setError] = useState("");
@@ -85,7 +87,15 @@ export function CourseStructureViewer() {
     [programs],
   );
 
-  const selectedId = programId || programOptions[0]?.id || "";
+  // Open on a preferred program (e.g. the logged-in student's own) when it
+  // really exists in the list; the picker still lets them switch freely.
+  const selectedId =
+    (programId && programOptions.some((p) => p.id === programId) ? programId : "") ||
+    (defaultProgramId && programOptions.some((p) => p.id === defaultProgramId)
+      ? defaultProgramId
+      : "") ||
+    programOptions[0]?.id ||
+    "";
 
   useEffect(() => {
     if (!selectedId) return;

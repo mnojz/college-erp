@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { InfoCard } from "@/app/components/student/InfoCard";
 import { ProfileHero } from "@/app/components/student/ProfileHero";
@@ -180,7 +181,6 @@ export default function StudentPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [selectedNotice, setSelectedNotice] = useState<NoticeDetailData | null>(null);
-  const [showAll, setShowAll] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState<EditFormState | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -420,14 +420,11 @@ export default function StudentPage() {
                 Campus updates and notices from your teachers
               </p>
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setShowAll(true)}
-              aria-label="View all announcements"
-            >
-              <IconLayoutList size={16} aria-hidden="true" />
-              View All ({announcements.length})
+            <Button asChild variant="ghost" aria-label="View all announcements">
+              <Link href="/student/announcements">
+                <IconLayoutList size={16} aria-hidden="true" />
+                View All ({announcements.length})
+              </Link>
             </Button>
           </header>
 
@@ -444,24 +441,6 @@ export default function StudentPage() {
             ))}
           </div>
         </section>
-      )}
-
-      {showAll && (
-        <AdminModal
-          title={`All Announcements (${announcements.length})`}
-          onClose={() => setShowAll(false)}
-          wide
-        >
-          <div className="flex flex-col gap-3">
-            {announcements.map((a) => (
-              <NoticePostCard
-                key={a.id}
-                notice={toNotice(a)}
-                onOpen={() => setSelectedNotice(toNotice(a))}
-              />
-            ))}
-          </div>
-        </AdminModal>
       )}
 
       {showEdit && editForm && (

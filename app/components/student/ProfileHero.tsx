@@ -41,9 +41,14 @@ export function ProfileHero({
   return (
     <Card className="p-5 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
-        <Avatar className="size-20 sm:size-24">
-          {profileImageUrl ? <AvatarImage src={profileImageUrl} alt={name} /> : null}
-          <AvatarFallback className="text-xl font-semibold sm:text-2xl">{initials}</AvatarFallback>
+        {/* Rounded square (not a circle) so it matches the teacher overview hero. */}
+        <Avatar className="size-20 rounded-xl after:rounded-xl sm:size-24">
+          {profileImageUrl ? (
+            <AvatarImage src={profileImageUrl} alt={name} className="rounded-xl" />
+          ) : null}
+          <AvatarFallback className="rounded-xl bg-linear-to-br from-primary/85 to-primary text-xl font-semibold text-primary-foreground sm:text-2xl">
+            {initials}
+          </AvatarFallback>
         </Avatar>
 
         <div className="min-w-0 flex-1">
