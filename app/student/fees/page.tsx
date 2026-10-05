@@ -17,7 +17,7 @@ export default function StudentFeesPage() {
           kind="fees"
           eyebrow="Student finance"
           title="Fee Structure"
-          description="Published programme and semester fee information for Far Western University."
+          description="Programmes covered by the college fee structure, and published fee amounts once available."
         />
       </div>
     </StudentShell>

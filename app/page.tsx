@@ -1,13 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { PublicLayout, usePublicLayout } from "@/app/components/layout/PublicLayout";
 import Link from "next/link";
-import {
-  NoticeDetailData,
-  NoticeDetailModal,
-} from "@/app/components/common/NoticeDetailModal";
-import { NoticePostCard } from "@/app/components/common/NoticePostCard";
 import {
   IconArrowRight,
   IconBell,
@@ -19,38 +13,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-type Announcement = {
-  id: string;
-  title: string;
-  body: string;
-  publishedAt: string | null;
-  createdAt: string;
-  author: { firstName: string; lastName: string } | null;
-  attachmentFileName: string | null;
-  attachmentMimeType: string | null;
-  attachmentSize: number | null;
-};
-
-/** Raw announcement row → client-safe notice shape for cards/modal. */
-function toNotice(a: Announcement): NoticeDetailData {
-  return {
-    id: a.id,
-    title: a.title,
-    body: a.body,
-    publishedAt: a.publishedAt,
-    createdAt: a.createdAt,
-    author: a.author,
-    attachment:
-      a.attachmentFileName && a.attachmentSize !== null
-        ? {
-            fileName: a.attachmentFileName,
-            mimeType: a.attachmentMimeType ?? "application/octet-stream",
-            size: a.attachmentSize,
-          }
-        : null,
-  };
-}
-
 const featureCards = [
   {
     title: "Course Curriculum",
@@ -61,8 +23,8 @@ const featureCards = [
   },
   {
     title: "Fee Structure",
-    description: "Inspect official semester tuition schedules, laboratory allocations, and institutional milestone deadlines.",
-    action: "Check Fee Schedules",
+    description: "Understand how tuition is organised each semester, including laboratory allocations and key payment milestones.",
+    action: "Learn About Fees",
     href: "/public/fee-structure",
     icon: <IconCreditCard size={24} aria-hidden="true" />,
   },
@@ -99,30 +61,40 @@ function HomeHeroCtas() {
 }
 
 export default function Home() {
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [selectedNotice, setSelectedNotice] = useState<NoticeDetailData | null>(null);
-
-  useEffect(() => {
-    fetch("/api/announcements")
-      .then(async (res) => {
-        if (res.ok) {
-          const data = await res.json();
-          setAnnouncements((data.announcements ?? []).slice(0, 3));
-        }
-      })
-      .catch(() => {});
-  }, []);
-
   return (
     <PublicLayout>
       {/* ─── Hero Section ───────────────────────────────────────────── */}
-      <section className="relative overflow-hidden px-4 py-16 sm:px-6 sm:py-24">
-        <div
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklab,var(--foreground)_8%,transparent),transparent_60%)]"
-          aria-hidden="true"
-        />
-        <div className="relative mx-auto flex max-w-3xl flex-col items-center text-center">
-          <Badge variant="secondary" className="gap-2 rounded-full px-4 py-1.5">
+      <section className="relative overflow-hidden px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
+        {/* Ambient backdrop: a slowly panning blueprint grid under three drifting
+            colour blobs and the existing top vignette. Every colour is derived
+            from --primary / --border / --foreground, so the whole thing retints
+            itself for Latte and Mocha with no per-theme variant.
+
+            The blobs carry negative animation-delays so they start out of phase
+            with each other — same durations would otherwise make them visibly
+            sync up on the loop. Those offsets are held at fixed *fractions* of
+            each blob's duration (25% / 52% / 69%), so retiming an animation
+            keeps the phase relationships intact. */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+          <div
+            className="animate-pan-grid absolute inset-0 opacity-40 [mask-image:radial-gradient(ellipse_at_center,black,transparent_72%)]"
+            style={{
+              backgroundImage:
+                "linear-gradient(to right, var(--border) 1px, transparent 1px), linear-gradient(to bottom, var(--border) 1px, transparent 1px)",
+              backgroundSize: "56px 56px",
+              backgroundPosition: "0 0",
+            }}
+          />
+          <div className="animate-drift-a absolute -top-32 left-[8%] size-[34rem] rounded-full bg-primary/10 blur-3xl [animation-delay:-2.75s]" />
+          <div className="animate-drift-b absolute -bottom-40 right-[6%] size-[30rem] rounded-full bg-primary/10 blur-3xl [animation-delay:-7.33s]" />
+          <div className="animate-drift-c absolute top-1/3 left-[42%] size-[26rem] rounded-full bg-primary/[0.07] blur-3xl [animation-delay:-12.46s]" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklab,var(--foreground)_8%,transparent),transparent_60%)]" />
+        </div>
+        <div className="relative mx-auto flex max-w-4xl flex-col items-center text-center">
+          <Badge
+            variant="secondary"
+            className="animate-in fade-in-0 zoom-in-95 gap-2 rounded-full px-4 py-1.5 duration-500"
+          >
             <span
               className="size-1.5 animate-pulse rounded-full bg-primary"
               aria-hidden="true"
@@ -130,41 +102,43 @@ export default function Home() {
             Far Western University • Central Academic Portal
           </Badge>
 
-          <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-            Unified Academic &amp; Campus{" "}
-            <span className="bg-gradient-to-r from-foreground via-primary to-foreground bg-clip-text text-transparent dark:from-foreground dark:via-muted-foreground dark:to-foreground">
-              Management Terminal
-            </span>
+          {/* Flat colour in both themes. This was a from-foreground/via-primary/to-foreground
+              gradient, which read as grey→blue in light mode but collapsed to three
+              indistinguishable light greys in dark mode — hence "flat". */}
+          <h1 className="mt-6 text-balance text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl animate-in fade-in-0 slide-in-from-bottom-2 duration-700 delay-100">
+            Unified Academic &amp; Campus Management Terminal
           </h1>
 
-          <p className="mt-5 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
+          <p className="mt-5 max-w-2xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg animate-in fade-in-0 slide-in-from-bottom-2 duration-700 delay-200">
             A secure digital workspace for students, faculty, and administration. Access semester
             courses, attendance logs, exam grading, syllabus blueprints, and campus notices.
           </p>
 
-          <div className="mt-8">
+          <div className="mt-8 animate-in fade-in-0 slide-in-from-bottom-2 duration-700 delay-300">
             <HomeHeroCtas />
           </div>
         </div>
       </section>
 
       {/* ─── 4 Feature Cards ────────────────────────────────────────── */}
-      <section className="px-4 pb-16 sm:px-6 sm:pb-20">
+      <section className="px-4 pb-16 pt-10 sm:px-6 sm:pb-20 sm:pt-16">
         <div className="mx-auto max-w-6xl">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
-            {featureCards.map((card) => (
+            {featureCards.map((card, i) => (
               <Link
                 href={card.href}
                 key={card.title}
-                className="group rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="group animate-in fade-in-0 slide-in-from-bottom-2 duration-500 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                // Staggered entrance: each card starts 80ms after the last.
+                style={{ animationDelay: `${400 + i * 80}ms` }}
               >
-                <Card className="h-full transition-colors group-hover:border-ring group-hover:bg-accent/5">
+                <Card className="h-full transition-all duration-300 group-hover:-translate-y-1 group-hover:border-ring group-hover:bg-accent/5 group-hover:shadow-lg">
                   <CardContent className="flex h-full flex-col p-5">
-                    <span className="mb-4 flex size-11 items-center justify-center rounded-lg bg-muted text-foreground">
+                    <span className="mb-4 flex size-11 items-center justify-center rounded-lg bg-muted text-foreground transition-all duration-300 group-hover:scale-105 group-hover:bg-primary/10 group-hover:text-primary">
                       {card.icon}
                     </span>
                     <h2 className="mb-1.5 text-base font-semibold">{card.title}</h2>
-                    <p className="mb-4 flex-1 text-sm leading-relaxed text-muted-foreground">
+                    <p className="mb-4 flex-1 text-pretty text-sm leading-relaxed text-muted-foreground">
                       {card.description}
                     </p>
                     <span className="inline-flex items-center gap-1 text-sm font-medium">
@@ -183,43 +157,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── Announcements ──────────────────────────────────────────── */}
-      {announcements.length > 0 && (
-        <section className="px-4 pb-16 sm:px-6 sm:pb-24">
-          <div className="mx-auto max-w-6xl">
-            <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">
-                  Recent Announcements
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Stay up-to-date with the latest news and updates from the university.
-                </p>
-              </div>
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/public/notices">
-                  View All Notices
-                  <IconArrowRight size={15} aria-hidden="true" />
-                </Link>
-              </Button>
-            </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              {announcements.map((announcement) => (
-                <NoticePostCard
-                  key={announcement.id}
-                  notice={toNotice(announcement)}
-                  onOpen={() => setSelectedNotice(toNotice(announcement))}
-                  compact
-                />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {selectedNotice && (
-        <NoticeDetailModal notice={selectedNotice} onClose={() => setSelectedNotice(null)} />
-      )}
     </PublicLayout>
   );
 }

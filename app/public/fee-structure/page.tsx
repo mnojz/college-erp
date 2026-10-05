@@ -8,7 +8,7 @@ export default function FeeStructurePage() {
         kind="fees"
         eyebrow="Student finance"
         title="Fee Structure"
-        description="Review published programme and semester fee information before registration."
+        description="Programmes covered by the college fee structure, and published fee amounts once available."
       />
     </PublicLayout>
   );
