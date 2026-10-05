@@ -36,6 +36,10 @@ import {
 } from "@tabler/icons-react";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { AdminModal } from "@/app/components/admin/AdminModal";
+import {
+  PaginationControls,
+  type PaginationMeta,
+} from "@/app/components/common/PaginationControls";
 import { ImageUploadCrop } from "@/app/components/common/ImageUploadCrop";
 import { cn } from "cn";
 
@@ -87,6 +91,7 @@ type SubjectOption = {
   code: string;
   name: string;
   semester: number;
+  programId: string;
   program: { name: string; code: string } | null;
 };
 
@@ -444,6 +449,14 @@ export default function AdminPeoplePage() {
   const [selectedSemesterFilter, setSelectedSemesterFilter] = useState("ALL");
   const [selectedStatusFilter, setSelectedStatusFilter] = useState("ALL");
   const [studentSearch, setStudentSearch] = useState("");
+  /** Debounced copy of studentSearch so typing doesn't fire a request per key. */
+  const [debouncedStudentSearch, setDebouncedStudentSearch] = useState("");
+  // Students are fetched paginated + filtered server-side (see loadStudents).
+  const [studentPage, setStudentPage] = useState(1);
+  const [studentPagination, setStudentPagination] = useState<PaginationMeta>({
+    total: 0, page: 1, pageSize: 25, totalPages: 1, hasMore: false,
+  });
+  const [studentsBusy, setStudentsBusy] = useState(false);
 
   // Create Modals
   const [showTeacherModal, setShowTeacherModal] = useState(false);
@@ -465,6 +478,52 @@ export default function AdminPeoplePage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
+  /**
+   * Fetch one page of students with every filter applied in the DATABASE.
+   * This is what makes pagination correct — filtering the current page in the
+   * browser can only ever match rows that happen to already be loaded, so a
+   * search would silently miss most matches.
+   */
+  async function loadStudents(page: number) {
+    const params = new URLSearchParams();
+    params.set("page", String(page));
+    params.set("pageSize", "25");
+    if (debouncedStudentSearch.trim()) params.set("q", debouncedStudentSearch.trim());
+    if (selectedProgramFilter !== "ALL") params.set("programId", selectedProgramFilter);
+    if (selectedSemesterFilter !== "ALL") params.set("semester", selectedSemesterFilter);
+    if (selectedStatusFilter !== "ALL") params.set("status", selectedStatusFilter);
+
+    setStudentsBusy(true);
+    try {
+      const res = await fetch(`/api/students?${params.toString()}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Unable to load students");
+        return;
+      }
+      setStudents(data.students ?? []);
+      if (data.pagination) setStudentPagination(data.pagination);
+    } catch {
+      setError("Unable to reach the server");
+    } finally {
+      setStudentsBusy(false);
+    }
+  }
+
+  // Debounce the search box so a request isn't fired on every keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedStudentSearch(studentSearch), 300);
+    return () => clearTimeout(timer);
+  }, [studentSearch]);
+
+  // Any filter change restarts at page 1 — otherwise you land on page 7 of a
+  // narrower result set and see an empty table.
+  useEffect(() => {
+    const sync = setTimeout(() => void loadStudents(1), 0);
+    return () => clearTimeout(sync);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch on filter change only
+  }, [debouncedStudentSearch, selectedProgramFilter, selectedSemesterFilter, selectedStatusFilter]);
+
   useEffect(() => {
     async function load() {
       try {
@@ -473,15 +532,13 @@ export default function AdminPeoplePage() {
           router.replace("/dashboard");
           return;
         }
-        const [tRes, sRes, pRes, subRes] = await Promise.all([
+        const [tRes, pRes, subRes] = await Promise.all([
           fetch("/api/teachers"),
-          fetch("/api/students"),
           fetch("/api/programs"),
           fetch("/api/subjects"),
         ]);
-        const [td, sd, pd, subd] = await Promise.all([tRes.json(), sRes.json(), pRes.json(), subRes.json()]);
+        const [td, pd, subd] = await Promise.all([tRes.json(), pRes.json(), subRes.json()]);
         setTeachers(td.teachers ?? []);
-        setStudents(sd.students ?? []);
         setPrograms(pd.programs ?? []);
         setSubjects(subd.subjects ?? []);
       } catch {
@@ -528,45 +585,16 @@ export default function AdminPeoplePage() {
    * semester/status filters themselves, so the options stay stable while the
    * admin drills in.
    */
+  // Derived from the full subject list, not the current page of students —
+  // otherwise the dropdown options would change every time you page.
   const studentSemesterOptions = useMemo(() => {
     const semesters = new Set<number>();
-    for (const s of students) {
+    for (const s of subjects) {
       if (selectedProgramFilter !== "ALL" && s.programId !== selectedProgramFilter) continue;
-      if (s.currentSemester != null) semesters.add(s.currentSemester);
+      semesters.add(s.semester);
     }
     return [...semesters].sort((a, b) => a - b);
-  }, [students, selectedProgramFilter]);
-
-  // Filtered students — program + semester + status + free-text search.
-  const filteredStudents = useMemo(() => {
-    const q = studentSearch.trim().toLowerCase();
-    return students.filter((s) => {
-      if (selectedProgramFilter !== "ALL" && s.programId !== selectedProgramFilter) return false;
-      if (
-        selectedSemesterFilter !== "ALL" &&
-        String(s.currentSemester ?? "") !== selectedSemesterFilter
-      ) {
-        return false;
-      }
-      // Status filter = account status, not the enrollment lifecycle.
-      if (selectedStatusFilter !== "ALL" && s.user.status !== selectedStatusFilter) return false;
-      if (!q) return true;
-      return (
-        s.user.firstName.toLowerCase().includes(q) ||
-        s.user.lastName.toLowerCase().includes(q) ||
-        s.user.email.toLowerCase().includes(q) ||
-        s.enrollmentNumber.toLowerCase().includes(q) ||
-        s.registrationId.toLowerCase().includes(q) ||
-        (s.rollNumber ? s.rollNumber.toLowerCase().includes(q) : false)
-      );
-    });
-  }, [
-    students,
-    studentSearch,
-    selectedProgramFilter,
-    selectedSemesterFilter,
-    selectedStatusFilter,
-  ]);
+  }, [subjects, selectedProgramFilter]);
 
   /** Number of active student filters — drives the "Reset (n)" affordance. */
   const studentFilterCount =
@@ -721,9 +749,7 @@ export default function AdminPeoplePage() {
         setError(data.error ?? "Failed to create student account");
         return;
       }
-      const refresh = await fetch("/api/students");
-      const refreshData = await refresh.json();
-      setStudents(refreshData.students ?? []);
+      await loadStudents(studentPage);
       setStudentForm(studentEmpty);
       setShowStudentModal(false);
       setMessage(`Student account created for ${data.student.user.firstName} ${data.student.user.lastName}.`);
@@ -774,9 +800,7 @@ export default function AdminPeoplePage() {
         setError(data.error ?? "Failed to update student account");
         return;
       }
-      const refresh = await fetch("/api/students");
-      const refreshData = await refresh.json();
-      setStudents(refreshData.students ?? []);
+      await loadStudents(studentPage);
       setEditingStudent(null);
       setMessage(`Student profile updated for ${data.student.user.firstName} ${data.student.user.lastName}.`);
     } catch {
@@ -805,7 +829,7 @@ export default function AdminPeoplePage() {
       if (deletingTarget.type === "teacher") {
         setTeachers((prev) => prev.filter((t) => t.id !== deletingTarget.id));
       } else {
-        setStudents((prev) => prev.filter((s) => s.id !== deletingTarget.id));
+        void loadStudents(studentPage);
       }
       setMessage(`${deletingTarget.name} has been removed successfully.`);
       setDeletingTarget(null);
@@ -832,9 +856,7 @@ export default function AdminPeoplePage() {
       setTeachers((prev) =>
         prev.map((t) => (t.user.id === userId ? { ...t, user: { ...t.user, status: next } } : t)),
       );
-      setStudents((prev) =>
-        prev.map((s) => (s.user.id === userId ? { ...s, user: { ...s.user, status: next } } : s)),
-      );
+      void loadStudents(studentPage);
       return true;
     } catch {
       setError("Unable to update account status");
@@ -876,7 +898,9 @@ export default function AdminPeoplePage() {
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "teachers" | "students")}>
               <TabsList>
                 <TabsTrigger value="teachers">Teachers ({teachers.length})</TabsTrigger>
-                <TabsTrigger value="students">Enrolled Students ({students.length})</TabsTrigger>
+                <TabsTrigger value="students">
+                  Enrolled Students ({studentPagination.total})
+                </TabsTrigger>
               </TabsList>
             </Tabs>
 
@@ -1009,11 +1033,9 @@ export default function AdminPeoplePage() {
               </div>
 
               <p className="text-xs text-muted-foreground">
-                Showing{" "}
-                <strong className="font-semibold text-foreground">
-                  {filteredStudents.length}
-                </strong>{" "}
-                of {students.length} students
+                {studentPagination.total === 0
+                  ? "No students match the current filters"
+                  : `Showing ${(studentPagination.page - 1) * studentPagination.pageSize + 1}\u2013${Math.min(studentPagination.page * studentPagination.pageSize, studentPagination.total)} of ${studentPagination.total} students`}
               </p>
             </div>
           )}
@@ -1190,7 +1212,13 @@ export default function AdminPeoplePage() {
                       Loading directory…
                     </TableCell>
                   </TableRow>
-                ) : filteredStudents.length === 0 ? (
+                ) : studentsBusy && students.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                      Loading students…
+                    </TableCell>
+                  </TableRow>
+                ) : students.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
                       {studentFilterCount > 0 ? (
@@ -1214,7 +1242,7 @@ export default function AdminPeoplePage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredStudents.map((s) => (
+                  students.map((s) => (
                     <TableRow key={s.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -1350,6 +1378,15 @@ export default function AdminPeoplePage() {
                 )}
               </TableBody>
             </Table>
+            <PaginationControls
+              pagination={studentPagination}
+              busy={studentsBusy}
+              label="students"
+              onPageChange={(next) => {
+                setStudentPage(next);
+                void loadStudents(next);
+              }}
+            />
           </div>
         )}
 

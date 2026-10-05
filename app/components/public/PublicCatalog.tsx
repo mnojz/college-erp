@@ -123,6 +123,9 @@ export function PublicCatalog({ kind, title, eyebrow, description }: CatalogProp
 
 function PublicItem({ item, kind }: { item: Item; kind: CatalogKind }) {
   if (kind === "fees") {
+    // There is no fee model in the schema yet, so this deliberately lists the
+    // PROGRAMMES a fee structure will apply to — and says so, rather than
+    // presenting a programme card as if it were a fee.
     return (
       <Card>
         <CardContent className="flex h-full flex-col p-5">
@@ -137,6 +140,10 @@ function PublicItem({ item, kind }: { item: Item; kind: CatalogKind }) {
           <p className="mt-1.5 text-sm text-muted-foreground">
             <strong className="font-medium text-foreground">Program Duration:</strong>{" "}
             {String(item.durationYears)} Years ({Number(item.durationYears) * 2} Semesters)
+          </p>
+          <p className="mt-3 border-t pt-3 text-xs text-muted-foreground">
+            No fee amounts are published yet, so this page lists the programmes a fee
+          structure applies to. Fee data will appear here once the college publishes it.
           </p>
         </CardContent>
       </Card>

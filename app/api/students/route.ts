@@ -2,6 +2,27 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@/app/generated/prisma/client";
 import { requireAdmin } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
+import { parsePageParams, paginatedResponse } from "@/app/lib/pagination";
+import { z } from "zod";
+
+/**
+ * Query filters for the directory. `status` is the ACCOUNT status (ACTIVE /
+ * INACTIVE), not the enrollment lifecycle.
+ */
+const StudentQuerySchema = z.object({
+  q: z.string().trim().min(1).optional(),
+  programId: z.string().trim().min(1).optional(),
+  semester: z.coerce.number().int().min(1).max(12).optional(),
+  status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
+});
+
+const STUDENT_SELECT = {
+  id: true, enrollmentNumber: true, registrationId: true, rollNumber: true,
+  profileImageUrl: true, admissionDate: true, programId: true, currentSemester: true,
+  gender: true, nationality: true, religion: true, category: true, status: true,
+  program: { select: { id: true, name: true, code: true } },
+  user: { select: { id: true, email: true, firstName: true, lastName: true, status: true } },
+} as const;
 
 type CreateStudentBody = {
   email?: unknown;
@@ -331,23 +352,63 @@ export async function DELETE(request: Request) {
   }
 }
 
-export async function GET() {
+/**
+ * GET /api/students — paginated + filtered student directory.
+ *
+ * Filtering happens in the database rather than in the client: at ~1000
+ * students, shipping every row and filtering in the browser means a large
+ * payload on every load AND filters that can only ever match the rows that
+ * happen to be on the current page.
+ *
+ *   ?page=1&pageSize=25&q=ram&programId=<id>&semester=3&status=ACTIVE
+ */
+export async function GET(request: Request) {
   if (!(await requireAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const { page, pageSize, skip, limit } = parsePageParams(searchParams, { pageSize: 25 });
+
+  // Treat empty query values (?programId=&semester=) as "no filter".
+  const rawQuery = Object.fromEntries([...searchParams.entries()].filter(([, v]) => v !== ""));
+  const parsed = StudentQuerySchema.safeParse(rawQuery);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid query parameters" }, { status: 400 });
+  }
+  const f = parsed.data;
+
+  const where: Prisma.StudentWhereInput = {
+    ...(f.programId ? { programId: f.programId } : {}),
+    ...(f.semester ? { currentSemester: f.semester } : {}),
+    ...(f.status ? { user: { status: f.status } } : {}),
+    ...(f.q
+      ? {
+          OR: [
+            { user: { firstName: { contains: f.q, mode: "insensitive" } } },
+            { user: { lastName: { contains: f.q, mode: "insensitive" } } },
+            { user: { email: { contains: f.q, mode: "insensitive" } } },
+            { enrollmentNumber: { contains: f.q, mode: "insensitive" } },
+            { registrationId: { contains: f.q, mode: "insensitive" } },
+            { rollNumber: { contains: f.q, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
+
   try {
-    const students = await prisma.student.findMany({
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true, enrollmentNumber: true, registrationId: true, rollNumber: true,
-        profileImageUrl: true, admissionDate: true, programId: true, currentSemester: true,
-        gender: true, nationality: true, religion: true, category: true, status: true,
-        program: { select: { id: true, name: true, code: true } },
-        user: { select: { id: true, email: true, firstName: true, lastName: true, status: true } },
-      },
-    });
-    return NextResponse.json({ students });
+    const [students, total] = await Promise.all([
+      prisma.student.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+        select: STUDENT_SELECT,
+      }),
+      prisma.student.count({ where }),
+    ]);
+    const { items, pagination } = paginatedResponse(students, total, page, pageSize);
+    return NextResponse.json({ students: items, pagination });
   } catch (error) {
     console.error("GET /api/students error:", error);
     return NextResponse.json({ error: "Unable to load students" }, { status: 500 });
