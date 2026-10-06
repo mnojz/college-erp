@@ -137,11 +137,11 @@ export default function Home() {
                     <span className="mb-4 flex size-11 items-center justify-center rounded-lg bg-muted text-foreground transition-all duration-300 group-hover:scale-105 group-hover:bg-primary/10 group-hover:text-primary">
                       {card.icon}
                     </span>
-                    <h2 className="mb-1.5 text-base font-semibold">{card.title}</h2>
+                    <h2 className="mb-1.5 text-lg font-semibold text-foreground">{card.title}</h2>
                     <p className="mb-4 flex-1 text-pretty text-sm leading-relaxed text-muted-foreground">
                       {card.description}
                     </p>
-                    <span className="inline-flex items-center gap-1 text-sm font-medium">
+                    <span className="inline-flex items-center gap-1 text-sm font-medium text-primary">
                       {card.action}
                       <IconArrowRight
                         size={15}

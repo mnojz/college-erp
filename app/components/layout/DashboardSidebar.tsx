@@ -45,12 +45,12 @@ export function DashboardSidebar({
               href={href}
               onClick={onNavigate}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+                "flex items-center gap-3 rounded-md px-3 py-2 text-[15px] font-medium text-foreground transition-colors hover:bg-accent/60 hover:text-foreground",
                 isActive && "bg-accent font-semibold text-foreground"
               )}
             >
               <span className="flex shrink-0 items-center justify-center">
-                <Icon size={18} className="[&>svg]:size-4" aria-hidden="true" />
+                <Icon size={18} className="[&>svg]:size-[18px]" aria-hidden="true" />
               </span>
               <span className="truncate">{label}</span>
             </Link>

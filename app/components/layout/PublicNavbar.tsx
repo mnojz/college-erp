@@ -40,16 +40,16 @@ export function PublicNavbar({
 
         <nav className="hidden items-center gap-1 md:flex" aria-label="Primary">
           {NAV_LINKS.map((link) => (
-            <Button key={link.href} variant="ghost" size="sm" asChild>
-              <Link
-                href={link.href}
-                className={cn(
-                  pathname === link.href && "bg-accent text-accent-foreground"
-                )}
-              >
-                {link.label}
-              </Link>
-            </Button>
+            <Link
+              key={link.href}
+              href={link.href}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-[15px] font-medium text-foreground transition-colors hover:bg-accent/60 hover:text-foreground",
+                pathname === link.href && "bg-accent font-semibold text-foreground"
+              )}
+            >
+              {link.label}
+            </Link>
           ))}
         </nav>
 
@@ -94,8 +94,8 @@ export function PublicNavbar({
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                  pathname === link.href && "bg-accent font-semibold text-accent-foreground"
+                  "rounded-md px-3 py-2 text-[15px] font-medium text-foreground hover:bg-accent hover:text-foreground",
+                  pathname === link.href && "bg-accent font-semibold text-foreground"
                 )}
               >
                 {link.label}

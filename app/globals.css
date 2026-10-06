@@ -12,34 +12,34 @@
    ───────────────────────────────────────────── */
 :root {
   --background: hsl(220 23.08% 94.9%); /* base */
-  --foreground: hsl(234 16.02% 35.49%); /* text */
+  --foreground: hsl(217 33% 17%); /* crisp dark neutral #1F2937 */
   --card: hsl(220 23.08% 94.9%); /* base */
-  --card-foreground: hsl(234 16.02% 35.49%); /* text */
+  --card-foreground: hsl(217 33% 17%); /* text */
   --popover: hsl(220 23.08% 94.9%); /* base */
-  --popover-foreground: hsl(234 16.02% 35.49%); /* text */
+  --popover-foreground: hsl(217 33% 17%); /* text */
   --primary: hsl(220 91.49% 53.92%); /* blue */
   --primary-foreground: hsl(220 23.08% 94.9%); /* base */
   --secondary: hsl(223 15.91% 82.75%); /* surface0 */
-  --secondary-foreground: hsl(234 16.02% 35.49%); /* text */
+  --secondary-foreground: hsl(217 33% 17%); /* text */
   --muted: hsl(223 15.91% 82.75%); /* surface0 */
-  --muted-foreground: hsl(233 12.8% 41.37%); /* subtext1 */
+  --muted-foreground: hsl(215 16% 38%); /* legible medium neutral #4B5563 */
   --accent: hsl(223 15.91% 82.75%); /* surface0 */
-  --accent-foreground: hsl(234 16.02% 35.49%); /* text */
+  --accent-foreground: hsl(217 33% 17%); /* text */
   --destructive: hsl(347 86.67% 44.12%); /* red */
   --border: hsl(225 13.56% 76.86%); /* surface1 */
   --input: hsl(225 13.56% 76.86%); /* surface1 */
-  --ring: hsl(234 16.02% 35.49%); /* text */
+  --ring: hsl(217 33% 17%); /* text */
   --chart-1: hsl(347 86.67% 44.12%); /* red */
   --chart-2: hsl(183 74.36% 33.33%); /* teal */
   --chart-3: hsl(220 91.49% 53.92%); /* blue */
   --chart-4: hsl(35 76.96% 49.41%); /* yellow */
   --chart-5: hsl(115 58.19% 39.8%); /* green */
   --sidebar: hsl(218 25.1% 93.73%); /* mantle */
-  --sidebar-foreground: hsl(234 16.02% 35.49%); /* text */
+  --sidebar-foreground: hsl(217 33% 17%); /* text */
   --sidebar-primary: hsl(220 91.49% 53.92%); /* blue */
   --sidebar-primary-foreground: hsl(220 23.08% 94.9%); /* base */
   --sidebar-accent: hsl(223 15.91% 82.75%); /* surface0 */
-  --sidebar-accent-foreground: hsl(234 16.02% 35.49%); /* text */
+  --sidebar-accent-foreground: hsl(217 33% 17%); /* text */
   --sidebar-border: hsl(225 13.56% 76.86%); /* surface1 */
   --sidebar-ring: hsl(225 13.56% 76.86%); /* surface1 */
   --radius: 0.625rem;
@@ -64,34 +64,34 @@
 
 .dark {
   --background: hsl(240 21.05% 14.9%); /* base */
-  --foreground: hsl(226 63.93% 88.04%); /* text */
+  --foreground: hsl(210 40% 96%); /* crisp light neutral #F3F4F6 */
   --card: hsl(240 21.05% 14.9%); /* base */
-  --card-foreground: hsl(226 63.93% 88.04%); /* text */
+  --card-foreground: hsl(210 40% 96%); /* text */
   --popover: hsl(240 21.05% 14.9%); /* base */
-  --popover-foreground: hsl(226 63.93% 88.04%); /* text */
+  --popover-foreground: hsl(210 40% 96%); /* text */
   --primary: hsl(217 91.87% 75.88%); /* blue */
   --primary-foreground: hsl(240 21.05% 14.9%); /* base */
   --secondary: hsl(237 16.24% 22.94%); /* surface0 */
-  --secondary-foreground: hsl(226 63.93% 88.04%); /* text */
+  --secondary-foreground: hsl(213 27% 84%); /* text */
   --muted: hsl(237 16.24% 22.94%); /* surface0 */
-  --muted-foreground: hsl(227 35.29% 80%); /* subtext1 */
+  --muted-foreground: hsl(215 20% 65%); /* legible muted neutral #94A3B8 */
   --accent: hsl(237 16.24% 22.94%); /* surface0 */
-  --accent-foreground: hsl(226 63.93% 88.04%); /* text */
+  --accent-foreground: hsl(210 40% 96%); /* text */
   --destructive: hsl(343 81.25% 74.9%); /* red */
   --border: hsl(234 13.21% 31.18%); /* surface1 */
   --input: hsl(234 13.21% 31.18%); /* surface1 */
-  --ring: hsl(226 63.93% 88.04%); /* text */
+  --ring: hsl(210 40% 96%); /* text */
   --chart-1: hsl(343 81.25% 74.9%); /* red */
   --chart-2: hsl(170 57.42% 73.33%); /* teal */
   --chart-3: hsl(217 91.87% 75.88%); /* blue */
   --chart-4: hsl(41 86.32% 83.14%); /* yellow */
   --chart-5: hsl(115 53.88% 76.08%); /* green */
   --sidebar: hsl(240 21.18% 14.12%); /* mantle */
-  --sidebar-foreground: hsl(226 63.93% 88.04%); /* text */
+  --sidebar-foreground: hsl(210 40% 96%); /* text */
   --sidebar-primary: hsl(217 91.87% 75.88%); /* blue */
   --sidebar-primary-foreground: hsl(240 21.05% 14.9%); /* base */
   --sidebar-accent: hsl(237 16.24% 22.94%); /* surface0 */
-  --sidebar-accent-foreground: hsl(226 63.93% 88.04%); /* text */
+  --sidebar-accent-foreground: hsl(210 40% 96%); /* text */
   --sidebar-border: hsl(234 13.21% 31.18%); /* surface1 */
   --sidebar-ring: hsl(234 13.21% 31.18%); /* surface1 */
 

@@ -70,7 +70,7 @@ export function DashboardShell({
                   <p className="mb-1 text-sm font-medium text-muted-foreground">{subtitle}</p>
                 )}
                 {title && (
-                  <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
+                  <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{title}</h1>
                 )}
               </div>
               {headerActions && (
