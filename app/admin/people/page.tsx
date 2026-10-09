@@ -40,6 +40,11 @@ import {
   PaginationControls,
   type PaginationMeta,
 } from "@/app/components/common/PaginationControls";
+import {
+  SortControl,
+  type SortDirection,
+  type SortOption,
+} from "@/app/components/common/SortControl";
 import { ImageUploadCrop } from "@/app/components/common/ImageUploadCrop";
 import { cn } from "cn";
 
@@ -47,6 +52,8 @@ type TeacherItem = {
   id: string;
   employeeNo: string;
   profileImageUrl: string | null;
+  /** ISO timestamp; exposed by the API solely so "Joined date" can sort on it. */
+  createdAt: string;
   user: {
     id: string;
     email: string;
@@ -64,7 +71,7 @@ type StudentItem = {
   id: string;
   enrollmentNumber: string;
   registrationId: string;
-  rollNumber: string | null;
+  rollNumber: number | null;
   profileImageUrl: string | null;
   admissionDate: string;
   programId: string | null;
@@ -95,6 +102,42 @@ type SubjectOption = {
   program: { name: string; code: string } | null;
 };
 
+type TeacherSortKey = "name" | "employeeNo" | "status";
+
+/**
+ * Student sort keys — MUST stay in lockstep with `STUDENT_SORT_KEYS` in
+ * app/api/students/route.ts, because these strings are sent straight to the API
+ * as `sortBy` and an unknown value is rejected with a 400.
+ */
+type StudentSortKey =
+  | "recent"
+  | "name"
+  | "roll"
+  | "semester"
+  | "program";
+
+/**
+ * Teachers are all fetched up front and sorted in the browser, so these keys map
+ * to in-memory comparators. Students are paginated server-side, so their keys
+ * are forwarded to the API instead — see STUDENT_SORT_OPTIONS below.
+ */
+const TEACHER_SORT_OPTIONS: readonly SortOption<TeacherSortKey>[] = [
+  { value: "name", label: "Name", defaultDirection: "asc" },
+  // Employee numbers carry a numeric tail ("EMP2" vs "EMP10") — compared with
+  // a numeric collator in sortedTeachers, not plain text order.
+  { value: "employeeNo", label: "Employee #", defaultDirection: "asc" },
+  { value: "status", label: "Status", defaultDirection: "asc" },
+];
+
+const STUDENT_SORT_OPTIONS: readonly SortOption<StudentSortKey>[] = [
+  // Matches the directory's original ordering, so the default never surprises.
+  { value: "recent", label: "Recently added", defaultDirection: "desc" },
+  { value: "name", label: "Name", defaultDirection: "asc" },
+  { value: "roll", label: "Roll number", defaultDirection: "asc" },
+  { value: "semester", label: "Semester", defaultDirection: "asc" },
+  { value: "program", label: "Program", defaultDirection: "asc" },
+];
+
 type DeleteTarget = {
   type: "teacher" | "student";
   id: string;
@@ -109,6 +152,36 @@ type StatusTarget = {
   name: string;
   identifier: string;
 };
+
+/**
+ * `useState` that persists to localStorage, so the admin's sort choices survive
+ * reloads and navigation. A stored value that isn't in `validValues` (e.g. a
+ * sort key removed since the last visit) falls back to `initial`.
+ */
+function usePersistentSortState<T extends string>(
+  storageKey: string,
+  initial: T,
+  validValues: readonly T[],
+): [T, (next: T) => void] {
+  const [value, setValue] = useState<T>(() => {
+    if (typeof window === "undefined") return initial;
+    const saved = window.localStorage.getItem(storageKey);
+    return saved !== null && (validValues as readonly string[]).includes(saved)
+      ? (saved as T)
+      : initial;
+  });
+
+  function setPersistent(next: T) {
+    setValue(next);
+    try {
+      window.localStorage.setItem(storageKey, next);
+    } catch {
+      // Private-mode / quota failure: the control still works for the session.
+    }
+  }
+
+  return [value, setPersistent];
+}
 
 const teacherEmpty = {
   email: "",
@@ -155,22 +228,42 @@ function titleCaseStatus(status: string) {
 }
 
 /**
- * Options for the students Status filter.
- *
- * This is deliberately the binary account state (UserStatus: ACTIVE /
- * INACTIVE — i.e. can this student sign in?), not the 5-value StudentStatus
- * enrollment lifecycle. The lifecycle (Graduated / Suspended / Withdrawn)
- * still renders as a badge in the table, so excluding it from the filter
- * never hides a student — every student matches Active or Inactive.
+ * Unified student-status filter value. Combines two distinct concepts into one
+ * dropdown:
+ *  - "ENROLLED" (default): live-semester students regardless of account state.
+ *  - Account status ("ACTIVE"/"INACTIVE"): can the account sign in? Scoped to
+ *    enrolled students.
+ *  - Lifecycle ("GRADUATED"/"DROPPED"): terminal states, selected exactly.
  */
-const ACCOUNT_STATUS_OPTIONS = ["ACTIVE", "INACTIVE"] as const;
+export type StudentStatusFilterValue =
+  | "ENROLLED"
+  | "ACTIVE"
+  | "INACTIVE"
+  | "GRADUATED"
+  | "DROPPED";
 
-/** Neutral account-status badge (replaces the old unstyled .badge classes). */
+const STUDENT_STATUS_FILTER_OPTIONS: Array<{ value: StudentStatusFilterValue; label: string }> = [
+  { value: "ENROLLED", label: "Enrolled" },
+  { value: "ACTIVE", label: "Account active" },
+  { value: "INACTIVE", label: "Account inactive" },
+  { value: "GRADUATED", label: "Graduated" },
+  { value: "DROPPED", label: "Dropped" },
+];
+
+/**
+ * Account-status badge. Uses the app's Catppuccin accent convention
+ * (translucent tinted background + matching text) — green for a live account,
+ * red for a deactivated one. Colors auto-swap with the light/dark theme.
+ */
 function AccountStatusBadge({ status }: { status: string }) {
   return status === "ACTIVE" ? (
-    <Badge variant="secondary">Active</Badge>
+    <Badge className="bg-[color-mix(in_oklab,var(--ctp-green)_15%,transparent)] text-[var(--ctp-green)]">
+      Active
+    </Badge>
   ) : (
-    <Badge variant="outline">Inactive</Badge>
+    <Badge className="bg-[color-mix(in_oklab,var(--ctp-red)_15%,transparent)] text-[var(--ctp-red)]">
+      Inactive
+    </Badge>
   );
 }
 
@@ -444,10 +537,17 @@ export default function AdminPeoplePage() {
   // Filters
   // Teachers: free-text search only.
   const [searchQuery, setSearchQuery] = useState("");
-  // Students: program + semester + status + free-text search.
+  // Students: program + semester + status + lifecycle + free-text search.
   const [selectedProgramFilter, setSelectedProgramFilter] = useState("ALL");
   const [selectedSemesterFilter, setSelectedSemesterFilter] = useState("ALL");
-  const [selectedStatusFilter, setSelectedStatusFilter] = useState("ALL");
+  /**
+   * Single student-status filter — folds the account status (can they sign in?)
+   * and the enrollment lifecycle (enrolled / graduated / dropped) into one
+   * dropdown. "ENROLLED" (default) shows live-semester students regardless of
+   * account state; the account options scope within that; the terminal options
+   * (GRADUATED/DROPPED) select exactly that lifecycle.
+   */
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<StudentStatusFilterValue>("ENROLLED");
   const [studentSearch, setStudentSearch] = useState("");
   /** Debounced copy of studentSearch so typing doesn't fire a request per key. */
   const [debouncedStudentSearch, setDebouncedStudentSearch] = useState("");
@@ -457,6 +557,30 @@ export default function AdminPeoplePage() {
     total: 0, page: 1, pageSize: 25, totalPages: 1, hasMore: false,
   });
   const [studentsBusy, setStudentsBusy] = useState(false);
+
+  // Sorting, persisted to localStorage. Teachers are all in memory and sort
+  // locally; students forward these to the API because only the current page
+  // of rows is in the browser.
+  const [teacherSort, setTeacherSort] = usePersistentSortState<TeacherSortKey>(
+    "college-erp-people-teacher-sort",
+    "name",
+    TEACHER_SORT_OPTIONS.map((o) => o.value),
+  );
+  const [teacherSortDir, setTeacherSortDir] = usePersistentSortState<SortDirection>(
+    "college-erp-people-teacher-sort-dir",
+    "asc",
+    ["asc", "desc"],
+  );
+  const [studentSort, setStudentSort] = usePersistentSortState<StudentSortKey>(
+    "college-erp-people-student-sort",
+    "recent",
+    STUDENT_SORT_OPTIONS.map((o) => o.value),
+  );
+  const [studentSortDir, setStudentSortDir] = usePersistentSortState<SortDirection>(
+    "college-erp-people-student-sort-dir",
+    "desc",
+    ["asc", "desc"],
+  );
 
   // Create Modals
   const [showTeacherModal, setShowTeacherModal] = useState(false);
@@ -491,7 +615,19 @@ export default function AdminPeoplePage() {
     if (debouncedStudentSearch.trim()) params.set("q", debouncedStudentSearch.trim());
     if (selectedProgramFilter !== "ALL") params.set("programId", selectedProgramFilter);
     if (selectedSemesterFilter !== "ALL") params.set("semester", selectedSemesterFilter);
-    if (selectedStatusFilter !== "ALL") params.set("status", selectedStatusFilter);
+    // One unified status filter maps to the API's two params: account status
+    // (ACTIVE/INACTIVE) or terminal lifecycle (GRADUATED/DROPPED). "ENROLLED"
+    // sends neither, keeping the API's default live-semester listing.
+    if (selectedStatusFilter === "ACTIVE" || selectedStatusFilter === "INACTIVE") {
+      params.set("status", selectedStatusFilter);
+    }
+    if (selectedStatusFilter === "GRADUATED" || selectedStatusFilter === "DROPPED") {
+      params.set("lifecycle", selectedStatusFilter);
+    }
+    // Sorting lives server-side with the filters: the browser only ever holds
+    // one page of rows, so re-sorting locally would order 25 of 41 students.
+    params.set("sortBy", studentSort);
+    params.set("sortDir", studentSortDir);
 
     setStudentsBusy(true);
     try {
@@ -521,8 +657,15 @@ export default function AdminPeoplePage() {
   useEffect(() => {
     const sync = setTimeout(() => void loadStudents(1), 0);
     return () => clearTimeout(sync);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch on filter change only
-  }, [debouncedStudentSearch, selectedProgramFilter, selectedSemesterFilter, selectedStatusFilter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch on filter/sort change only
+  }, [
+    debouncedStudentSearch,
+    selectedProgramFilter,
+    selectedSemesterFilter,
+    selectedStatusFilter,
+    studentSort,
+    studentSortDir,
+  ]);
 
   useEffect(() => {
     async function load() {
@@ -579,34 +722,86 @@ export default function AdminPeoplePage() {
   }, [teachers, searchQuery]);
 
   /**
-   * Semester options for the students filter. Derived from the students of the
-   * currently selected program (across all statuses) so the list can never
-   * offer a semester that matches nothing. Deliberately NOT narrowed by the
-   * semester/status filters themselves, so the options stay stable while the
-   * admin drills in.
+   * Teachers are fetched once, so ordering happens here in memory rather than
+   * in the API. The final `localeCompare` on
+   * id keeps rows with equal keys in a stable order between renders.
    */
-  // Derived from the full subject list, not the current page of students —
-  // otherwise the dropdown options would change every time you page.
-  const studentSemesterOptions = useMemo(() => {
-    const semesters = new Set<number>();
-    for (const s of subjects) {
-      if (selectedProgramFilter !== "ALL" && s.programId !== selectedProgramFilter) continue;
-      semesters.add(s.semester);
+  const sortedTeachers = useMemo(() => {
+    const collator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
+    const sign = teacherSortDir === "asc" ? 1 : -1;
+
+    const compare = (a: TeacherItem, b: TeacherItem): number => {
+      switch (teacherSort) {
+        case "employeeNo":
+          return collator.compare(a.employeeNo, b.employeeNo);
+        case "status":
+          return collator.compare(a.user.status, b.user.status);
+        case "name":
+        default:
+          return (
+            collator.compare(a.user.firstName, b.user.firstName) ||
+            collator.compare(a.user.lastName, b.user.lastName)
+          );
+      }
+    };
+
+    return [...filteredTeachers].sort(
+      (a, b) => sign * compare(a, b) || a.id.localeCompare(b.id),
+    );
+  }, [filteredTeachers, teacherSort, teacherSortDir]);
+
+  const [activeSemesterOptions, setActiveSemesterOptions] = useState<number[]>([]);
+
+  /**
+   * Semester options for the students filter — semesters that currently have
+   * ACTIVE students ("the semester in the list exists if the students
+   * exist"), scoped to the selected program. Refreshed on mount and whenever
+   * the program filter changes; the student list refreshes separately through
+   * loadStudents.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    async function loadActiveSemesters() {
+      try {
+        const url =
+          selectedProgramFilter !== "ALL"
+            ? `/api/semesters?programId=${selectedProgramFilter}&activeOnly=1`
+            : "/api/semesters?activeOnly=1";
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!res.ok || cancelled) return;
+        const numbers = ((data.semesters ?? []) as Array<{ number: number }>)
+          .map((s) => s.number)
+          .sort((a, b) => a - b);
+        setActiveSemesterOptions(numbers);
+      } catch {
+        if (!cancelled) setActiveSemesterOptions([]);
+      }
     }
-    return [...semesters].sort((a, b) => a - b);
-  }, [subjects, selectedProgramFilter]);
+    void loadActiveSemesters();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProgramFilter]);
+
+  /**
+   * Backwards-compatible alias: the filter dropdown below still reads
+   * studentSemesterOptions. Deliberately NOT narrowed by the semester/status
+   * filters themselves, so the options stay stable while the admin drills in.
+   */
+  const studentSemesterOptions = activeSemesterOptions;
 
   /** Number of active student filters — drives the "Reset (n)" affordance. */
   const studentFilterCount =
     (selectedProgramFilter !== "ALL" ? 1 : 0) +
     (selectedSemesterFilter !== "ALL" ? 1 : 0) +
-    (selectedStatusFilter !== "ALL" ? 1 : 0) +
+    (selectedStatusFilter !== "ENROLLED" ? 1 : 0) +
     (studentSearch.trim() ? 1 : 0);
 
   function resetStudentFilters() {
     setSelectedProgramFilter("ALL");
     setSelectedSemesterFilter("ALL");
-    setSelectedStatusFilter("ALL");
+    setSelectedStatusFilter("ENROLLED");
     setStudentSearch("");
   }
 
@@ -639,7 +834,7 @@ export default function AdminPeoplePage() {
       password: "",
       enrollmentNumber: student.enrollmentNumber,
       registrationId: student.registrationId,
-      rollNumber: student.rollNumber || "",
+      rollNumber: String(student.rollNumber ?? ""),
       admissionDate: student.admissionDate ? new Date(student.admissionDate).toISOString().slice(0, 10) : "",
       programId: student.programId || "",
       currentSemester: student.currentSemester ? String(student.currentSemester) : "1",
@@ -953,6 +1148,18 @@ export default function AdminPeoplePage() {
                   Reset
                 </Button>
               )}
+              {/* Right end of the search row. Teachers sort in memory, so no refetch. */}
+              <SortControl
+                className="ml-auto"
+                ariaLabel="Sort teachers by"
+                value={teacherSort}
+                direction={teacherSortDir}
+                options={TEACHER_SORT_OPTIONS}
+                onChange={(value, direction) => {
+                  setTeacherSort(value);
+                  setTeacherSortDir(direction);
+                }}
+              />
             </div>
           ) : (
             <div className="flex flex-col gap-3 rounded-xl border bg-muted/20 p-3.5">
@@ -996,15 +1203,25 @@ export default function AdminPeoplePage() {
                   </SelectContent>
                 </Select>
 
-                <Select value={selectedStatusFilter} onValueChange={setSelectedStatusFilter}>
-                  <SelectTrigger className="w-full sm:w-40" aria-label="Filter by status">
+                <Select
+                  value={selectedStatusFilter}
+                  onValueChange={(value) => {
+                    const next = value as StudentStatusFilterValue;
+                    setSelectedStatusFilter(next);
+                    // Terminal states sit outside semesters — a stale semester
+                    // selection would silently empty the results.
+                    if (next === "GRADUATED" || next === "DROPPED") {
+                      setSelectedSemesterFilter("ALL");
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-full sm:w-44" aria-label="Filter by status">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent position="popper">
-                    <SelectItem value="ALL">All statuses</SelectItem>
-                    {ACCOUNT_STATUS_OPTIONS.map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {titleCaseStatus(status)}
+                    {STUDENT_STATUS_FILTER_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1030,6 +1247,20 @@ export default function AdminPeoplePage() {
                     Reset ({studentFilterCount})
                   </Button>
                 )}
+
+                {/* Right end of the filter row. Sorting is a view choice, not a
+                    filter, so it is deliberately excluded from studentFilterCount. */}
+                <SortControl
+                  className="ml-auto"
+                  ariaLabel="Sort students by"
+                  value={studentSort}
+                  direction={studentSortDir}
+                  options={STUDENT_SORT_OPTIONS}
+                  onChange={(value, direction) => {
+                    setStudentSort(value);
+                    setStudentSortDir(direction);
+                  }}
+                />
               </div>
 
               <p className="text-xs text-muted-foreground">
@@ -1062,14 +1293,14 @@ export default function AdminPeoplePage() {
                       Loading directory…
                     </TableCell>
                   </TableRow>
-                ) : filteredTeachers.length === 0 ? (
+                ) : sortedTeachers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
                       No faculty records found. Click <strong className="font-medium text-foreground">Add Teacher</strong> to create an account.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredTeachers.map((t) => (
+                  sortedTeachers.map((t) => (
                     <TableRow key={t.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">

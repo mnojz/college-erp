@@ -331,6 +331,9 @@ export async function GET() {
         id: true,
         employeeNo: true,
         profileImageUrl: true,
+        // Surfaced so the directory can offer a "Joined date" sort — the model
+        // has little else to order by.
+        createdAt: true,
         user: {
           select: {
             id: true,

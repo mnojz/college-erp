@@ -26,7 +26,7 @@ import {
 type Profile = {
   enrollmentNumber: string;
   registrationId: string;
-  rollNumber: string | null;
+  rollNumber: number | null;
   profileImageUrl: string | null;
   currentSemester: number | null;
   user: { email: string; firstName: string; lastName: string };

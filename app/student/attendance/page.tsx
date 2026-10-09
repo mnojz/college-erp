@@ -25,7 +25,7 @@ import { cn } from "cn";
 type Profile = {
   enrollmentNumber: string;
   registrationId: string;
-  rollNumber: string | null;
+  rollNumber: number | null;
   profileImageUrl: string | null;
   user: { email: string; firstName: string; lastName: string };
   program: { name: string; code: string } | null;
@@ -112,7 +112,8 @@ export default function StudentAttendancePage() {
   }
 
   const fullName = `${profile.user.firstName} ${profile.user.lastName}`;
-  const studentId = profile.rollNumber || profile.enrollmentNumber;
+  // Roll numbers are integers now; StudentShell takes a display string.
+  const studentId = profile.rollNumber != null ? String(profile.rollNumber) : profile.enrollmentNumber;
 
   const totalSessions = records.length;
   const presentSessions = records.filter((r) => r.status === "PRESENT").length;

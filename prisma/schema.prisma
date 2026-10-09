@@ -25,6 +25,7 @@ enum StudentStatus {
   GRADUATED
   SUSPENDED
   WITHDRAWN
+  DROPPED
 }
 
 /** A student's status within a single academic session/semester. */
@@ -137,7 +138,7 @@ model Student {
   userId                  String   @unique
   enrollmentNumber        String   @unique
   registrationId          String   @unique
-  rollNumber              String?  @unique
+  rollNumber              Int?     @unique
   profileImageUrl         String?
   programId               String?
   currentSemester         Int?     @default(1)

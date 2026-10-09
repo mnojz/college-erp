@@ -11,7 +11,7 @@ import { gradeForMarks } from "@/app/lib/grading";
 type Student = {
   id: string;
   enrollmentNumber: string;
-  rollNumber: string | null;
+  rollNumber: number | null;
   user: { firstName: string; lastName: string };
 };
 

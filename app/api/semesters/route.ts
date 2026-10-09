@@ -1,16 +1,36 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/app/lib/auth";
+import { requireAdmin, requireAuth } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
+import { getActiveSemesters } from "@/app/lib/progression";
 
 /**
- * GET /api/semesters?programId=xxx
- * Returns the list of valid semester numbers for a program
- * (derived from program.durationYears * 2, no DB table needed).
+ * GET /api/semesters?programId=xxx[&activeOnly=1]
+ *
+ * Without activeOnly: the full THEORETICAL range (durationYears × 2) — for
+ * curriculum data (subjects, materials, syllabus) that exists whether or not
+ * a batch is enrolled.
+ *
+ * With activeOnly=1: only semesters that currently have ACTIVE students
+ * ("the semester in the list exists if the students exist") — for
+ * batch-dependent pickers (people filter, attendance, class creation).
  */
 export async function GET(request: Request) {
+  // Teachers need activeOnly for their attendance/class pickers; the full
+  // range was already admin-only, so any signed-in user may call this.
+  if (!(await requireAuth())) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   try {
     const { searchParams } = new URL(request.url);
     const programId = searchParams.get("programId");
+    const activeOnly = searchParams.get("activeOnly") === "1";
+
+    if (activeOnly) {
+      const numbers = await getActiveSemesters(prisma, programId ?? undefined);
+      return NextResponse.json({
+        semesters: numbers.map((n) => ({ number: n, name: `Semester ${n}` })),
+      });
+    }
 
     if (programId) {
       const program = await prisma.program.findUnique({

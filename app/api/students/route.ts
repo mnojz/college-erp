@@ -8,13 +8,70 @@ import { z } from "zod";
 /**
  * Query filters for the directory. `status` is the ACCOUNT status (ACTIVE /
  * INACTIVE), not the enrollment lifecycle.
+ *
+ * `sortBy` keys are shared with `buildStudentOrderBy` so the accepted values and
+ * the ordering they produce can't drift apart.
  */
+const STUDENT_SORT_KEYS = [
+  "recent",
+  "name",
+  "roll",
+  "semester",
+  "program",
+] as const;
+type StudentSortKey = (typeof STUDENT_SORT_KEYS)[number];
+
 const StudentQuerySchema = z.object({
   q: z.string().trim().min(1).optional(),
   programId: z.string().trim().min(1).optional(),
   semester: z.coerce.number().int().min(1).max(12).optional(),
   status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
+  lifecycle: z.enum(["GRADUATED", "DROPPED"]).optional(),
+  includeTerminal: z.coerce.boolean().optional(),
+  sortBy: z.enum(STUDENT_SORT_KEYS).optional(),
+  sortDir: z.enum(["asc", "desc"]).optional(),
+  // Terminal lifecycle states are opt-in: by default the directory shows only
+  // students in a live semester (non-null currentSemester + ACTIVE/INACTIVE).
 });
+
+/**
+ * Map a sort key to a Prisma `orderBy` list.
+ *
+ * Nullable columns pass `nulls: "last"` in BOTH directions so students without
+ * a roll or semester don't jump to the top when the admin flips direction.
+ *
+ * `id` is appended as a tiebreaker because the directory paginates: without a
+ * total order, rows sharing a sort key can land on different pages between
+ * requests and visibly shuffle as you page through.
+ */
+function buildStudentOrderBy(
+  key: StudentSortKey,
+  dir: Prisma.SortOrder,
+): Prisma.StudentOrderByWithRelationInput[] {
+  const byName: Prisma.StudentOrderByWithRelationInput[] = [
+    { user: { firstName: dir } },
+    { user: { lastName: dir } },
+  ];
+
+  const primary: Prisma.StudentOrderByWithRelationInput[] = (() => {
+    switch (key) {
+      case "name":
+        return byName;
+      case "roll":
+        return [{ rollNumber: { sort: dir, nulls: "last" } }];
+      case "semester":
+        return [{ currentSemester: { sort: dir, nulls: "last" } }];
+      // Ordering by relation: students with no program fall where SQL puts a NULL.
+      case "program":
+        return [{ program: { code: dir } }, { program: { name: dir } }];
+      case "recent":
+      default:
+        return [{ createdAt: dir }];
+    }
+  })();
+
+  return [...primary, { id: dir }];
+}
 
 const STUDENT_SELECT = {
   id: true, enrollmentNumber: true, registrationId: true, rollNumber: true,
@@ -68,7 +125,7 @@ type UpdateStudentBody = {
 };
 
 /** Valid StudentStatus values, for payload validation. */
-const STUDENT_STATUSES = ["ACTIVE", "INACTIVE", "GRADUATED", "SUSPENDED", "WITHDRAWN"] as const;
+const STUDENT_STATUSES = ["ACTIVE", "INACTIVE", "GRADUATED", "SUSPENDED", "WITHDRAWN", "DROPPED"] as const;
 
 export async function POST(request: Request) {
   if (!(await requireAdmin())) {
@@ -88,7 +145,10 @@ export async function POST(request: Request) {
   const lastName = typeof body.lastName === "string" ? body.lastName.trim() : "";
   const enrollmentNumber = typeof body.enrollmentNumber === "string" ? body.enrollmentNumber.trim() : "";
   const registrationId = typeof body.registrationId === "string" ? body.registrationId.trim() : "";
-  const rollNumber = typeof body.rollNumber === "string" ? body.rollNumber.trim() : undefined;
+  // Rolls are integers in the DB, but the form keeps them as text so typing
+  // doesn't fight the input — parse here and let the caller reject non-numbers.
+  const rollRaw = typeof body.rollNumber === "string" ? body.rollNumber.trim() : "";
+  const rollNumber = rollRaw === "" ? null : /^\d+$/.test(rollRaw) ? Number(rollRaw) : NaN;
   const profileImageUrl = typeof body.profileImageUrl === "string" ? body.profileImageUrl.trim() : undefined;
   const admissionDate = typeof body.admissionDate === "string" ? new Date(body.admissionDate) : null;
   const programId = typeof body.programId === "string" ? body.programId : undefined;
@@ -112,6 +172,10 @@ export async function POST(request: Request) {
 
   if (Number.isNaN(admissionDate.getTime())) {
     return NextResponse.json({ error: "Admission date is invalid" }, { status: 400 });
+  }
+
+  if (Number.isNaN(rollNumber)) {
+    return NextResponse.json({ error: "Roll number must be a whole number" }, { status: 400 });
   }
 
   if (password.length < 8) {
@@ -178,7 +242,8 @@ export async function PUT(request: Request) {
   const lastName = typeof body.lastName === "string" ? body.lastName.trim() : "";
   const enrollmentNumber = typeof body.enrollmentNumber === "string" ? body.enrollmentNumber.trim() : "";
   const registrationId = typeof body.registrationId === "string" ? body.registrationId.trim() : "";
-  const rollNumber = typeof body.rollNumber === "string" ? (body.rollNumber.trim() || null) : null;
+  const rollRaw = typeof body.rollNumber === "string" ? body.rollNumber.trim() : "";
+  const rollNumber = rollRaw === "" ? null : /^\d+$/.test(rollRaw) ? Number(rollRaw) : NaN;
   const profileImageUrl = typeof body.profileImageUrl === "string" ? (body.profileImageUrl.trim() || null) : null;
   const admissionDate = typeof body.admissionDate === "string" ? new Date(body.admissionDate) : null;
   const programId = typeof body.programId === "string" && body.programId ? body.programId : null;
@@ -212,6 +277,10 @@ export async function PUT(request: Request) {
 
   if (Number.isNaN(admissionDate.getTime())) {
     return NextResponse.json({ error: "Admission date is invalid" }, { status: 400 });
+  }
+
+  if (Number.isNaN(rollNumber)) {
+    return NextResponse.json({ error: "Roll number must be a whole number" }, { status: 400 });
   }
 
   if (password && password.length < 8) {
@@ -378,21 +447,29 @@ export async function GET(request: Request) {
   }
   const f = parsed.data;
 
+  // rollNumber is an INTEGER now, so substring matching is impossible: match an
+  // exact value when the query is numeric and skip that arm otherwise. Names,
+  // enrollment numbers and registration IDs still match by substring.
+  const searchArms: Prisma.StudentWhereInput[] = [
+    { user: { firstName: { contains: f.q, mode: "insensitive" } } },
+    { user: { lastName: { contains: f.q, mode: "insensitive" } } },
+    { user: { email: { contains: f.q, mode: "insensitive" } } },
+    { enrollmentNumber: { contains: f.q, mode: "insensitive" } },
+    { registrationId: { contains: f.q, mode: "insensitive" } },
+    ...(f.q && /^\d+$/.test(f.q) ? [{ rollNumber: { equals: Number(f.q) } }] : []),
+  ];
+
   const where: Prisma.StudentWhereInput = {
     ...(f.programId ? { programId: f.programId } : {}),
     ...(f.semester ? { currentSemester: f.semester } : {}),
     ...(f.status ? { user: { status: f.status } } : {}),
-    ...(f.q
-      ? {
-          OR: [
-            { user: { firstName: { contains: f.q, mode: "insensitive" } } },
-            { user: { lastName: { contains: f.q, mode: "insensitive" } } },
-            { user: { email: { contains: f.q, mode: "insensitive" } } },
-            { enrollmentNumber: { contains: f.q, mode: "insensitive" } },
-            { registrationId: { contains: f.q, mode: "insensitive" } },
-            { rollNumber: { contains: f.q, mode: "insensitive" } },
-          ],
-        }
+    ...(f.q ? { OR: searchArms } : {}),
+    // Graduated/dropped students sit outside semesters: a lifecycle filter
+    // selects exactly that state; otherwise they are hidden unless the admin
+    // explicitly includes terminal states.
+    ...(f.lifecycle ? { status: f.lifecycle } : {}),
+    ...(!f.lifecycle && !f.includeTerminal
+      ? { status: { in: ["ACTIVE", "INACTIVE"] as const }, currentSemester: { not: null } }
       : {}),
   };
 
@@ -400,7 +477,9 @@ export async function GET(request: Request) {
     const [students, total] = await Promise.all([
       prisma.student.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        // "recent"/desc is what the directory did before sorting existed, so
+        // callers that send no sort params keep seeing the same order.
+        orderBy: buildStudentOrderBy(f.sortBy ?? "recent", f.sortDir ?? "desc"),
         skip,
         take: limit,
         select: STUDENT_SELECT,
@@ -411,6 +490,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ students: items, pagination });
   } catch (error) {
     console.error("GET /api/students error:", error);
-    return NextResponse.json({ error: "Unable to load students" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Unable to load students" },
+      { status: 500 },
+    );
   }
 }

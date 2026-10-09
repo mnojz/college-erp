@@ -192,7 +192,7 @@ function collectFieldValues(
     values.currentSemester = s.currentSemester ? `Semester ${s.currentSemester}` : null;
     values.enrollmentNumber = s.enrollmentNumber;
     values.registrationId = s.registrationId;
-    values.rollNumber = s.rollNumber;
+    values.rollNumber = s.rollNumber != null ? String(s.rollNumber) : null;
     values.admissionDate = s.admissionDate ? formatProfileDate(s.admissionDate) : null;
     values.status = s.status
       ? formatEnumLabel(s.status)

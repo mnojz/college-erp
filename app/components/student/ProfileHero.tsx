@@ -11,7 +11,7 @@ type ProfileHeroProps = {
   program: string;
   department: string;
   admissionNo: string;
-  rollNumber: string | null;
+  rollNumber: number | null;
   profileImageUrl: string | null;
   onEdit?: () => void;
 };

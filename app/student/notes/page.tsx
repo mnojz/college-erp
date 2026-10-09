@@ -33,7 +33,7 @@ import {
 type Profile = {
   enrollmentNumber: string;
   registrationId: string;
-  rollNumber: string | null;
+  rollNumber: number | null;
   profileImageUrl: string | null;
   currentSemester: number | null;
   user: { email: string; firstName: string; lastName: string };
@@ -264,7 +264,8 @@ export default function StudentNotesPage() {
   }
 
   const fullName = `${profile.user.firstName} ${profile.user.lastName}`;
-  const studentId = profile.rollNumber || profile.enrollmentNumber;
+  // Roll numbers are integers now; StudentShell takes a display string.
+  const studentId = profile.rollNumber != null ? String(profile.rollNumber) : profile.enrollmentNumber;
 
   const myProgramFilteredPrograms = meta.programs;
   const subjectOptions = filters.programId

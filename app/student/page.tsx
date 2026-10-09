@@ -44,7 +44,7 @@ import {
 type Profile = {
   enrollmentNumber: string;
   registrationId: string;
-  rollNumber: string | null;
+  rollNumber: number | null;
   profileImageUrl: string | null;
   admissionDate: string;
   // Personal information — managed by admins, read-only for the student.
@@ -336,7 +336,7 @@ export default function StudentPage() {
     <StudentShell
       active="/dashboard"
       name={fullName}
-      studentId={profile.rollNumber || profile.enrollmentNumber}
+      studentId={profile.rollNumber != null ? String(profile.rollNumber) : profile.enrollmentNumber}
       avatarUrl={profile.profileImageUrl}
     >
       <ProfileHero
@@ -395,7 +395,7 @@ export default function StudentPage() {
             ["Batch / Year", batch],
             ["Enrollment No.", profile.enrollmentNumber],
             ["Registration ID", profile.registrationId],
-            ["Roll Number", profile.rollNumber || "Not assigned"],
+            ["Roll Number", profile.rollNumber != null ? String(profile.rollNumber) : "Not assigned"],
             ["Current CGPA", "Not provided"],
           ]}
         />

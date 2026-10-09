@@ -24,7 +24,7 @@ import { CAMPUS_TIME_ZONE, campusNow, campusTodayISO } from "@/app/lib/campus-ti
 type Student = {
   id: string;
   enrollmentNumber: string;
-  rollNumber: string | null;
+  rollNumber: number | null;
   profileImageUrl: string | null;
   /** `user.status` — INACTIVE means an admin deactivated this account. */
   user: { firstName: string; lastName: string; status: string };
@@ -497,7 +497,7 @@ export default function TeacherAttendancePage() {
         s.user.firstName.toLowerCase().includes(q) ||
         s.user.lastName.toLowerCase().includes(q) ||
         s.enrollmentNumber.toLowerCase().includes(q) ||
-        (s.rollNumber && s.rollNumber.toLowerCase().includes(q)),
+        (s.rollNumber != null && String(s.rollNumber).includes(q)),
     );
   }, [selectedClass, searchQuery]);
 
