@@ -4,7 +4,8 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { AdminShell } from "@/app/components/admin/AdminShell";
-import { AttendancePolicyCard } from "@/app/components/admin/AttendancePolicyCard";
+import { ProgressionCard } from "@/app/components/admin/ProgressionCard";
+import { BulkIntakeCard } from "@/app/components/admin/BulkIntakeCard";
 import { AdminModal } from "@/app/components/admin/AdminModal";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -417,7 +418,9 @@ export default function AdminSetupPage() {
         </table>
       </div>
 
-      <AttendancePolicyCard />
+      <ProgressionCard />
+
+      <BulkIntakeCard />
 
       {/* Modal 1: Set Department (one-time) */}
       {showSetDept && (

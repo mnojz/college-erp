@@ -9,11 +9,13 @@ import {
   IconCalendarClock,
   IconUsersGroup,
   IconBell,
+  IconSettings,
 } from "@tabler/icons-react";
 
 const adminLinks = [
   ["Overview", "/dashboard", IconDashboard],
   ["Department", "/admin/setup", IconSchool],
+  ["Settings", "/admin/settings", IconSettings],
   ["Curriculum", "/admin/curriculum", IconBooks],
   ["Syllabus", "/admin/syllabus", IconFileDescription],
   ["Class Scheduling", "/admin/teaching", IconCalendarClock],
