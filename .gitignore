@@ -10,3 +10,10 @@ tsconfig.tsbuildinfo
 
 # One-off DB migration backups (local rollback artifacts, may contain records)
 prisma/_backup-*.json
+
+# MediaPipe face-verification models (large binaries; fetch with `npm run setup:models`)
+public/models/*
+!public/models/README.md
+
+# Personal scratch notes
+i'll_do_it_later.md
