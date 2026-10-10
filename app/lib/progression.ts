@@ -129,19 +129,108 @@ export type CohortPreview = {
 
 /**
  * Resolve the current academic year. Semester history rows must attach to a
- * year — the alternative (null academicYearId) would break the unique
- * constraint and the history view.
+ * year.
+ *
+ * @deprecated Academic years are fully automatic now — this is a thin
+ * wrapper over {@link ensureCurrentAcademicYear} kept so callers compile.
  */
 export async function requireCurrentAcademicYear(
   db: Tx,
+): Promise<{ id: string; name: string }> {
+  return ensureCurrentAcademicYear(db, new Date(), 1);
+}
+
+/**
+ * Bikram Sambat year for a date, using the Baishakh-1 ≈ April-13 cutoff.
+ * No date library needed: BS_year = AD_year + 57 once the new BS year has
+ * begun (mid-April onward), else AD_year + 56.
+ */
+export function getBsYear(adDate: Date): number {
+  const m = adDate.getMonth(); // 0-based
+  const d = adDate.getDate();
+  const y = adDate.getFullYear();
+  // Baishakh 1 falls on Apr 13 (leap years: Apr 14 in some years — the 13th
+  // cutoff is close enough for a history-bucket label).
+  const newYearBegun = m > 3 || (m === 3 && d >= 13);
+  return y + (newYearBegun ? 57 : 56);
+}
+
+/** Session label for a date, e.g. an Aug-2025 admission → "2082/2083". */
+export function getAcademicYearName(adDate: Date): string {
+  const bs = getBsYear(adDate);
+  return `${bs}/${bs + 1}`;
+}
+
+/**
+ * Fully-automatic academic-year resolution — the single choke point behind
+ * bulk intake, cohort advance, and single-student advance.
+ *
+ * - No current year at all → create the session for `refDate` and return it.
+ * - `intakeSemester === 1` and the current year already has sem-2 rows (any
+ *   ACTIVE student with currentSemester >= 2): the old cycle reached its
+ *   second half, so this sem-1 intake opens a NEW session — close the old
+ *   year (isCurrent=false, status=CLOSED) and create the next.
+ * - Otherwise → return the current year unchanged.
+ *
+ * Must be called inside the caller's transaction (pass `tx`): the unique
+ * `name` column is the backstop against concurrent double-creation.
+ */
+export async function ensureCurrentAcademicYear(
+  db: Tx,
+  refDate: Date,
+  intakeSemester?: number,
 ): Promise<{ id: string; name: string }> {
   const current = await db.academicYear.findFirst({
     where: { isCurrent: true, status: "ACTIVE" },
     select: { id: true, name: true },
   });
+
   if (!current) {
-    throw new Error("NO_CURRENT_YEAR:No current academic year is set");
+    const name = getAcademicYearName(refDate);
+    const created = await db.academicYear.upsert({
+      where: { name },
+      update: { isCurrent: true, status: "ACTIVE" },
+      create: {
+        name,
+        startDate: refDate,
+        endDate: new Date(refDate.getTime() + 365 * 24 * 60 * 60 * 1000),
+        isCurrent: true,
+        status: "ACTIVE",
+      },
+      select: { id: true, name: true },
+    });
+    return created;
   }
+
+  if (intakeSemester === 1) {
+    const reachedSecondHalf = await db.student.findFirst({
+      where: { status: "ACTIVE", currentSemester: { gte: 2 } },
+      select: { id: true },
+    });
+    if (reachedSecondHalf) {
+      const name = getAcademicYearName(refDate);
+      if (name !== current.name) {
+        await db.academicYear.update({
+          where: { id: current.id },
+          data: { isCurrent: false, status: "CLOSED" },
+        });
+        const created = await db.academicYear.upsert({
+          where: { name },
+          update: { isCurrent: true, status: "ACTIVE" },
+          create: {
+            name,
+            startDate: refDate,
+            endDate: new Date(refDate.getTime() + 365 * 24 * 60 * 60 * 1000),
+            isCurrent: true,
+            status: "ACTIVE",
+          },
+          select: { id: true, name: true },
+        });
+        return created;
+      }
+    }
+  }
+
   return current;
 }
 
@@ -363,7 +452,9 @@ export async function validateBulkIntake(
     }),
     rollValues.length > 0
       ? db.student.findMany({
-          where: { rollNumber: { in: rollValues } },
+          // Roll numbers are unique per class (program + semester), not
+          // globally: only clash against students in THIS intake's class.
+          where: { rollNumber: { in: rollValues }, programId, currentSemester: semester },
           select: { rollNumber: true },
         })
       : Promise.resolve([] as Array<{ rollNumber: number | null }>),
@@ -371,7 +462,7 @@ export async function validateBulkIntake(
   for (const c of enrollClash) problems.push(`Enrollment "${c.enrollmentNumber}" already exists`);
   for (const c of regClash) problems.push(`Registration "${c.registrationId}" already exists`);
   for (const c of emailClash) problems.push(`Email "${c.email}" already exists`);
-  for (const c of rollClash) problems.push(`Roll number ${c.rollNumber} already exists`);
+  for (const c of rollClash) problems.push(`Roll number ${c.rollNumber} is already used in this class`);
 
   if (problems.length > 0) return { ok: false, problems };
   return { ok: true, rows };

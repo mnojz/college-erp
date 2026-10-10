@@ -55,6 +55,29 @@ const SUBJECT_COLORS = [
   "lavender", "pink", "sapphire", "maroon", "sky", "flamingo", "rosewater",
 ] as const;
 
+/**
+ * Attendance is advisory, not a pass/fail gate — there is no eligibility
+ * threshold. The percentage is colour-banded only: red below 50%, yellow from
+ * 50–70%, green above 70%.
+ */
+function attendanceBand(pct: number): "red" | "yellow" | "green" {
+  if (pct < 50) return "red";
+  if (pct <= 70) return "yellow";
+  return "green";
+}
+
+const BAND_COLOR = {
+  red: "var(--ctp-red)",
+  yellow: "var(--ctp-yellow)",
+  green: "var(--ctp-green)",
+} as const;
+
+const BAND_MESSAGE = {
+  red: "Attendance is low — attend more classes",
+  yellow: "Attendance is getting low",
+  green: "Attendance is healthy",
+} as const;
+
 export default function StudentAttendancePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -62,8 +85,6 @@ export default function StudentAttendancePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("ALL");
-  /** Exam-eligibility threshold, configured per academic year by an admin. */
-  const [minAttendancePercent, setMinAttendancePercent] = useState(75);
 
   useEffect(() => {
     async function loadData() {
@@ -82,7 +103,6 @@ export default function StudentAttendancePage() {
         const attData = await attRes.json();
 
         setProfile(profileData.student);
-        setMinAttendancePercent(profileData.attendancePolicy?.minAttendancePercent ?? 75);
         setRecords(attData.student?.attendanceRecords ?? []);
       } catch {
         setError("Unable to load attendance records");
@@ -185,7 +205,7 @@ export default function StudentAttendancePage() {
     ).values(),
   );
 
-  const eligible = Number(overallPercentage) >= minAttendancePercent;
+  const overallBand = attendanceBand(Number(overallPercentage));
 
   return (
     <StudentShell
@@ -201,14 +221,10 @@ export default function StudentAttendancePage() {
           <Card>
             <CardContent className="p-5">
               <p className="text-xs font-medium text-muted-foreground">Overall Attendance</p>
-              <p className={cn("mt-1 text-3xl font-bold", eligible ? "text-[var(--ctp-green)]" : "text-destructive")}>
+              <p className="mt-1 text-3xl font-bold" style={{ color: BAND_COLOR[overallBand] }}>
                 {overallPercentage}%
               </p>
-              <small className="text-xs text-muted-foreground">
-                {eligible
-                  ? "Eligible for examinations"
-                  : `Below ${minAttendancePercent}% threshold`}
-              </small>
+              <small className="text-xs text-muted-foreground">{BAND_MESSAGE[overallBand]}</small>
             </CardContent>
           </Card>
           <Card>
@@ -221,7 +237,7 @@ export default function StudentAttendancePage() {
           <Card>
             <CardContent className="p-5">
               <p className="text-xs font-medium text-muted-foreground">Present</p>
-              <p className="mt-1 text-3xl font-bold text-emerald-600 dark:text-emerald-400">{presentSessions}</p>
+              <p className="mt-1 text-3xl font-bold text-[var(--ctp-green)]">{presentSessions}</p>
               <small className="text-xs text-muted-foreground">Attended classes</small>
             </CardContent>
           </Card>
@@ -243,7 +259,7 @@ export default function StudentAttendancePage() {
             <CardContent className="flex flex-col gap-3.5">
               {subjectStats.map((sub) => {
                 const pct = sub.total > 0 ? (sub.present / sub.total) * 100 : 0;
-                const isSafe = pct >= minAttendancePercent;
+                const band = attendanceBand(pct);
                 return (
                   <div key={sub.code}>
                     <div className="mb-1.5 flex items-center justify-between gap-2">
@@ -252,7 +268,7 @@ export default function StudentAttendancePage() {
                         <span className="text-muted-foreground">— {sub.name}</span>
                       </span>
                       <span className="shrink-0 text-sm">
-                        <strong className={isSafe ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}>
+                        <strong style={{ color: BAND_COLOR[band] }}>
                           {pct.toFixed(1)}%
                         </strong>{" "}
                         <span className="text-xs text-muted-foreground">
@@ -262,8 +278,8 @@ export default function StudentAttendancePage() {
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                       <div
-                        className={cn("h-full rounded-full transition-all", isSafe ? "bg-emerald-500" : "bg-destructive")}
-                        style={{ width: `${pct}%` }}
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${pct}%`, background: BAND_COLOR[band] }}
                       />
                     </div>
                   </div>

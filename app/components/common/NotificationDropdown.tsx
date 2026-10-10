@@ -10,6 +10,7 @@ import {
   IconReport,
   IconAlertCircle,
   IconUser,
+  IconUserCheck,
 } from "@tabler/icons-react";
 import { Bell, Check, Clock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ const iconMap: Record<string, ReactElement> = {
   assessment: <IconClipboardCheck size={18} className="shrink-0" />,
   result: <IconReport size={18} className="shrink-0" />,
   teacher_assignment: <IconUser size={18} className="shrink-0" />,
+  profile_review: <IconUserCheck size={18} className="shrink-0" />,
 };
 
 const timeAgo = (iso: string) => {

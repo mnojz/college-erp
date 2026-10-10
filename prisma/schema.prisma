@@ -7,6 +7,504 @@ datasource db {
   provider = "postgresql"
 }
 
+/// Verification state of a user's submitted profile changes.
+/// APPROVED is the default so existing users are unaffected. A user who edits a
+/// self-service field (address, guardian, phone…) or uploads a new profile
+/// picture stages it as PENDING_REVIEW; an admin then approves (the changes go
+/// live) or rejects (they are discarded and the previous values are kept).
+enum ProfileReviewStatus {
+  APPROVED
+  PENDING_REVIEW
+  REJECTED
+}
+
+model User {
+  id                    String           @id @default(cuid())
+  email                 String           @unique
+  passwordHash          String
+  firstName             String
+  lastName              String
+  role                  Role
+  status                UserStatus       @default(ACTIVE)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  /// Base64 data-URL of the profile picture awaiting admin review (mirrors the
+  /// app's existing profileImageUrl storage convention). Cleared on
+  /// approve/reject.
+  pendingAvatarUrl      String?
+  /// Self-service profile fields (address, guardian, phone…) awaiting admin
+  /// review, stored as a partial { Student column: value } map containing only
+  /// the CHANGED fields. Applied to the Student row on approve, discarded on
+  /// reject.
+  pendingProfileData    Json?
+  profileReviewStatus   ProfileReviewStatus @default(APPROVED)
+  authoredAnnouncements Announcement[]
+  bookmarks             Bookmark[]
+  notifications         Notification[]
+  privacySettings       ProfilePrivacy[]
+  student               Student?
+  uploadedMaterials     StudyMaterial[]
+  teacher               Teacher?
+
+  @@index([profileReviewStatus])
+}
+
+model Department {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  code      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  programs  Program[]
+}
+
+model Program {
+  id             String          @id @default(cuid())
+  name           String
+  code           String          @unique
+  durationYears  Int             @default(4)
+  departmentName String
+  departmentId   String?
+  archivedAt     DateTime?
+  archivedBy     String?
+  announcements  Announcement[]
+  assessments    Assessment[]
+  breaks         Break[]
+  classes        Class[]
+  curriculum     Curriculum?
+  department     Department?     @relation(fields: [departmentId], references: [id])
+  students       Student[]
+  studyMaterials StudyMaterial[]
+  subjects       Subject[]
+  syllabi        Syllabus[]
+}
+
+model Student {
+  id                 String             @id @default(cuid())
+  userId             String             @unique
+  enrollmentNumber   String             @unique
+  registrationId     String             @unique
+  rollNumber         Int?
+  profileImageUrl    String?
+  programId          String?
+  admissionDate      DateTime
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  currentSemester    Int?               @default(1)
+  bloodGroup         String?
+  category           String?
+  emergencyContact   String?
+  gender             String?
+  guardianEmail      String?
+  guardianPhone      String?
+  guardianRelation   String?
+  nationality        String?
+  phone              String?
+  religion           String?
+  status             StudentStatus      @default(ACTIVE)
+  currDistrictId     Int?
+  currDistrictName   String?
+  currLocalLevelId   Int?
+  currLocalLevelName String?
+  currLocalLevelType String?
+  currProvinceId     Int?
+  currProvinceName   String?
+  currSameAsPerm     Boolean            @default(true)
+  currTole           String?
+  currWard           Int?
+  permDistrictId     Int?
+  permDistrictName   String?
+  permLocalLevelId   Int?
+  permLocalLevelName String?
+  permLocalLevelType String?
+  permProvinceId     Int?
+  permProvinceName   String?
+  permTole           String?
+  permWard           Int?
+  guardianName       String?
+  attendanceRecords  AttendanceRecord[]
+  results            Result[]
+  program            Program?           @relation(fields: [programId], references: [id])
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studentSemesters   StudentSemester[]
+
+  // Roll numbers are per CLASS (program + semester): the same roll may exist
+  // in other classes. enrollmentNumber/registrationId stay globally unique.
+  @@unique([programId, currentSemester, rollNumber])
+  @@index([programId])
+  @@index([currentSemester])
+}
+
+model Teacher {
+  id              String           @id @default(cuid())
+  userId          String           @unique
+  employeeNo      String           @unique
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  profileImageUrl String?
+  bio             String?
+  office          String?
+  phone           String?
+  qualification   String?
+  announcements   Announcement[]
+  classes         Class[]
+  subjectTeachers SubjectTeacher[]
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Subject {
+  id              String           @id @default(cuid())
+  name            String
+  code            String           @unique
+  programId       String
+  semester        Int              @default(1)
+  credits         Int              @default(3)
+  announcements   Announcement[]
+  assessments     Assessment[]
+  classes         Class[]
+  studyMaterials  StudyMaterial[]
+  program         Program          @relation(fields: [programId], references: [id], onDelete: Cascade)
+  subjectTeachers SubjectTeacher[]
+
+  @@unique([programId, semester, code])
+  @@index([programId, semester])
+}
+
+/// *
+/// * Many-to-many assignment of teachers to subjects. This is the source of
+/// * truth for "who teaches what": class schedule slots derive their teacher
+/// * from these rows automatically instead of picking one from the full faculty
+/// * list. A subject may list several teachers (e.g. parallel practical groups).
+model SubjectTeacher {
+  id        String   @id @default(cuid())
+  subjectId String
+  teacherId String
+  createdAt DateTime @default(now())
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher   Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@unique([subjectId, teacherId])
+  @@index([teacherId])
+}
+
+/// *
+/// * In-app notification for a single recipient (user). Created by system
+/// * events: campus announcements, teacher class notices, material uploads,
+/// * assessments, published results, timetable changes, subject assignments.
+/// * `link` is the dashboard path the recipient is taken to on click.
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  body      String
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+}
+
+model Class {
+  id        String               @id @default(cuid())
+  subjectId String
+  teacherId String?
+  programId String
+  dayOfWeek DayOfWeek
+  startTime DateTime             @db.Time(6)
+  endTime   DateTime             @db.Time(6)
+  semester  Int                  @default(1)
+  group     String?
+  type      String               @default("Lecture")
+  sessions  AttendanceSession[]
+  program   Program              @relation(fields: [programId], references: [id])
+  subject   Subject              @relation(fields: [subjectId], references: [id])
+  teacher   Teacher?             @relation(fields: [teacherId], references: [id])
+  materials StudyMaterialClass[]
+
+  @@unique([subjectId, teacherId, programId, semester, dayOfWeek, startTime, endTime])
+  @@index([teacherId, semester, dayOfWeek])
+}
+
+model Break {
+  id        String   @id @default(cuid())
+  programId String
+  semester  Int      @default(1)
+  startTime DateTime @db.Time(6)
+  endTime   DateTime @db.Time(6)
+  program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@unique([programId, semester])
+  @@index([programId])
+}
+
+model AttendanceSession {
+  id          String             @id @default(cuid())
+  classId     String
+  sessionDate DateTime           @db.Date
+  createdAt   DateTime           @default(now())
+  records     AttendanceRecord[]
+  class       Class              @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([classId, sessionDate])
+}
+
+model AttendanceRecord {
+  id        String            @id @default(cuid())
+  sessionId String
+  studentId String
+  status    AttendanceStatus
+  note      String?
+  session   AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  student   Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, studentId])
+  @@index([studentId, status])
+}
+
+model Assessment {
+  id             String    @id @default(cuid())
+  subjectId      String
+  programId      String
+  name           String
+  maxMarks       Decimal   @db.Decimal(6, 2)
+  assessmentDate DateTime?
+  semester       Int       @default(1)
+  publishedAt    DateTime?
+  publishedBy    String?
+  program        Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  subject        Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  results        Result[]
+
+  @@unique([subjectId, semester, name])
+  @@index([programId, semester])
+}
+
+model Result {
+  id           String     @id @default(cuid())
+  assessmentId String
+  studentId    String
+  marks        Decimal    @db.Decimal(6, 2)
+  grade        String?
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  student      Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, studentId])
+  @@index([studentId])
+}
+
+model Announcement {
+  id                 String    @id @default(cuid())
+  title              String
+  body               String
+  publishedAt        DateTime?
+  authorId           String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  attachmentData     Bytes?
+  attachmentFileName String?
+  attachmentMimeType String?
+  attachmentSize     Int?
+  programId          String?
+  semester           Int?
+  subjectId          String?
+  teacherId          String?
+  author             User?     @relation(fields: [authorId], references: [id])
+  program            Program?  @relation(fields: [programId], references: [id])
+  subject            Subject?  @relation(fields: [subjectId], references: [id])
+  teacher            Teacher?  @relation(fields: [teacherId], references: [id])
+
+  @@index([publishedAt])
+  @@index([teacherId])
+  @@index([programId, semester])
+}
+
+model Curriculum {
+  id        String               @id @default(cuid())
+  programId String               @unique
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  program   Program              @relation(fields: [programId], references: [id], onDelete: Cascade)
+  electives CurriculumElective[]
+  years     CurriculumYear[]
+}
+
+model CurriculumYear {
+  id           String               @id @default(cuid())
+  curriculumId String
+  yearNo       Int
+  label        String
+  semesters    CurriculumSemester[]
+  curriculum   Curriculum           @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
+
+  @@unique([curriculumId, yearNo])
+}
+
+model CurriculumSemester {
+  id         String             @id @default(cuid())
+  yearId     String
+  semesterNo Int
+  label      String
+  courses    CurriculumCourse[]
+  year       CurriculumYear     @relation(fields: [yearId], references: [id], onDelete: Cascade)
+
+  @@unique([yearId, semesterNo])
+}
+
+model CurriculumCourse {
+  id         String             @id @default(cuid())
+  semesterId String
+  code       String?
+  name       String
+  credits    Int                @default(3)
+  sortOrder  Int                @default(0)
+  semester   CurriculumSemester @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+
+  @@index([semesterId])
+}
+
+model CurriculumElective {
+  id           String     @id @default(cuid())
+  curriculumId String
+  group        String
+  code         String?
+  name         String
+  credits      Int        @default(3)
+  sortOrder    Int        @default(0)
+  curriculum   Curriculum @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
+
+  @@index([curriculumId, group])
+}
+
+model StudyMaterial {
+  id             String               @id @default(cuid())
+  title          String
+  description    String?
+  topic          String?
+  materialType   MaterialType         @default(LECTURE_NOTES)
+  visibility     MaterialVisibility   @default(EVERYONE)
+  departmentName String?
+  programId      String?
+  semester       Int?
+  subjectId      String?
+  fileName       String
+  mimeType       String?
+  fileSize       Int
+  fileData       Bytes
+  uploaderId     String
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  bookmarks      Bookmark[]
+  program        Program?             @relation(fields: [programId], references: [id])
+  subject        Subject?             @relation(fields: [subjectId], references: [id])
+  uploader       User                 @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  classLinks     StudyMaterialClass[]
+
+  @@index([materialType])
+  @@index([visibility])
+  @@index([programId, semester])
+  @@index([subjectId])
+  @@index([uploaderId])
+  @@index([createdAt])
+}
+
+model StudyMaterialClass {
+  id         String        @id @default(cuid())
+  materialId String
+  classId    String
+  class      Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
+  material   StudyMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@unique([materialId, classId])
+  @@index([classId])
+}
+
+model Bookmark {
+  id              String        @id @default(cuid())
+  userId          String
+  studyMaterialId String
+  createdAt       DateTime      @default(now())
+  studyMaterial   StudyMaterial @relation(fields: [studyMaterialId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, studyMaterialId])
+  @@index([studyMaterialId])
+}
+
+model Syllabus {
+  id             String   @id @default(cuid())
+  title          String?
+  departmentName String
+  programId      String?
+  semester       Int
+  fileName       String
+  mimeType       String?
+  fileSize       Int
+  fileData       Bytes
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  program        Program? @relation(fields: [programId], references: [id])
+
+  @@index([departmentName])
+  @@index([programId, semester])
+  @@index([semester])
+  @@index([createdAt])
+}
+
+model ProfilePrivacy {
+  id         String          @id @default(cuid())
+  userId     String
+  fieldKey   String
+  visibility FieldVisibility
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, fieldKey])
+  @@index([userId])
+}
+
+model AcademicYear {
+  id        String             @id @default(cuid())
+  name      String             @unique
+  startDate DateTime
+  endDate   DateTime
+  isCurrent Boolean            @default(false)
+  status    AcademicYearStatus @default(ACTIVE)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  semesters StudentSemester[]
+
+  @@index([isCurrent])
+  @@index([status])
+}
+
+/// *
+/// * Records a student's enrollment in a particular (academic year, semester).
+/// * This is the source of truth for a student's academic history: advancing to a
+/// * new semester creates a new row (the previous ACTIVE one becomes COMPLETED)
+/// * instead of overwriting a single integer — historical enrollment is therefore
+/// * always preserved.
+model StudentSemester {
+  id             String                @id @default(cuid())
+  studentId      String
+  academicYearId String
+  semesterNo     Int
+  startDate      DateTime?
+  endDate        DateTime?
+  status         StudentSemesterStatus @default(ACTIVE)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  academicYear   AcademicYear          @relation(fields: [academicYearId], references: [id])
+  student        Student               @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, academicYearId, semesterNo])
+  @@index([studentId, status])
+  @@index([academicYearId])
+}
+
 enum Role {
   ADMIN
   TEACHER
@@ -18,24 +516,23 @@ enum UserStatus {
   INACTIVE
 }
 
-/** Overall lifecycle state of a student's account/enrollment. */
+/// * Overall lifecycle state of a student's account/enrollment.
 enum StudentStatus {
   ACTIVE
   INACTIVE
   GRADUATED
   SUSPENDED
-  WITHDRAWN
   DROPPED
 }
 
-/** A student's status within a single academic session/semester. */
+/// * A student's status within a single academic session/semester.
 enum StudentSemesterStatus {
   ACTIVE
   COMPLETED
   DROPPED
 }
 
-/** Open/closed state of an academic year. */
+/// * Open/closed state of an academic year.
 enum AcademicYearStatus {
   ACTIVE
   CLOSED
@@ -73,535 +570,7 @@ enum MaterialVisibility {
   CLASSES
 }
 
-// Visibility a user can assign to their own profile fields. "RESTRICTED"
-// fields are NOT stored with this enum — they are institution-controlled and
-// can never be made public by the owner (see ProfilePrivacy + field registry).
 enum FieldVisibility {
   PUBLIC
   PRIVATE
-}
-
-model User {
-  id                    String          @id @default(cuid())
-  email                 String          @unique
-  passwordHash          String
-  firstName             String
-  lastName              String
-  role                  Role
-  status                UserStatus      @default(ACTIVE)
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
-  student               Student?
-  teacher               Teacher?
-  authoredAnnouncements Announcement[]
-  uploadedMaterials     StudyMaterial[]
-  bookmarks             Bookmark[]
-  notifications         Notification[]
-  privacySettings       ProfilePrivacy[]
-}
-
-model Department {
-  id        String    @id @default(cuid())
-  name      String    @unique
-  code      String    @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  programs  Program[]
-}
-
-model Program {
-  id             String          @id @default(cuid())
-  name           String
-  code           String          @unique
-  durationYears  Int             @default(4)
-  departmentName String
-  departmentId   String?
-  department     Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  // Archive instead of delete: an archived program keeps all of its subjects,
-  // classes, assessments and results intact, but stops appearing anywhere it
-  // would be selected for teaching.
-  archivedAt     DateTime?
-  archivedBy     String?
-  students       Student[]
-  subjects       Subject[]
-  classes        Class[]
-  breaks         Break[]
-  assessments    Assessment[]
-  curriculum     Curriculum?
-  studyMaterials StudyMaterial[]
-  syllabi        Syllabus[]
-  announcements  Announcement[]
-}
-
-model Student {
-  id                      String   @id @default(cuid())
-  userId                  String   @unique
-  enrollmentNumber        String   @unique
-  registrationId          String   @unique
-  rollNumber              Int?     @unique
-  profileImageUrl         String?
-  programId               String?
-  currentSemester         Int?     @default(1)
-    admissionDate           DateTime
-  // Overall enrollment lifecycle state (replaces the old free-text ENROLLED flag).
-  status                  StudentStatus @default(ACTIVE)
-
-  // Personal information — critical, set by admin only (student cannot edit).
-  gender      String?
-  bloodGroup  String?
-  nationality String?
-  religion    String?
-  category    String?
-
-  // Contact details — set/edited by the student themselves.
-  phone            String?
-  emergencyContact String?
-
-  // Structured permanent address (Nepal): cascading geo selectors + free-text tole.
-  permProvinceId     Int?
-  permProvinceName   String?
-  permDistrictId     Int?
-  permDistrictName   String?
-  permLocalLevelId   Int?
-  permLocalLevelName String?
-  permLocalLevelType String?
-  permWard           Int?
-  permTole           String?
-
-  // Current address — either same as permanent (toggle) or independently specified.
-  currSameAsPerm     Boolean  @default(true)
-  currProvinceId     Int?
-  currProvinceName   String?
-  currDistrictId     Int?
-  currDistrictName   String?
-  currLocalLevelId   Int?
-  currLocalLevelName String?
-  currLocalLevelType String?
-  currWard           Int?
-  currTole           String?
-
-  // Guardian / parent details — set/edited by the student.
-  guardianName     String?
-  guardianPhone    String?
-  guardianEmail    String?
-  guardianRelation String?
-
-  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  program           Program?           @relation(fields: [programId], references: [id], onDelete: SetNull)
-    attendanceRecords AttendanceRecord[]
-  results           Result[]
-  studentSemesters  StudentSemester[]
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-
-  @@index([programId])
-  @@index([currentSemester])
-}
-
-model Teacher {
-  id              String           @id @default(cuid())
-  userId          String           @unique
-  employeeNo      String           @unique
-  profileImageUrl String?
-
-  // Contact / professional details — edited by the teacher, visibility
-  // governed by the profile privacy system (app/lib/profile-shared.ts).
-  phone           String?
-  office          String?
-  qualification   String?
-  bio             String?
-
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  classes         Class[]
-  announcements   Announcement[]
-  subjectTeachers SubjectTeacher[]
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-}
-
-model Subject {
-  id              String           @id @default(cuid())
-  name            String
-  code            String           @unique
-  programId       String
-    semester        Int              @default(1)
-  credits         Int              @default(3)
-  program         Program          @relation(fields: [programId], references: [id], onDelete: Cascade)
-  classes         Class[]
-  assessments     Assessment[]
-  studyMaterials  StudyMaterial[]
-  announcements   Announcement[]
-  subjectTeachers SubjectTeacher[]
-
-  @@unique([programId, semester, code])
-  @@index([programId, semester])
-}
-
-/**
- * Many-to-many assignment of teachers to subjects. This is the source of
- * truth for "who teaches what": class schedule slots derive their teacher
- * from these rows automatically instead of picking one from the full faculty
- * list. A subject may list several teachers (e.g. parallel practical groups).
- */
-model SubjectTeacher {
-  id        String   @id @default(cuid())
-  subjectId String
-  teacherId String
-  createdAt DateTime @default(now())
-  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  teacher   Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-
-  @@unique([subjectId, teacherId])
-  @@index([teacherId])
-}
-
-/**
- * In-app notification for a single recipient (user). Created by system
- * events: campus announcements, teacher class notices, material uploads,
- * assessments, published results, timetable changes, subject assignments.
- * `link` is the dashboard path the recipient is taken to on click.
- */
-model Notification {
-  id        String    @id @default(cuid())
-  userId    String
-  type      String
-  title     String
-  body      String
-  link      String?
-  readAt    DateTime?
-  createdAt DateTime  @default(now())
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-  @@index([userId, readAt])
-}
-
-model Class {
-  id        String               @id @default(cuid())
-  subjectId String
-  teacherId String? // nullable for legacy rows; scheduled slots always have a teacher
-  programId String
-  semester  Int                  @default(1)
-  dayOfWeek DayOfWeek
-  startTime DateTime             @db.Time
-  endTime   DateTime             @db.Time
-  type      String               @default("Lecture") // "Lecture" | "Practical"
-  group     String? // e.g. "Gr. A" — allows parallel practical groups
-  subject   Subject              @relation(fields: [subjectId], references: [id], onDelete: Restrict)
-  teacher   Teacher?             @relation(fields: [teacherId], references: [id], onDelete: SetNull)
-  program   Program              @relation(fields: [programId], references: [id], onDelete: Restrict)
-  sessions  AttendanceSession[]
-  materials StudyMaterialClass[]
-
-  @@unique([subjectId, teacherId, programId, semester, dayOfWeek, startTime, endTime])
-  @@index([teacherId, semester, dayOfWeek])
-}
-
-// ─── Timetable break window (per program+semester) ─────────────
-// A daily reserved time window (e.g. 13:00–13:30). It is NOT a class and NOT
-// a subject: it exists only for the class schedule, and no class slot on ANY
-// weekday may overlap it (enforced in /api/classes). Rendered as the hatched
-// "Break" band across Mon–Fri on the weekly grid.
-model Break {
-  id        String   @id @default(cuid())
-  programId String
-  semester  Int      @default(1)
-  startTime DateTime @db.Time
-  endTime   DateTime @db.Time
-  program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
-
-  @@unique([programId, semester])
-  @@index([programId])
-}
-
-model AttendanceSession {
-  id          String             @id @default(cuid())
-  classId     String
-  sessionDate DateTime           @db.Date
-  createdAt   DateTime           @default(now())
-  class       Class              @relation(fields: [classId], references: [id], onDelete: Cascade)
-  records     AttendanceRecord[]
-
-  @@unique([classId, sessionDate])
-}
-
-model AttendanceRecord {
-  id        String            @id @default(cuid())
-  sessionId String
-  studentId String
-  status    AttendanceStatus
-  note      String?
-  session   AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  student   Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
-
-  @@unique([sessionId, studentId])
-  @@index([studentId, status])
-}
-
-model Assessment {
-  id             String    @id @default(cuid())
-  subjectId      String
-  programId      String
-  semester       Int       @default(1)
-  name           String
-  maxMarks       Decimal   @db.Decimal(6, 2)
-  assessmentDate DateTime?
-  // Results are provisional until a teacher publishes them: a null
-  // publishedAt keeps them out of the student's results page.
-  publishedAt    DateTime?
-  publishedBy    String? // User id who published (null again on unpublish)
-  subject        Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  program        Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
-  results        Result[]
-
-  @@unique([subjectId, semester, name])
-  @@index([programId, semester])
-}
-
-model Result {
-  id           String     @id @default(cuid())
-  assessmentId String
-  studentId    String
-  marks        Decimal    @db.Decimal(6, 2)
-  grade        String?
-  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  student      Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
-
-  @@unique([assessmentId, studentId])
-  @@index([studentId])
-}
-
-model Announcement {
-  id          String    @id @default(cuid())
-  title       String
-  body        String
-  publishedAt DateTime?
-  authorId    String?
-  author      User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  // Teacher-scoped notices: when `teacherId` is set the notice targets a
-  // specific teaching group (subject × program × semester) instead of the
-  // whole campus. `authorId` always points at the publishing User so cards
-  // can render the author byline for both admins and teachers.
-  teacherId String?
-  teacher   Teacher? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
-  subjectId String?
-  subject   Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
-  programId String?
-  program   Program? @relation(fields: [programId], references: [id], onDelete: SetNull)
-  semester  Int?
-
-  // Optional attachment (e.g. a notice image/PDF), stored in Postgres like
-  // other uploads so the app stays self-contained with the pg adapter.
-  attachmentFileName String?
-  attachmentMimeType String?
-  attachmentSize     Int?
-  attachmentData     Bytes?
-
-  @@index([publishedAt])
-  @@index([teacherId])
-  @@index([programId, semester])
-}
-
-// ─── Curriculum (admin-manageable course structure) ─────────────
-model Curriculum {
-  id        String               @id @default(cuid())
-  programId String               @unique
-  program   Program              @relation(fields: [programId], references: [id], onDelete: Cascade)
-  years     CurriculumYear[]
-  electives CurriculumElective[]
-  createdAt DateTime             @default(now())
-  updatedAt DateTime             @updatedAt
-}
-
-model CurriculumYear {
-  id           String               @id @default(cuid())
-  curriculumId String
-  curriculum   Curriculum           @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
-  yearNo       Int
-  label        String
-  semesters    CurriculumSemester[]
-
-  @@unique([curriculumId, yearNo])
-}
-
-model CurriculumSemester {
-  id         String             @id @default(cuid())
-  yearId     String
-  year       CurriculumYear     @relation(fields: [yearId], references: [id], onDelete: Cascade)
-  semesterNo Int
-  label      String
-  courses    CurriculumCourse[]
-
-  @@unique([yearId, semesterNo])
-}
-
-model CurriculumCourse {
-  id         String             @id @default(cuid())
-  semesterId String
-  semester   CurriculumSemester @relation(fields: [semesterId], references: [id], onDelete: Cascade)
-  code       String?
-  name       String
-  credits    Int                @default(3)
-  sortOrder  Int                @default(0)
-
-  @@index([semesterId])
-}
-
-model CurriculumElective {
-  id           String     @id @default(cuid())
-  curriculumId String
-  curriculum   Curriculum @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
-  group        String // "ELECTIVE_I" | "ELECTIVE_II"
-  code         String?
-  name         String
-  credits      Int        @default(3)
-  sortOrder    Int        @default(0)
-
-  @@index([curriculumId, group])
-}
-
-// ─── Notes / Study Materials library ────────────────────────────
-model StudyMaterial {
-  id             String             @id @default(cuid())
-  title          String
-  description    String?
-  topic          String?
-  materialType   MaterialType       @default(LECTURE_NOTES)
-  visibility     MaterialVisibility @default(EVERYONE)
-  departmentName String?
-  programId      String?
-  semester       Int?
-  subjectId      String?
-  fileName       String
-  mimeType       String?
-  fileSize       Int // bytes
-  fileData       Bytes // stored in Postgres — keeps uploads self-contained with pg adapter
-  uploaderId     String
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-
-  program    Program?             @relation(fields: [programId], references: [id], onDelete: SetNull)
-  subject    Subject?             @relation(fields: [subjectId], references: [id], onDelete: SetNull)
-  uploader   User                 @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
-  classLinks StudyMaterialClass[]
-  bookmarks  Bookmark[]
-
-  @@index([materialType])
-  @@index([visibility])
-  @@index([programId, semester])
-  @@index([subjectId])
-  @@index([uploaderId])
-  @@index([createdAt])
-}
-
-// Targets a whole teaching group (all schedule slots of a subject for a program/semester)
-model StudyMaterialClass {
-  id         String        @id @default(cuid())
-  materialId String
-  classId    String
-  material   StudyMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
-  class      Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
-
-  @@unique([materialId, classId])
-  @@index([classId])
-}
-
-model Bookmark {
-  id              String        @id @default(cuid())
-  userId          String
-  studyMaterialId String
-  createdAt       DateTime      @default(now())
-  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  studyMaterial   StudyMaterial @relation(fields: [studyMaterialId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, studyMaterialId])
-  @@index([studyMaterialId])
-}
-
-// ─── Syllabus library (admin-uploaded PDF syllabi, publicly readable) ─────
-model Syllabus {
-  id             String   @id @default(cuid())
-  title          String? // null => derived from file name
-  departmentName String
-  programId      String?
-  semester       Int // 1..8
-  fileName       String
-  mimeType       String?
-  fileSize       Int // bytes
-  fileData       Bytes // stored in Postgres — keeps uploads self-contained with pg adapter
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  program Program? @relation(fields: [programId], references: [id], onDelete: SetNull)
-
-  @@index([departmentName])
-  @@index([programId, semester])
-  @@index([semester])
-  @@index([createdAt])
-}
-
-// ─── Profile privacy (who can see which profile field) ─────────
-// One row per USER-controlled profile field the owner has explicitly set.
-// An absent row means "use the registry default" (app/lib/profile-shared.ts).
-// RESTRICTED fields (roll number, category, guardian contacts, …) are never
-// stored here: their visibility is role policy and cannot be changed by the
-// profile owner.
-model ProfilePrivacy {
-  id         String          @id @default(cuid())
-  userId     String
-  fieldKey   String
-  visibility FieldVisibility
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
-  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-    @@unique([userId, fieldKey])
-  @@index([userId])
-}
-
-// ─── Academic Year (a running academic session, e.g. 2023/2024) ──
-model AcademicYear {
-  id        String              @id @default(cuid())
-  name      String              @unique
-  startDate DateTime
-  endDate   DateTime
-  isCurrent Boolean             @default(false)
-  status    AcademicYearStatus  @default(ACTIVE)
-  // Minimum attendance % required for exam eligibility this year (was a
-  // hardcoded 75 on the student attendance page).
-  minAttendancePercent Int      @default(75)
-  createdAt DateTime            @default(now())
-  updatedAt DateTime            @updatedAt
-  semesters StudentSemester[]
-
-  @@index([isCurrent])
-  @@index([status])
-}
-
-/**
- * Records a student's enrollment in a particular (academic year, semester).
- * This is the source of truth for a student's academic history: advancing to a
- * new semester creates a new row (the previous ACTIVE one becomes COMPLETED)
- * instead of overwriting a single integer — historical enrollment is therefore
- * always preserved.
- */
-model StudentSemester {
-  id             String                 @id @default(cuid())
-  studentId      String
-  academicYearId String
-  semesterNo     Int
-  startDate      DateTime?
-  endDate        DateTime?
-  status         StudentSemesterStatus  @default(ACTIVE)
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
-  student        Student                @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  academicYear   AcademicYear           @relation(fields: [academicYearId], references: [id])
-
-  @@unique([studentId, academicYearId, semesterNo])
-  @@index([studentId, status])
-  @@index([academicYearId])
 }

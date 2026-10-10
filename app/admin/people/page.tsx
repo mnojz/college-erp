@@ -80,7 +80,7 @@ type StudentItem = {
   nationality: string | null;
   religion: string | null;
   category: string | null;
-  // Enrollment lifecycle (ACTIVE / INACTIVE / GRADUATED / SUSPENDED / WITHDRAWN).
+  // Enrollment lifecycle (ACTIVE / INACTIVE / GRADUATED / SUSPENDED / DROPPED).
   status: string;
   program: { id: string; name: string; code: string } | null;
   user: {
@@ -240,6 +240,7 @@ export type StudentStatusFilterValue =
   | "ACTIVE"
   | "INACTIVE"
   | "GRADUATED"
+  | "SUSPENDED"
   | "DROPPED";
 
 const STUDENT_STATUS_FILTER_OPTIONS: Array<{ value: StudentStatusFilterValue; label: string }> = [
@@ -247,6 +248,7 @@ const STUDENT_STATUS_FILTER_OPTIONS: Array<{ value: StudentStatusFilterValue; la
   { value: "ACTIVE", label: "Account active" },
   { value: "INACTIVE", label: "Account inactive" },
   { value: "GRADUATED", label: "Graduated" },
+  { value: "SUSPENDED", label: "Suspended" },
   { value: "DROPPED", label: "Dropped" },
 ];
 
@@ -616,12 +618,18 @@ export default function AdminPeoplePage() {
     if (selectedProgramFilter !== "ALL") params.set("programId", selectedProgramFilter);
     if (selectedSemesterFilter !== "ALL") params.set("semester", selectedSemesterFilter);
     // One unified status filter maps to the API's two params: account status
-    // (ACTIVE/INACTIVE) or terminal lifecycle (GRADUATED/DROPPED). "ENROLLED"
-    // sends neither, keeping the API's default live-semester listing.
+    // (ACTIVE/INACTIVE) or terminal lifecycle. "ENROLLED" sends neither, keeping
+    // the API's default live-semester listing. Every non-enrolled state
+    // (GRADUATED/SUSPENDED/DROPPED) must be sent as `lifecycle`, or
+    // students in that state become unreachable in the directory.
     if (selectedStatusFilter === "ACTIVE" || selectedStatusFilter === "INACTIVE") {
       params.set("status", selectedStatusFilter);
     }
-    if (selectedStatusFilter === "GRADUATED" || selectedStatusFilter === "DROPPED") {
+    if (
+      selectedStatusFilter === "GRADUATED" ||
+      selectedStatusFilter === "SUSPENDED" ||
+      selectedStatusFilter === "DROPPED"
+    ) {
       params.set("lifecycle", selectedStatusFilter);
     }
     // Sorting lives server-side with the filters: the browser only ever holds
@@ -1172,7 +1180,7 @@ export default function AdminPeoplePage() {
                     setSelectedSemesterFilter("ALL");
                   }}
                 >
-                  <SelectTrigger className="w-full sm:w-56" aria-label="Filter by program">
+                  <SelectTrigger className="w-full sm:w-48" aria-label="Filter by program">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent position="popper">
@@ -1190,7 +1198,7 @@ export default function AdminPeoplePage() {
                   onValueChange={setSelectedSemesterFilter}
                   disabled={studentSemesterOptions.length === 0}
                 >
-                  <SelectTrigger className="w-full sm:w-36" aria-label="Filter by semester">
+                  <SelectTrigger className="w-full sm:w-32" aria-label="Filter by semester">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent position="popper">
@@ -1208,14 +1216,18 @@ export default function AdminPeoplePage() {
                   onValueChange={(value) => {
                     const next = value as StudentStatusFilterValue;
                     setSelectedStatusFilter(next);
-                    // Terminal states sit outside semesters — a stale semester
-                    // selection would silently empty the results.
-                    if (next === "GRADUATED" || next === "DROPPED") {
+                    // Non-enrolled states sit outside semesters — a stale
+                    // semester selection would silently empty the results.
+                    if (
+                      next === "GRADUATED" ||
+                      next === "SUSPENDED" ||
+                      next === "DROPPED"
+                    ) {
                       setSelectedSemesterFilter("ALL");
                     }
                   }}
                 >
-                  <SelectTrigger className="w-full sm:w-44" aria-label="Filter by status">
+                  <SelectTrigger className="w-full sm:w-36" aria-label="Filter by status">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent position="popper">
@@ -1227,7 +1239,7 @@ export default function AdminPeoplePage() {
                   </SelectContent>
                 </Select>
 
-                <div className="relative w-full sm:w-64">
+                <div className="relative w-full sm:w-48">
                   <IconSearch
                     size={15}
                     aria-hidden="true"
@@ -2271,7 +2283,7 @@ export default function AdminPeoplePage() {
                       <SelectItem value="INACTIVE">Inactive</SelectItem>
                       <SelectItem value="GRADUATED">Graduated</SelectItem>
                       <SelectItem value="SUSPENDED">Suspended</SelectItem>
-                      <SelectItem value="WITHDRAWN">Withdrawn</SelectItem>
+                      <SelectItem value="DROPPED">Dropped</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

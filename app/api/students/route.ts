@@ -26,8 +26,17 @@ const StudentQuerySchema = z.object({
   programId: z.string().trim().min(1).optional(),
   semester: z.coerce.number().int().min(1).max(12).optional(),
   status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
-  lifecycle: z.enum(["GRADUATED", "DROPPED"]).optional(),
-  includeTerminal: z.coerce.boolean().optional(),
+  // Every non-enrolled lifecycle state must be selectable here, or students set
+  // to it (e.g. via the edit modal) become unreachable in the directory — the
+  // default listing only shows ACTIVE/INACTIVE. GRADUATED/SUSPENDED/DROPPED are
+  // all opt-in through this param.
+  lifecycle: z.enum(["GRADUATED", "SUSPENDED", "DROPPED"]).optional(),
+  // z.coerce.boolean() treats ANY non-empty string as true ("false" → true),
+  // so accept only the literal query-string values.
+  includeTerminal: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => v === "true"),
   sortBy: z.enum(STUDENT_SORT_KEYS).optional(),
   sortDir: z.enum(["asc", "desc"]).optional(),
   // Terminal lifecycle states are opt-in: by default the directory shows only
@@ -125,7 +134,7 @@ type UpdateStudentBody = {
 };
 
 /** Valid StudentStatus values, for payload validation. */
-const STUDENT_STATUSES = ["ACTIVE", "INACTIVE", "GRADUATED", "SUSPENDED", "WITHDRAWN", "DROPPED"] as const;
+const STUDENT_STATUSES = ["ACTIVE", "INACTIVE", "GRADUATED", "SUSPENDED", "DROPPED"] as const;
 
 export async function POST(request: Request) {
   if (!(await requireAdmin())) {
@@ -213,7 +222,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ student }, { status: 201 });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return NextResponse.json({ error: "Email, enrollment number, registration ID, or roll number is already registered" }, { status: 409 });
+      return NextResponse.json({ error: "Email, enrollment number, registration ID, or roll number in this class is already registered" }, { status: 409 });
     }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
       return NextResponse.json({ error: "Program does not exist" }, { status: 400 });
@@ -367,7 +376,7 @@ export async function PUT(request: Request) {
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return NextResponse.json(
-        { error: "Email, enrollment number, registration ID, or roll number is already in use" },
+        { error: "Email, enrollment number, registration ID, or roll number in this class is already in use" },
         { status: 409 },
       );
     }
@@ -459,18 +468,27 @@ export async function GET(request: Request) {
     ...(f.q && /^\d+$/.test(f.q) ? [{ rollNumber: { equals: Number(f.q) } }] : []),
   ];
 
+  // NOTE: these spreads must never set the same key twice — a later spread
+  // silently OVERWRITES an earlier one (that bug made `?semester=4` a no-op:
+  // the default clause below re-set `currentSemester: { not: null }`). Each
+  // key is therefore set in exactly one place below.
+  const liveListing = !f.lifecycle && !f.includeTerminal;
   const where: Prisma.StudentWhereInput = {
     ...(f.programId ? { programId: f.programId } : {}),
-    ...(f.semester ? { currentSemester: f.semester } : {}),
+    // The semester filter IS a currentSemester value — it replaces (never
+    // coexists with) the default "in a live semester" constraint.
+    ...(f.semester
+      ? { currentSemester: f.semester }
+      : liveListing
+        ? { currentSemester: { not: null } }
+        : {}),
     ...(f.status ? { user: { status: f.status } } : {}),
     ...(f.q ? { OR: searchArms } : {}),
     // Graduated/dropped students sit outside semesters: a lifecycle filter
     // selects exactly that state; otherwise they are hidden unless the admin
     // explicitly includes terminal states.
     ...(f.lifecycle ? { status: f.lifecycle } : {}),
-    ...(!f.lifecycle && !f.includeTerminal
-      ? { status: { in: ["ACTIVE", "INACTIVE"] as const }, currentSemester: { not: null } }
-      : {}),
+    ...(liveListing ? { status: { in: ["ACTIVE", "INACTIVE"] as const } } : {}),
   };
 
   try {

@@ -4,10 +4,10 @@ import { requireAdmin } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
 import {
   advanceStudentTx,
+  ensureCurrentAcademicYear,
   getCohortSummaries,
   graduateStudentTx,
   previewCohortAdvance,
-  requireCurrentAcademicYear,
 } from "@/app/lib/progression";
 
 /**
@@ -35,12 +35,13 @@ export async function GET(request: Request) {
     }
 
     const cohorts = await getCohortSummaries(prisma);
-    let currentYear: { id: string; name: string } | null = null;
-    try {
-      currentYear = await requireCurrentAcademicYear(prisma);
-    } catch {
-      currentYear = null;
-    }
+    // Read-only label for the UI: the current year if one exists, else null
+    // (fresh DB with no history yet). Years are fully automatic — POST paths
+    // ensure one inside their transaction, so GET never writes.
+    const currentYear = await prisma.academicYear.findFirst({
+      where: { isCurrent: true, status: "ACTIVE" },
+      select: { id: true, name: true },
+    });
     return NextResponse.json({ cohorts, currentYear });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "";
@@ -79,22 +80,26 @@ export async function POST(request: Request) {
   try {
     // Re-resolve inside the handler so the preview can't go stale: students
     // admitted/removed between preview and confirm change the outcome.
+    // The academic year is fully automatic (ensured inside the transaction).
     const preview = await previewCohortAdvance(prisma, body.programId, body.fromSemester);
-    let year: { id: string; name: string } | null = null;
-    if (!preview.graduates) {
-      year = await requireCurrentAcademicYear(prisma);
-    }
 
     const now = new Date();
-    const moved = await prisma.$transaction(async (tx) => {
+    const { moved, yearName } = await prisma.$transaction(async (tx) => {
+      let year: { id: string; name: string } | null = null;
+      if (!preview.graduates) {
+        // Promotions reuse the current session — never trigger a rollover.
+        year = await ensureCurrentAcademicYear(tx, now);
+      }
+      let count = 0;
       for (const s of preview.students) {
         if (preview.graduates) {
           await graduateStudentTx(tx, s.id, now);
         } else {
           await advanceStudentTx(tx, s.id, preview.toSemester as number, (year as { id: string }).id, now);
         }
+        count++;
       }
-      return preview.students.length;
+      return { moved: count, yearName: year?.name ?? null };
     });
 
     return NextResponse.json({
@@ -104,18 +109,12 @@ export async function POST(request: Request) {
       fromSemester: preview.fromSemester,
       toSemester: preview.toSemester,
       programCode: preview.programCode,
-      academicYear: year?.name ?? null,
+      academicYear: yearName,
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "";
     if (msg.startsWith("NOT_FOUND:") || msg.startsWith("EMPTY:")) {
       return NextResponse.json({ error: msg.slice(msg.indexOf(":") + 1) }, { status: 404 });
-    }
-    if (msg.startsWith("NO_CURRENT_YEAR:")) {
-      return NextResponse.json(
-        { error: "No current academic year is set — create one before advancing cohorts" },
-        { status: 400 },
-      );
     }
     console.error("POST /api/progression/cohorts error:", error);
     return NextResponse.json({ error: "Unable to advance cohort" }, { status: 500 });

@@ -4,6 +4,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import {
+  BarChartCard,
+  ColumnChartCard,
+  LifecycleDonutCard,
+  type BarDatum,
+  type LifecycleData,
+} from "@/app/components/admin/Charts";
+import {
   IconBook,
   IconBriefcase,
   IconCalendar,
@@ -12,49 +19,31 @@ import {
   IconUsers,
 } from "@tabler/icons-react";
 
-type Counts = Record<
-  "students" | "teachers" | "programs" | "subjects" | "classes" | "assessments",
-  number
->;
+type Totals = {
+  students: number;
+  teachers: number;
+  programs: number;
+  subjects: number;
+  classes: number;
+  assessments: number;
+};
 
-const initial: Counts = {
-  students: 0,
-  teachers: 0,
-  programs: 0,
-  subjects: 0,
-  classes: 0,
-  assessments: 0,
+type Stats = {
+  totals: Totals;
+  byProgram: Array<{ code: string; name: string; count: number }>;
+  bySemester: Array<{ semester: number; count: number }>;
+  lifecycle: LifecycleData;
 };
 
 const METRIC_CONFIG: Record<
-  keyof Counts,
+  keyof Totals,
   { label: string; description: string; icon: React.ReactNode }
 > = {
-  students: {
-    label: "Students",
-    description: "Enrolled learners",
-    icon: <IconUsers size={20} />,
-  },
-  teachers: {
-    label: "Teachers",
-    description: "Teaching staff",
-    icon: <IconSchool size={20} />,
-  },
-  programs: {
-    label: "Programs",
-    description: "Degree programs",
-    icon: <IconBriefcase size={20} />,
-  },
-  subjects: {
-    label: "Subjects",
-    description: "Course modules",
-    icon: <IconBook size={20} />,
-  },
-  classes: {
-    label: "Class Slots",
-    description: "Scheduled sessions",
-    icon: <IconCalendar size={20} />,
-  },
+  students: { label: "Students", description: "Enrolled learners", icon: <IconUsers size={20} /> },
+  teachers: { label: "Teachers", description: "Teaching staff", icon: <IconSchool size={20} /> },
+  programs: { label: "Programs", description: "Degree programs", icon: <IconBriefcase size={20} /> },
+  subjects: { label: "Subjects", description: "Course modules", icon: <IconBook size={20} /> },
+  classes: { label: "Class Slots", description: "Scheduled sessions", icon: <IconCalendar size={20} /> },
   assessments: {
     label: "Assessments",
     description: "Graded evaluations",
@@ -64,7 +53,7 @@ const METRIC_CONFIG: Record<
 
 export default function AdminPage() {
   const router = useRouter();
-  const [counts, setCounts] = useState<Counts>(initial);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -74,23 +63,24 @@ export default function AdminPage() {
       const user = await me.json();
       if (user.user.role !== "ADMIN") return router.replace("/dashboard");
 
-      const endpoints = ["students", "teachers", "programs", "subjects", "classes", "assessments"];
-      const responses = await Promise.all(endpoints.map((ep) => fetch(`/api/${ep}`)));
-      if (responses.some((r) => !r.ok)) throw new Error();
-      const data = await Promise.all(responses.map((r) => r.json()));
-
-      setCounts({
-        students: data[0].students.length,
-        teachers: data[1].teachers.length,
-        programs: data[2].programs.length,
-        subjects: data[3].subjects.length,
-        classes: data[4].classes.length,
-        assessments: data[5].assessments.length,
-      });
+      // One aggregate request — the previous six list-fetch + `.length` approach
+      // undercounted students (the endpoint paginates at 25).
+      const res = await fetch("/api/admin/stats");
+      if (!res.ok) throw new Error();
+      setStats(await res.json());
     }
 
     load().catch(() => setError("Unable to load dashboard data"));
   }, [router]);
+
+  const programData: BarDatum[] = (stats?.byProgram ?? []).map((p) => ({
+    label: `${p.code} · ${p.name}`,
+    value: p.count,
+  }));
+  const semesterData: BarDatum[] = (stats?.bySemester ?? []).map((s) => ({
+    label: `Sem ${s.semester}`,
+    value: s.count,
+  }));
 
   return (
     <AdminShell title="Overview" subtitle="College statistics at a glance" active="/dashboard">
@@ -105,8 +95,9 @@ export default function AdminPage() {
 
       {/* Stat Cards */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {(Object.entries(counts) as [keyof Counts, number][]).map(([key, value]) => {
+        {(Object.keys(METRIC_CONFIG) as Array<keyof Totals>).map((key) => {
           const cfg = METRIC_CONFIG[key];
+          const value = stats?.totals[key] ?? 0;
           return (
             <article
               key={key}
@@ -129,6 +120,18 @@ export default function AdminPage() {
           );
         })}
       </section>
+
+      {/* Distribution charts */}
+      <section className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <BarChartCard title="Enrollment by program" data={programData} />
+        <ColumnChartCard title="Students per semester" data={semesterData} />
+        <div className="lg:col-span-2">
+          <LifecycleDonutCard
+            data={stats?.lifecycle ?? { active: 0, graduated: 0, dropped: 0 }}
+          />
+        </div>
+      </section>
     </AdminShell>
   );
 }
+

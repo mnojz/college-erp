@@ -139,10 +139,8 @@ export function ProgressionCard() {
           <div className="grid gap-3">
             <p className="m-0 text-sm text-muted-foreground">
               Active batches per program — promote each cohort when ready.{" "}
-              {currentYear ? (
+              {currentYear && (
                 <>History rows attach to <strong className="font-medium text-foreground">{currentYear.name}</strong>.</>
-              ) : (
-                <strong className="font-medium text-destructive">No current academic year — advancing is disabled.</strong>
               )}
             </p>
 
@@ -169,7 +167,7 @@ export function ProgressionCard() {
                       size="sm"
                       variant="outline"
                       className="ml-auto"
-                      disabled={busy || !currentYear}
+                      disabled={busy}
                       onClick={() => void openPreview(c)}
                     >
                       {c.isFinalSemester ? "Graduate" : `Promote to Sem ${c.semester + 1}`}

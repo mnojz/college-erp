@@ -17,6 +17,7 @@ import {
   IconZoomIn,
   IconZoomOut,
 } from "@tabler/icons-react";
+import { clampPan, drawCropPreview, exportSquareCrop } from "@/app/lib/crop";
 
 type ImageUploadCropProps = {
   label: string;
@@ -70,45 +71,16 @@ export function ImageUploadCrop({
     e.target.value = "";
   };
 
-  // Draw the preview onto the interactive canvas
+  // Draw the preview onto the interactive canvas using the shared helpers —
+  // paints an opaque white base then cover-crops, so the image is visible
+  // immediately on open (the old version left a transparent canvas over a dark
+  // viewport, which read as "black / nothing until I drag").
   const drawPreview = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || !imageObj) return;
-
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-
-    ctx.clearRect(0, 0, CROP_SIZE, CROP_SIZE);
-
-    // Base scale to cover the square canvas
-    const baseScale = Math.max(
-      CROP_SIZE / imageObj.naturalWidth,
-      CROP_SIZE / imageObj.naturalHeight
-    );
-    const scale = baseScale * zoom;
-
-    const scaledWidth = imageObj.naturalWidth * scale;
-    const scaledHeight = imageObj.naturalHeight * scale;
-
-    // Centered default + pan offset
-    const drawX = (CROP_SIZE - scaledWidth) / 2 + pan.x;
-    const drawY = (CROP_SIZE - scaledHeight) / 2 + pan.y;
-
-    ctx.save();
-    // Draw the image
-    ctx.drawImage(imageObj, drawX, drawY, scaledWidth, scaledHeight);
-
-    // Draw dark overlay outside circular/rounded square crop guide
-    ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
-    // Top border
-    ctx.fillRect(0, 0, CROP_SIZE, 0);
-
-    // Crop border stroke
-    ctx.strokeStyle = "#0ea5e9";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(2, 2, CROP_SIZE - 4, CROP_SIZE - 4);
-
-    ctx.restore();
+    drawCropPreview(ctx, imageObj, CROP_SIZE, { zoom, pan });
   }, [imageObj, zoom, pan]);
 
   useEffect(() => {
@@ -117,87 +89,38 @@ export function ImageUploadCrop({
     }
   }, [modalOpen, imageObj, drawPreview]);
 
-  // Pan interaction
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Pan interaction (pointer events cover mouse + touch uniformly)
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
     setIsDragging(true);
     setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
   };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDragging) return;
-    setPan({
+    const next = clampPan(imageObj!, CROP_SIZE, zoom, {
       x: e.clientX - dragStart.x,
       y: e.clientY - dragStart.y,
     });
+    setPan(next);
   };
+  const handlePointerUp = () => setIsDragging(false);
 
-  const handleMouseUp = () => setIsDragging(false);
-
-  // Touch handlers for mobile
-  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    if (e.touches.length === 1) {
-      setIsDragging(true);
-      setDragStart({
-        x: e.touches[0].clientX - pan.x,
-        y: e.touches[0].clientY - pan.y,
-      });
-    }
+  const setZoomClamped = (z: number) => {
+    const next = Math.min(Math.max(z, 1), 3.5);
+    setZoom(next);
+    if (imageObj) setPan((p) => clampPan(imageObj, CROP_SIZE, next, p));
   };
-
-  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isDragging || e.touches.length !== 1) return;
-    setPan({
-      x: e.touches[0].clientX - dragStart.x,
-      y: e.touches[0].clientY - dragStart.y,
-    });
-  };
-
-  const handleTouchEnd = () => setIsDragging(false);
 
   // Mouse wheel zoom
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
-    const delta = e.deltaY * -0.0015;
-    setZoom((prev) => Math.min(Math.max(prev + delta, 1), 3.5));
+    setZoomClamped(zoom + e.deltaY * -0.0015);
   };
 
-  // Perform Final Crop to high-res 320x320 JPEG
+  // Perform Final Crop to high-res 320x320 JPEG (shared export math)
   const handleCropApply = () => {
     if (!imageObj) return;
-
-    const outputSize = 320;
-    const outputCanvas = document.createElement("canvas");
-    outputCanvas.width = outputSize;
-    outputCanvas.height = outputSize;
-
-    const ctx = outputCanvas.getContext("2d");
-    if (!ctx) return;
-
-    const baseScale = Math.max(
-      CROP_SIZE / imageObj.naturalWidth,
-      CROP_SIZE / imageObj.naturalHeight
-    );
-    const scale = baseScale * zoom;
-
-    const scaledWidth = imageObj.naturalWidth * scale;
-    const scaledHeight = imageObj.naturalHeight * scale;
-
-    const drawX = (CROP_SIZE - scaledWidth) / 2 + pan.x;
-    const drawY = (CROP_SIZE - scaledHeight) / 2 + pan.y;
-
-    // Scale up factor to output size
-    const factor = outputSize / CROP_SIZE;
-
-    ctx.drawImage(
-      imageObj,
-      drawX * factor,
-      drawY * factor,
-      scaledWidth * factor,
-      scaledHeight * factor
-    );
-
-    const croppedDataUrl = outputCanvas.toDataURL("image/jpeg", 0.88);
-    onChange(croppedDataUrl);
+    onChange(exportSquareCrop(imageObj, CROP_SIZE, { zoom, pan }));
     setModalOpen(false);
   };
 
@@ -304,19 +227,17 @@ export function ImageUploadCrop({
 
             <div className="grid gap-4">
               {/* Canvas Viewport */}
-              <div className="grid place-items-center overflow-hidden rounded-xl bg-slate-900 p-2 dark:bg-slate-950">
+              <div className="grid place-items-center overflow-hidden rounded-xl border bg-white p-2 dark:bg-card">
                 <canvas
                   ref={canvasRef}
                   width={CROP_SIZE}
                   height={CROP_SIZE}
-                  onMouseDown={handleMouseDown}
-                  onMouseMove={handleMouseMove}
-                  onMouseUp={handleMouseUp}
-                  onMouseLeave={handleMouseUp}
-                  onTouchStart={handleTouchStart}
-                  onTouchMove={handleTouchMove}
-                  onTouchEnd={handleTouchEnd}
+                  onPointerDown={handlePointerDown}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUp}
+                  onPointerLeave={handlePointerUp}
                   onWheel={handleWheel}
+                  className="touch-none"
                   style={{
                     width: `${CROP_SIZE}px`,
                     height: `${CROP_SIZE}px`,
@@ -340,7 +261,7 @@ export function ImageUploadCrop({
                     size="icon-sm"
                     title="Zoom out"
                     aria-label="Zoom out"
-                    onClick={() => setZoom((z) => Math.max(1, Number((z - 0.2).toFixed(2))))}
+                    onClick={() => setZoomClamped(zoom - 0.2)}
                   >
                     <IconZoomOut size={16} aria-hidden="true" />
                   </Button>
@@ -350,7 +271,7 @@ export function ImageUploadCrop({
                     max="3.5"
                     step="0.05"
                     value={zoom}
-                    onChange={(e) => setZoom(parseFloat(e.target.value))}
+                    onChange={(e) => setZoomClamped(parseFloat(e.target.value))}
                     aria-label="Zoom level"
                     className="flex-1 accent-primary"
                   />
@@ -360,7 +281,7 @@ export function ImageUploadCrop({
                     size="icon-sm"
                     title="Zoom in"
                     aria-label="Zoom in"
-                    onClick={() => setZoom((z) => Math.min(3.5, Number((z + 0.2).toFixed(2))))}
+                    onClick={() => setZoomClamped(zoom + 0.2)}
                   >
                     <IconZoomIn size={16} aria-hidden="true" />
                   </Button>

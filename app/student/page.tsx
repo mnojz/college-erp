@@ -12,7 +12,7 @@ import {
 } from "@/app/components/common/NoticeDetailModal";
 import { NoticePostCard } from "@/app/components/common/NoticePostCard";
 import { AdminModal } from "@/app/components/admin/AdminModal";
-import { ImageUploadCrop } from "@/app/components/common/ImageUploadCrop";
+import { ProfilePictureUpload } from "@/app/components/profile/ProfilePictureUpload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -82,7 +82,13 @@ type Profile = {
   guardianPhone: string | null;
   guardianEmail: string | null;
   guardianRelation: string | null;
-  user: { email: string; firstName: string; lastName: string; status: string };
+  user: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    status: string;
+    profileReviewStatus: "APPROVED" | "PENDING_REVIEW" | "REJECTED";
+  };
   program: { name: string; code: string; durationYears: number; departmentName: string } | null;
   currentSemester: number | null;
 };
@@ -93,7 +99,6 @@ type Profile = {
  * program, semester…) is intentionally absent — students can never edit it.
  */
 type EditFormState = {
-  profileImageUrl: string;
   bloodGroup: string;
   phone: string;
   // Permanent address (structured)
@@ -194,7 +199,6 @@ export default function StudentPage() {
     setEditError("");
     setEditSuccess("");
     setEditForm({
-      profileImageUrl: profile.profileImageUrl ?? "",
       bloodGroup: profile.bloodGroup ?? "",
       phone: profile.phone ?? "",
       // Permanent address
@@ -247,7 +251,6 @@ export default function StudentPage() {
     setEditError("");
 
     const body: Record<string, unknown> = {
-      profileImageUrl: editForm.profileImageUrl,
       bloodGroup: editForm.bloodGroup,
       phone: editForm.phone,
       // Permanent address
@@ -284,9 +287,13 @@ export default function StudentPage() {
         return;
       }
       setProfile(result.student);
-      setEditSuccess("Profile updated successfully.");
       setEditForm((current) =>
         current ? { ...current, currentPassword: "", newPassword: "" } : current,
+      );
+      setEditSuccess(
+        result.pendingReview
+          ? "Submitted for review — an administrator will approve your changes before they appear on your profile."
+          : "Profile updated successfully.",
       );
     } catch {
       setEditError("Unable to reach the server");
@@ -446,16 +453,16 @@ export default function StudentPage() {
       {showEdit && editForm && (
         <AdminModal title="Edit Profile" onClose={() => setShowEdit(false)} wide>
           <form className="flex flex-col gap-4" onSubmit={handleSaveProfile}>
-            <ImageUploadCrop
-              label="Profile Photo"
-              value={editForm.profileImageUrl}
-              onChange={(val) => setEditForm({ ...editForm, profileImageUrl: val })}
+            <ProfilePictureUpload
+              currentAvatarUrl={profile.profileImageUrl}
+              profileReviewStatus={profile.user.profileReviewStatus ?? "APPROVED"}
             />
 
             <p className="text-sm text-muted-foreground" style={{ marginTop: 2 }}>
-              You can update your photo, contact and guardian details below. Critical records —
+              You can update your contact and guardian details below. Critical records —
               name, gender, registration number, nationality, category, religion, program — are
-              managed by the college office and cannot be changed here.
+              managed by the college office and cannot be changed here. Profile photo changes
+              above go through admin approval before going live.
             </p>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

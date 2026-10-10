@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
+import { ensureCurrentAcademicYear } from "@/app/lib/progression";
 import { jsonBody } from "@/app/lib/validation";
 import { parsePageParams, paginatedResponse } from "@/app/lib/pagination";
 
@@ -113,22 +114,14 @@ export async function POST(request: Request) {
     }
 
     let academicYearId = body.academicYearId;
-    if (!academicYearId) {
-      const current = await prisma.academicYear.findFirst({
-        where: { isCurrent: true, status: "ACTIVE" },
-        select: { id: true },
-      });
-      if (!current) {
-        return NextResponse.json(
-          { error: "No current academic year is set; pass academicYearId" },
-          { status: 400 },
-        );
-      }
-      academicYearId = current.id;
-    }
-
     const now = new Date();
     const result = await prisma.$transaction(async (tx) => {
+      if (!academicYearId) {
+        // Fully automatic: resolve (creating if needed) inside the transaction.
+        // Explicit academicYearId still wins when the caller passes one.
+        const year = await ensureCurrentAcademicYear(tx, now, body.semester);
+        academicYearId = year.id;
+      }
       // Close any previously-ACTIVE semester for this academic year that is lower.
       await tx.studentSemester.updateMany({
         where: {

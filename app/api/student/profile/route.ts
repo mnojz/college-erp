@@ -3,6 +3,7 @@ import { Prisma } from "@/app/generated/prisma/client";
 import { getSession } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
 import { validateAddress, type AddressInput } from "@/app/lib/nepal-geo";
+import { allAdminUserIds, notifyUsers } from "@/app/lib/notify";
 
 const PROFILE_SELECT = {
   id: true,
@@ -64,6 +65,7 @@ const PROFILE_SELECT = {
       firstName: true,
       lastName: true,
       status: true,
+      profileReviewStatus: true,
     },
   },
 } as const;
@@ -75,7 +77,9 @@ const PROFILE_SELECT = {
  * are only ever set by an admin, so a broken/fake form cannot corrupt them.
  */
 const SELF_EDITABLE = new Set([
-  "profileImageUrl",
+  // profileImageUrl is intentionally NOT self-editable: profile pictures go
+  // through the two-step verification flow (client gates + admin approval)
+  // via the avatar server actions instead.
   "bloodGroup",
   "phone",
   "emergencyContact",
@@ -114,25 +118,13 @@ export async function GET() {
   }
 
   try {
-    const [student, currentYear] = await Promise.all([
-      prisma.student.findUnique({
-        where: { userId: session.userId },
-        select: PROFILE_SELECT,
-      }),
-      // Exam-eligibility threshold for the current academic year, so the
-      // attendance page doesn't have to hardcode it (fallback matches the
-      // column default).
-      prisma.academicYear.findFirst({
-        where: { isCurrent: true },
-        select: { minAttendancePercent: true },
-      }),
-    ]);
+    const student = await prisma.student.findUnique({
+      where: { userId: session.userId },
+      select: PROFILE_SELECT,
+    });
 
     return student
-      ? NextResponse.json({
-          student,
-          attendancePolicy: { minAttendancePercent: currentYear?.minAttendancePercent ?? 75 },
-        })
+      ? NextResponse.json({ student })
       : NextResponse.json({ error: "Student profile not found" }, { status: 404 });
   } catch (error) {
     console.error("GET /api/student/profile error:", error);
@@ -319,25 +311,68 @@ try {
       }
     }
 
-    await prisma.$transaction(async (tx) => {
-      if (email !== undefined || newPassword) {
-        const userData: Prisma.UserUpdateInput = {};
-        if (email !== undefined) userData.email = email;
-        if (newPassword) {
-          const { hash } = await import("bcryptjs");
-          userData.passwordHash = await hash(newPassword, 12);
-        }
-        await tx.user.update({ where: { id: existing.userId }, data: userData });
+    // Password changes apply immediately (they are a security action, not a
+    // profile-data edit, and the current password was already verified above).
+    // Email is deliberately never writable here — it is the account identity.
+    if (newPassword) {
+      const { hash } = await import("bcryptjs");
+      await prisma.user.update({
+        where: { id: existing.userId },
+        data: { passwordHash: await hash(newPassword, 12) },
+      });
+    }
+
+    // ── Stage the changes for admin review instead of applying them ──
+    //
+    // Self-service edits (address, guardian, phone…) no longer go live
+    // immediately. The validated SELF_EDITABLE payload is stored as a JSON blob
+    // on the user's `pendingProfileData`, and `profileReviewStatus` flips to
+    // PENDING_REVIEW so the user appears in /admin/profile-reviews. An admin
+    // approves (writes the blob onto the Student row) or rejects (discards it);
+    // either way the user's live profile stays untouched until then.
+    //
+    // `undefined` means "not included in this request", so absent fields are
+    // left alone — re-submitting only stages the fields the user actually
+    // touched this time (it does not accumulate across submissions).
+    if (Object.keys(studentData).length > 0) {
+      const snapshot = JSON.parse(JSON.stringify(studentData)) as Prisma.InputJsonValue;
+      await prisma.user.update({
+        where: { id: existing.userId },
+        data: { pendingProfileData: snapshot, profileReviewStatus: "PENDING_REVIEW" },
+      });
+
+      // Alert admins that a profile-field change is awaiting review. Fire-and-
+      // forget so a notification hiccup never fails the student's save.
+      try {
+        const me = await prisma.user.findUnique({
+          where: { id: session.userId },
+          select: { firstName: true, lastName: true },
+        });
+        const who = me ? `${me.firstName} ${me.lastName}`.trim() : "A student";
+        await notifyUsers(await allAdminUserIds(), {
+          type: "profile_review",
+          title: "New profile details to review",
+          body: `${who} submitted profile changes for approval.`,
+          link: "/admin/profile-reviews",
+        });
+      } catch (err) {
+        console.error("notify admins (profile PATCH):", err);
       }
+    }
 
-      await tx.student.update({ where: { id: existing.id }, data: studentData });
-    });
-
-    const updated = await prisma.student.findUnique({
+    // The submitted changes are NOT applied yet (awaiting admin approval), so
+    // return the student's current LIVE profile. `existing` is only a narrow
+    // select (id/userId/passwordHash), so re-read with PROFILE_SELECT — this
+    // also avoids ever sending passwordHash to the client.
+    const live = await prisma.student.findUnique({
       where: { id: existing.id },
       select: PROFILE_SELECT,
     });
-    return NextResponse.json({ student: updated });
+
+    return NextResponse.json({
+      student: live,
+      pendingReview: Object.keys(studentData).length > 0,
+    });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return NextResponse.json({ error: "That email address is already in use" }, { status: 409 });

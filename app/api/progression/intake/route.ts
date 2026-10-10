@@ -4,8 +4,8 @@ import { z } from "zod";
 import { requireAdmin } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
 import {
+  ensureCurrentAcademicYear,
   parseBulkRow,
-  requireCurrentAcademicYear,
   validateBulkIntake,
   type BulkStudentInput,
 } from "@/app/lib/progression";
@@ -81,8 +81,9 @@ export async function POST(request: Request) {
     }
 
     // Commit: re-validated above, so this transaction either admits the whole
-    // batch or nothing.
-    const year = await requireCurrentAcademicYear(prisma);
+    // batch or nothing. The academic year is fully automatic: resolved (and
+    // rolled over when a new sem-1 lands on a year that reached sem-2)
+    // inside the same transaction from the admission date.
     const admissionDate = body.admissionDate ? new Date(body.admissionDate) : new Date();
     if (Number.isNaN(admissionDate.getTime())) {
       return NextResponse.json({ error: "admissionDate is not a valid date" }, { status: 400 });
@@ -90,7 +91,8 @@ export async function POST(request: Request) {
     const passwordHash = await hash(body.password ?? "student1234", 12);
     const now = new Date();
 
-    const created = await prisma.$transaction(async (tx) => {
+    const { created, yearName } = await prisma.$transaction(async (tx) => {
+      const year = await ensureCurrentAcademicYear(tx, admissionDate, body.semester);
       const out: Array<{ enrollmentNumber: string; email: string }> = [];
       for (const r of checked.rows) {
         const user = await tx.user.create({
@@ -127,14 +129,14 @@ export async function POST(request: Request) {
         });
         out.push({ enrollmentNumber: student.enrollmentNumber, email: user.email });
       }
-      return out;
+      return { created: out, yearName: year.name };
     });
 
     return NextResponse.json(
       {
         ok: true,
         created: created.length,
-        academicYear: year.name,
+        academicYear: yearName,
         students: created,
       },
       { status: 201 },
@@ -145,13 +147,6 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { ok: false, problems: ["A record collided on save (duplicate unique field) — nothing was created"] },
         { status: 409 },
-      );
-    }
-    const msg = e?.message ?? "";
-    if (msg.startsWith("NO_CURRENT_YEAR:")) {
-      return NextResponse.json(
-        { ok: false, problems: ["No current academic year is set — create one before admitting students"] },
-        { status: 400 },
       );
     }
     console.error("POST /api/progression/intake error:", error);
