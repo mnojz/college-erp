@@ -8,6 +8,10 @@ node_modules
 # TypeScript incremental build cache
 tsconfig.tsbuildinfo
 
+# Real secrets (SMTP passwords etc.) — .env itself is tracked as a template,
+# but .env.local overrides it and must never be committed.
+.env.local
+
 # One-off DB migration backups (local rollback artifacts, may contain records)
 prisma/_backup-*.json
 

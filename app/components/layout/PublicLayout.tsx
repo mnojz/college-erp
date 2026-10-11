@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Logo } from "@/app/components/common/Logo";
 import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
 import { PublicNavbar } from "./PublicNavbar";
+import { ForgotPasswordDialog } from "@/app/components/public/ForgotPasswordDialog";
 import { useTheme } from "@/app/lib/useTheme";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
   useTheme(); // ensure theme initialized
 
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -189,6 +191,20 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
 
+              <div className="-mt-0.5 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowLoginModal(false);
+                    setShowForgotPassword(true);
+                  }}
+                  disabled={loading}
+                  className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+                >
+                  Forgot password?
+                </button>
+              </div>
+
               <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
                 <Checkbox
                   checked={remember}
@@ -253,6 +269,20 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Conditionally mounted so each open starts with fresh dialog state
+            (and the login-form email prefills via initialEmail). */}
+        {showForgotPassword && (
+          <ForgotPasswordDialog
+            open
+            onOpenChange={setShowForgotPassword}
+            initialEmail={email}
+            onBackToSignIn={() => {
+              setShowForgotPassword(false);
+              openLogin();
+            }}
+          />
+        )}
       </div>
     </PublicLayoutContext.Provider>
   );

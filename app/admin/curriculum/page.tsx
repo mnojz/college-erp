@@ -141,6 +141,7 @@ export default function AdminCurriculumPage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadCurriculum intentionally flips its loading flag before fetching; this fetch-on-id-change pattern is the desired behavior
     if (programId) void loadCurriculum(programId);
   }, [programId, loadCurriculum]);
 

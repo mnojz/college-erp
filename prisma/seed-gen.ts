@@ -24,6 +24,7 @@ const clientKey = (m: string) => m[0].toLowerCase() + m.slice(1);
 async function main() {
   const DATA: Record<string, unknown[]> = {};
   for (const model of CREATE_ORDER) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the Prisma client is indexed dynamically by model name while seeding
     let rows: any[] = await (prisma as any)[clientKey(model)].findMany();
     const blobField = BLOB_TABLES[model];
     if (blobField) {

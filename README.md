@@ -109,9 +109,17 @@ Create or update `.env` in the project root:
 
 ```env
 DATABASE_URL="postgresql://admin:admin@localhost:5432/college_erp?schema=public"
+JWT_SECRET="a-long-random-string"
 
 # Optional but recommended for Prisma shadow operations
 SHADOW_DATABASE_URL="postgresql://admin:admin@localhost:5432/college_erp_shadow?schema=public"
+
+# Forgot-password emails (optional in development — see step 7)
+SMTP_HOST=""
+SMTP_PORT="587"
+SMTP_USER=""
+SMTP_PASS=""
+SMTP_FROM="College ERP <no-reply@example.com>"
 ```
 
 If you use `SHADOW_DATABASE_URL`, create the shadow database too:
@@ -139,6 +147,33 @@ Open the app at:
 http://localhost:3000
 ```
 
+### 7. Configure email for Forgot Password (optional in development)
+
+The login modal's **Forgot password?** flow emails a 6-digit OTP to the
+user's address, verifies it, then emails them a random 8-character password.
+
+- **Development (no setup needed):** with `SMTP_HOST` left empty, OTPs and
+  generated passwords are printed to the `npm run dev` console instead of
+  being emailed — you can walk the whole flow locally.
+- **Real email:** fill the `SMTP_*` variables. The easiest free option is a
+  Gmail App Password:
+  1. Enable 2-Step Verification on a Google account you control.
+  2. Google Account → Security → 2-Step Verification → **App passwords** →
+     create one (generates a 16-character password).
+  3. Put them in **`.env.local`** (gitignored — never in `.env`, which is
+     committed):
+
+     ```env
+     SMTP_HOST="smtp.gmail.com"
+     SMTP_PORT="587"
+     SMTP_USER="your.account@gmail.com"
+     SMTP_PASS="your-16-char-app-password"
+     SMTP_FROM="College ERP <your.account@gmail.com>"
+     ```
+
+The recipient can be any mailbox (e.g. `@fwu.edu.np` Outlook inboxes) — the
+sender and recipient providers are independent.
+
 ## Available Scripts
 
 - `npm run dev` - Run Next.js dev server
@@ -146,6 +181,7 @@ http://localhost:3000
 - `npm run start` - Start production build
 - `npm run lint` - Run ESLint
 - `npm run db:push` - Push Prisma schema to PostgreSQL
+- `npm run test` - Run unit tests (Vitest)
 
 ## Access Model (At a Glance)
 

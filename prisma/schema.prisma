@@ -42,6 +42,17 @@ model User {
   /// profileReviewStatus (shared with data edits) so the picture uploader only
   /// shows "rejected" when a picture specifically was — not on a data-only reject.
   lastAvatarRejectedAt  DateTime?
+  /// Forgot-password OTP. Only the SHA-256 hash is stored — the plaintext
+  /// code exists solely in the emailed message.
+  resetOtpHash          String?
+  /// When the current OTP stops being accepted (10-minute TTL).
+  resetOtpExpiresAt     DateTime?
+  /// Failed verification attempts against the current OTP (capped at 5).
+  resetOtpAttempts      Int       @default(0)
+  /// Last OTP email send, used for the 60-second resend cooldown.
+  resetOtpSentAt        DateTime?
+  /// OTP emails sent within the rolling 1-hour window anchored at resetOtpSentAt.
+  resetOtpSendCount     Int       @default(0)
   authoredAnnouncements Announcement[]
   bookmarks             Bookmark[]
   notifications         Notification[]

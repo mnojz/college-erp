@@ -27,6 +27,7 @@ async function main() {
   for (const model of CREATE_ORDER) {
     const rows = DATA[model] ?? [];
     if (rows.length === 0) continue;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the Prisma client is indexed dynamically by model name while seeding
     await (prisma as any)[clientKey(model)].createMany({ data: rows });
     console.log("  seeded " + model + " " + rows.length);
   }
