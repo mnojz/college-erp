@@ -38,6 +38,10 @@ model User {
   /// reject.
   pendingProfileData    Json?
   profileReviewStatus   ProfileReviewStatus @default(APPROVED)
+  /// Timestamp of the last rejected profile PICTURE submission. Distinct from
+  /// profileReviewStatus (shared with data edits) so the picture uploader only
+  /// shows "rejected" when a picture specifically was — not on a data-only reject.
+  lastAvatarRejectedAt  DateTime?
   authoredAnnouncements Announcement[]
   bookmarks             Bookmark[]
   notifications         Notification[]

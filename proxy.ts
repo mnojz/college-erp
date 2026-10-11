@@ -4,8 +4,10 @@ import jwt, { type JwtPayload } from "jsonwebtoken";
 export const config = {
   matcher: [
     // Run on all page routes but skip API routes (their handlers do their own
-    // per-resource authorization) and static assets.
-    "/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
+    // per-resource authorization) and static assets — including the public
+    // model/WASM files under /models (auth-gating them breaks dynamic imports
+    // in the client, and they hold no secrets).
+    "/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|models/).*)",
   ],
 };
 

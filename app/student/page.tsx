@@ -88,6 +88,8 @@ type Profile = {
     lastName: string;
     status: string;
     profileReviewStatus: "APPROVED" | "PENDING_REVIEW" | "REJECTED";
+    pendingAvatarUrl: string | null;
+    lastAvatarRejectedAt: string | null;
   };
   program: { name: string; code: string; durationYears: number; departmentName: string } | null;
   currentSemester: number | null;
@@ -455,7 +457,8 @@ export default function StudentPage() {
           <form className="flex flex-col gap-4" onSubmit={handleSaveProfile}>
             <ProfilePictureUpload
               currentAvatarUrl={profile.profileImageUrl}
-              profileReviewStatus={profile.user.profileReviewStatus ?? "APPROVED"}
+              avatarPending={Boolean(profile.user.pendingAvatarUrl)}
+              avatarRejected={Boolean(profile.user.lastAvatarRejectedAt)}
             />
 
             <p className="text-sm text-muted-foreground" style={{ marginTop: 2 }}>

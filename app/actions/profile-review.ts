@@ -56,7 +56,7 @@ export async function submitAvatarForReview(
 
   await prisma.user.update({
     where: { id: session.userId },
-    data: { pendingAvatarUrl: dataUrl, profileReviewStatus: "PENDING_REVIEW" },
+    data: { pendingAvatarUrl: dataUrl, profileReviewStatus: "PENDING_REVIEW", lastAvatarRejectedAt: null },
   });
   revalidatePath("/student");
   revalidatePath("/teacher");
@@ -107,6 +107,8 @@ export async function approveProfileChanges(
         pendingAvatarUrl: null,
         pendingProfileData: Prisma.DbNull,
         profileReviewStatus: "APPROVED",
+        // A picture approved now supersedes any earlier picture rejection.
+        ...(user.pendingAvatarUrl ? { lastAvatarRejectedAt: null } : {}),
       },
     }),
   ];
@@ -192,6 +194,9 @@ export async function rejectProfileChanges(
         pendingAvatarUrl: null,
         pendingProfileData: Prisma.DbNull,
         profileReviewStatus: "REJECTED",
+        // Only flag the PICTURE as rejected when one was actually pending; a
+        // data-only rejection must not surface as "photo rejected" in the UI.
+        ...(user.pendingAvatarUrl ? { lastAvatarRejectedAt: new Date() } : {}),
       },
     }),
     prisma.notification.create({

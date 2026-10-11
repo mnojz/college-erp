@@ -87,12 +87,13 @@ function buildDiff(
   const rows: DiffRow[] = [];
   for (const key of DISPLAY_KEYS) {
     if (!(key in pending)) continue;
-    rows.push({
-      key,
-      label: PROFILE_FIELD_LABELS[key] ?? key,
-      from: formatValue(key, current[key] ?? null),
-      to: formatValue(key, pending[key]),
-    });
+    const from = formatValue(key, current[key] ?? null);
+    const to = formatValue(key, pending[key]);
+    // Only surface fields whose value actually changed — the staged payload can
+    // include no-op keys (e.g. currSameAsPerm is always sent), and showing an
+    // unchanged "X → X" row is just noise for the reviewer.
+    if (from === to) continue;
+    rows.push({ key, label: PROFILE_FIELD_LABELS[key] ?? key, from, to });
   }
   return rows;
 }

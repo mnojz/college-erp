@@ -22,7 +22,10 @@ import { AvatarCropDialog } from "@/app/components/profile/AvatarCropDialog";
 
 type Props = {
   currentAvatarUrl: string | null;
-  profileReviewStatus: "APPROVED" | "PENDING_REVIEW" | "REJECTED";
+  /** A profile PICTURE is currently awaiting admin review. */
+  avatarPending: boolean;
+  /** The last profile PICTURE submission was rejected (not a data edit). */
+  avatarRejected: boolean;
 };
 
 /**
@@ -35,7 +38,7 @@ type Props = {
  *  3. On pass, a Server Action stages the picture as PENDING_REVIEW; an admin
  *     later approves/rejects it at /admin/profile-reviews.
  */
-export function ProfilePictureUpload({ currentAvatarUrl, profileReviewStatus }: Props) {
+export function ProfilePictureUpload({ currentAvatarUrl, avatarPending, avatarRejected }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -79,7 +82,9 @@ export function ProfilePictureUpload({ currentAvatarUrl, profileReviewStatus }: 
         return;
       }
 
-      // Gate 2: passport face check (single, straight, eyes open, neutral, framed).
+      // Gate 2: passport face check (single, straight, framed) + obstruction
+      // check (eyewear incl. sunglasses / mask / closed eyes) — all inside
+      // checkPassportFace.
       setPhase("Checking photo…");
       const face = await checkPassportFace(img);
       if (!face.ok) {
@@ -111,12 +116,8 @@ export function ProfilePictureUpload({ currentAvatarUrl, profileReviewStatus }: 
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2 text-base">
           Profile Photo
-          {profileReviewStatus === "PENDING_REVIEW" && (
-            <Badge variant="secondary">Pending review</Badge>
-          )}
-          {profileReviewStatus === "REJECTED" && (
-            <Badge variant="destructive">Last photo rejected</Badge>
-          )}
+          {avatarPending && <Badge variant="secondary">Pending review</Badge>}
+          {avatarRejected && <Badge variant="destructive">Last photo rejected</Badge>}
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-wrap items-center gap-4">

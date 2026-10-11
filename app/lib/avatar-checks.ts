@@ -7,18 +7,23 @@
  * approval workflow at /admin/profile-reviews remains the authoritative check.
  *
  * Checks performed (fail-fast, most-specific-first):
- *   1. Blur/noise   — variance of a 3x3 Laplacian response >= BLUR_MIN_VARIANCE.
+ *   1. Blur/noise   — variance of a 3x3 Laplacian response >= BLUR_MIN_VARIANCE
+ *      (run in the component, before this function).
  *   2. Exactly one face detected.
  *   3. Head straight — |yaw|, |pitch|, |roll| from the facial transformation
  *      matrix each <= ANGLE_MAX_RAD (~14.3°).
  *   4. Framing — face fills most of the frame and is centred (head-to-chest).
+ *   5. Facial obstruction — eyewear (incl. sunglasses) / face mask via FrameFind
+ *      (app/lib/obstruction-checks.ts), on a canvas capped at 1024px using the
+ *      landmarks from this pass; closed eyes are rejected from the same
+ *      landmarks via the eye-aspect-ratio (EAR) gate in that module.
  *
- * NOTE on eyewear: MediaPipe's FaceLandmarker does NOT emit a per-landmark
- * visibility/presence score for faces (that field is only populated by the
- * pose landmarker), and it ships no glasses model. So there is no reliable
- * client-side signal for sunglasses/glasses — attempting one produces false
- * rejections on perfectly clear photos. Eyewear is therefore left to the admin
- * reviewer at /admin/profile-reviews, which is the authoritative gate anyway.
+ * NOTE on eyewear: MediaPipe's FaceLandmarker cannot detect glasses/masks (no
+ * such model, and it does not emit per-landmark visibility for faces), so that
+ * signal comes from FrameFind's ONNX classifiers (MeGlass-trained glasses head,
+ * 3-class mask head). All gates here are ADVISORY — a modified client can bypass
+ * them — so the admin approval workflow at /admin/profile-reviews remains the
+ * authoritative check.
  */
 
 import {
@@ -27,6 +32,7 @@ import {
   type FaceLandmarkerResult,
   type NormalizedLandmark,
 } from "@mediapipe/tasks-vision";
+import { detectObstructions, evaluateObstruction } from "@/app/lib/obstruction-checks";
 
 /** Minimum Laplacian variance for an acceptable (sharp enough) photo. */
 export const BLUR_MIN_VARIANCE = 150;
@@ -102,10 +108,25 @@ export function laplacianVariance(img: HTMLImageElement, size = 256): number {
   return sumSq / n - mean * mean;
 }
 
+/**
+ * Machine-readable reason a photo was rejected. The UI maps `reason` to a
+ * friendly toast; `code` is for tests / analytics so we never string-match.
+ */
+export type RejectionCode =
+  | "ERROR"
+  | "NO_FACE"
+  | "MULTI_FACE"
+  | "ANGLE"
+  | "FRAMING"
+  | "EYEWEAR"
+  | "MASK"
+  | "EYES_CLOSED"
+  | "UNCERTAIN";
+
 /** Result of the local verification gates. */
 export type FaceCheckResult =
   | { ok: true; score: number }
-  | { ok: false; reason: string };
+  | { ok: false; reason: string; code: RejectionCode };
 
 // ── MediaPipe FaceLandmarker (lazy singleton) ────────────────────────────────
 // Loads once per session. The WASM backend and model are served from
@@ -249,6 +270,7 @@ export async function checkPassportFace(img: HTMLImageElement): Promise<FaceChec
     console.error("FaceLandmarker detect error:", err);
     return {
       ok: false,
+      code: "ERROR",
       reason: "Couldn't run face verification. Please try again with a different photo.",
     };
   }
@@ -258,12 +280,14 @@ export async function checkPassportFace(img: HTMLImageElement): Promise<FaceChec
   if (faces.length === 0) {
     return {
       ok: false,
+      code: "NO_FACE",
       reason: "No face detected. Upload a clear, front-facing passport-style photo of yourself.",
     };
   }
   if (faces.length > 1) {
     return {
       ok: false,
+      code: "MULTI_FACE",
       reason: "More than one person detected. Upload a photo with only yourself.",
     };
   }
@@ -277,18 +301,21 @@ export async function checkPassportFace(img: HTMLImageElement): Promise<FaceChec
     if (Math.abs(euler.yaw) > PASSPORT.ANGLE_MAX_RAD) {
       return {
         ok: false,
+        code: "ANGLE",
         reason: "You're looking too far left or right. Face the camera straight on.",
       };
     }
     if (Math.abs(euler.pitch) > PASSPORT.ANGLE_MAX_RAD) {
       return {
         ok: false,
+        code: "ANGLE",
         reason: "Please look straight ahead — not too far up or down.",
       };
     }
     if (Math.abs(euler.roll) > PASSPORT.ANGLE_MAX_RAD) {
       return {
         ok: false,
+        code: "ANGLE",
         reason: "Your head is tilted. Please keep it straight and level with the camera.",
       };
     }
@@ -303,17 +330,38 @@ export async function checkPassportFace(img: HTMLImageElement): Promise<FaceChec
   if (faceH < PASSPORT.FACE_H_MIN) {
     return {
       ok: false,
+      code: "FRAMING",
       reason: "Your face is too small in the frame. Move closer so your head fills most of the photo.",
     };
   }
   if (faceH > PASSPORT.FACE_H_MAX || faceW > PASSPORT.FACE_H_MAX) {
     return {
       ok: false,
+      code: "FRAMING",
       reason: "Your face is too large / too close. Include a little space around your head and shoulders.",
     };
   }
   if (Math.abs(centerX - 0.5) > PASSPORT.CENTER_TOL) {
-    return { ok: false, reason: "Please centre your face in the frame." };
+    return { ok: false, code: "FRAMING", reason: "Please centre your face in the frame." };
+  }
+
+  // ── Facial obstruction (eyewear / mask) via FrameFind ──
+  // Runs last, using the landmarks from this same MediaPipe pass (no second
+  // face detection). A null result means the models couldn't load or inference
+  // threw — we FAIL CLOSED (do not auto-approve) and ask the user to retry,
+  // matching the existing "couldn't run verification" behaviour. Admin review
+  // stays the gate.
+  const obstructionInputs = await detectObstructions(img, landmarks);
+  if (obstructionInputs === null) {
+    return {
+      ok: false,
+      code: "UNCERTAIN",
+      reason: "We couldn't reliably verify this photo. Please try another image.",
+    };
+  }
+  const obstruction = evaluateObstruction(obstructionInputs);
+  if (obstruction.obstructed) {
+    return { ok: false, code: obstruction.code, reason: obstruction.reason };
   }
 
   return { ok: true, score: 1 };

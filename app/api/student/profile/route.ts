@@ -66,6 +66,8 @@ const PROFILE_SELECT = {
       lastName: true,
       status: true,
       profileReviewStatus: true,
+      pendingAvatarUrl: true,
+      lastAvatarRejectedAt: true,
     },
   },
 } as const;

@@ -10,9 +10,11 @@
     "db:push": "npx prisma db push",
     "db:generate": "npx prisma generate",
     "db:seed": "npx tsx prisma/seed.ts",
-    "setup:models": "bash scripts/fetch-models.sh"
+    "setup:models": "bash scripts/fetch-models.sh",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@framefind/core": "^0.4.1",
     "@mediapipe/tasks-vision": "^1.1.0",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
@@ -26,6 +28,7 @@
     "lucide-react": "^1.41.0",
     "next": "16.3.2",
     "next-themes": "^0.4.6",
+    "onnxruntime-web": "^1.30.0",
     "pg": "^8.23.0",
     "prisma": "^7.9.1",
     "radix-ui": "^1.6.7",
@@ -40,14 +43,15 @@
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^20",
+    "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.2",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.3"
   },
   "allowScripts": {
     "bcrypt@6.0.0": true,
