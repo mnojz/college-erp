@@ -77,12 +77,6 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
     }
   }
 
-  function fillDemo(demoEmail: string, demoPass: string) {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    setError("");
-  }
-
   return (
     <PublicLayoutContext.Provider value={{ openLogin }}>
       <div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -236,37 +230,6 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
                 )}
               </Button>
             </form>
-
-            <div className="flex flex-col gap-3 border-t pt-5">
-              <div className="relative text-center">
-                <span className="relative z-10 bg-popover px-2 text-xs font-medium tracking-wide text-muted-foreground">
-                  Or use a demo account
-                </span>
-                <div className="absolute inset-x-0 top-1/2 h-px bg-border" aria-hidden="true" />
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { label: "Student", email: "student@fwu.edu.np", pass: "student1234" },
-                  { label: "Teacher", email: "teacher@fwu.edu.np", pass: "teacher1234" },
-                  { label: "Admin", email: "admin@fwu.edu.np", pass: "admin1234" },
-                ].map((demo) => (
-                  <Button
-                    key={demo.label}
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={loading}
-                    onClick={() => fillDemo(demo.email, demo.pass)}
-                    className="h-9 w-full"
-                  >
-                    {demo.label}
-                  </Button>
-                ))}
-              </div>
-              <p className="text-center text-xs text-muted-foreground">
-                Credentials are pre-filled — just press Sign In.
-              </p>
-            </div>
           </DialogContent>
         </Dialog>
 

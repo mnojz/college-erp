@@ -600,6 +600,58 @@ export default function AdminPeoplePage() {
   // Deactivate Confirmation Modal (activation is applied directly, no modal)
   const [statusTarget, setStatusTarget] = useState<StatusTarget | null>(null);
 
+  // Admin self-service: change own password (requires current password)
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newAdminPassword, setNewAdminPassword] = useState("");
+  const [confirmAdminPassword, setConfirmAdminPassword] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwError, setPwError] = useState("");
+  const [pwMessage, setPwMessage] = useState("");
+
+  /**
+   * Change the signed-in admin's own password via PATCH /api/admin/password.
+   * Mirrors the student self-service rules: current password must verify and
+   * the new password must be at least 8 characters.
+   */
+  async function handleAdminPasswordChange(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPwError("");
+    setPwMessage("");
+    if (!currentPassword || !newAdminPassword) {
+      setPwError("Enter your current password and a new password.");
+      return;
+    }
+    if (newAdminPassword.length < 8) {
+      setPwError("New password must be at least 8 characters.");
+      return;
+    }
+    if (newAdminPassword !== confirmAdminPassword) {
+      setPwError("New passwords do not match.");
+      return;
+    }
+    setPwSaving(true);
+    try {
+      const res = await fetch("/api/admin/password", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword: newAdminPassword }),
+      });
+      const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) {
+        setPwError(payload?.error ?? "Unable to change password");
+        return;
+      }
+      setPwMessage("Your password was changed successfully.");
+      setCurrentPassword("");
+      setNewAdminPassword("");
+      setConfirmAdminPassword("");
+    } catch {
+      setPwError("Unable to reach the server");
+    } finally {
+      setPwSaving(false);
+    }
+  }
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -2468,6 +2520,67 @@ export default function AdminPeoplePage() {
             </div>
           </AdminModal>
         )}
+
+        {/* Admin self-service: change own password */}
+        <section className="rounded-xl border bg-card p-5 shadow-xs">
+          <h2 className="text-base font-semibold">Change my password</h2>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            Update the password for the account you are signed in with. Your current password is
+            required to confirm the change.
+          </p>
+          <form onSubmit={handleAdminPasswordChange} className="mt-4 grid max-w-md gap-3.5">
+            <div className="grid gap-1.5">
+              <Label htmlFor="admin-current-password">Current password</Label>
+              <Input
+                id="admin-current-password"
+                type="password"
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                disabled={pwSaving}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="admin-new-password">New password</Label>
+              <Input
+                id="admin-new-password"
+                type="password"
+                autoComplete="new-password"
+                placeholder="At least 8 characters"
+                value={newAdminPassword}
+                onChange={(e) => setNewAdminPassword(e.target.value)}
+                disabled={pwSaving}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="admin-confirm-password">Confirm new password</Label>
+              <Input
+                id="admin-confirm-password"
+                type="password"
+                autoComplete="new-password"
+                value={confirmAdminPassword}
+                onChange={(e) => setConfirmAdminPassword(e.target.value)}
+                disabled={pwSaving}
+              />
+            </div>
+            {pwError && (
+              <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] text-destructive">
+                {pwError}
+              </p>
+            )}
+            {pwMessage && (
+              <p className="flex items-center gap-2 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-[13px] font-medium text-emerald-600 dark:text-emerald-400">
+                <IconCircleCheck size={15} aria-hidden="true" className="shrink-0" />
+                {pwMessage}
+              </p>
+            )}
+            <div>
+              <Button type="submit" size="sm" disabled={pwSaving}>
+                {pwSaving ? "Changing…" : "Change password"}
+              </Button>
+            </div>
+          </form>
+        </section>
       </div>
     </AdminShell>
   );
