@@ -7,4 +7,7 @@
  */
 import { config as loadEnv } from "dotenv";
 
-loadEnv({ path: [".env.local", ".env"] });
+// dotenv does NOT override existing vars, so load the base first and the
+// override file second — mirroring Next.js `.env` → `.env.local` precedence.
+loadEnv({ path: ".env" });
+loadEnv({ path: ".env.local", override: true });
