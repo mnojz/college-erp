@@ -128,6 +128,23 @@ If you use `SHADOW_DATABASE_URL`, create the shadow database too:
 CREATE DATABASE college_erp_shadow OWNER admin;
 ```
 
+#### Using Neon serverless Postgres
+
+Instead of local Postgres, point the app at a [Neon](https://neon.tech) project
+by putting **both** connection strings in gitignored `.env.local` (never in
+`.env` — this repo is public):
+
+```env
+# Pooled endpoint — application runtime (app/lib/prisma.ts) and Vercel deploys
+DATABASE_URL="postgresql://user:pass@ep-xxx-pooler.region.aws.neon.tech/db?sslmode=require&channel_binding=require"
+# Direct (unpooled) endpoint — Prisma CLI (db push / migrate) uses it automatically
+DATABASE_URL_UNPOOLED="postgresql://user:pass@ep-xxx.region.aws.neon.tech/db?sslmode=require"
+```
+
+`.env.local` overrides `.env` everywhere — Next.js at runtime, and
+`prisma/load-env.ts` for the Prisma CLI and seed scripts — so the committed
+localhost values in `.env` remain a safe fallback for fresh clones.
+
 ### 5. Sync Prisma schema to database
 
 ```bash
