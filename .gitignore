@@ -4,7 +4,7 @@ node_modules
 .agents
 .claude
 .windsurf
-# .env
+.env
 # TypeScript incremental build cache
 tsconfig.tsbuildinfo
 
