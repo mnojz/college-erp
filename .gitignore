@@ -21,3 +21,5 @@ public/models/*
 
 # Personal scratch notes
 i'll_do_it_later.md
+.vercel
+.env*
