@@ -864,21 +864,25 @@ export default function TeacherAttendancePage() {
                       toggleStudent(student.id);
                     }
                   }}
-                  className={`flex items-center justify-between gap-4 rounded-xl border px-4 py-3 transition-colors ${
+                  className={`flex min-h-16 items-stretch justify-between gap-4 overflow-hidden rounded-xl border transition-colors ${
                     isPresent
                       ? "border-[color-mix(in_oklab,var(--ctp-green)_35%,transparent)] bg-[color-mix(in_oklab,var(--ctp-green)_8%,transparent)]"
                       : "border-border bg-card"
                   } ${inactive ? "opacity-50" : ""} ${readOnly ? "" : "cursor-pointer hover:bg-muted/40"}`}
                 >
-                  <div className="flex min-w-0 items-center gap-3.5">
+                  {/* Left group stretches to the row's full height so the roll
+                      tile reads as a flush-left gutter: no padding around it,
+                      square right edge, left corners inherited from the row's
+                      rounded-xl + overflow-hidden clipping. */}
+                  <div className="flex min-w-0 items-stretch gap-3.5">
                     {/* Roll number leads the row — teachers mark attendance by
                         roll, so it's the primary scan target. Zero-padded so
                         digits stay aligned down the list; the present state is
                         carried by the green tint + checkbox, not a badge. */}
                     <span
-                      className={`flex h-11 w-16 shrink-0 items-center justify-center rounded-lg border text-2xl font-extrabold tabular-nums ${
+                      className={`flex w-16 shrink-0 items-center justify-center border-r text-2xl font-extrabold tabular-nums ${
                         isPresent
-                          ? "border-[color-mix(in_oklab,var(--ctp-green)_35%,transparent)] bg-[color-mix(in_oklab,var(--ctp-green)_16%,transparent)] text-(--ctp-green)"
+                          ? "border-[color-mix(in_oklab,var(--ctp-green)_30%,transparent)] bg-[color-mix(in_oklab,var(--ctp-green)_16%,transparent)] text-(--ctp-green)"
                           : "border-border bg-muted text-foreground"
                       }`}
                     >
@@ -886,23 +890,25 @@ export default function TeacherAttendancePage() {
                         ? String(student.rollNumber).padStart(2, "0")
                         : "—"}
                     </span>
-                    <span
-                      className={`flex size-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${
-                        isPresent
-                          ? "bg-[color-mix(in_oklab,var(--ctp-green)_16%,transparent)] text-(--ctp-green)"
-                          : "bg-muted text-muted-foreground"
-                      }`}
-                      aria-hidden="true"
-                    >
-                      {student.user.firstName[0]}
-                      {student.user.lastName[0]}
-                    </span>
-                    <p className="min-w-0 truncate text-sm font-semibold text-foreground">
-                      {student.user.firstName} {student.user.lastName}
-                    </p>
+                    <div className="flex min-w-0 items-center">
+                      <span
+                        className={`flex size-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${
+                          isPresent
+                            ? "bg-[color-mix(in_oklab,var(--ctp-green)_16%,transparent)] text-(--ctp-green)"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                        aria-hidden="true"
+                      >
+                        {student.user.firstName[0]}
+                        {student.user.lastName[0]}
+                      </span>
+                      <p className="ml-3.5 min-w-0 truncate text-sm font-semibold text-foreground">
+                        {student.user.firstName} {student.user.lastName}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="flex shrink-0 items-center gap-3">
+                  <div className="flex shrink-0 items-center gap-3 pr-4">
                     {inactive && (
                       <span
                         className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-bold tracking-wide text-muted-foreground"
