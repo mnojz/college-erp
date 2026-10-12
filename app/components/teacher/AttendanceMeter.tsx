@@ -44,7 +44,7 @@ export function AttendanceMeter({ present, total }: AttendanceMeterProps) {
       <span className="w-14 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
         {hasHistory ? `${present}/${total}` : "—/0"}
       </span>
-      <div className="h-2 w-28 shrink-0 overflow-hidden rounded-full bg-muted">
+      <div className="h-2 w-50 shrink-0 overflow-hidden rounded-full bg-muted">
         <div
           className="h-full rounded-full transition-[width] duration-500"
           style={{

@@ -973,9 +973,9 @@ export default function TeacherAttendancePage() {
                   </div>
 
                   {/* Right cluster: the fixed-width meter sits close to the
-                      checkbox (shared gap-3) so every row's bar has the same
+                      checkbox (shared gap) so every row's bar has the same
                       length — the name absorbs the remaining slack. */}
-                  <div className="flex shrink-0 items-center gap-3 pr-4">
+                  <div className="flex shrink-0 items-center gap-30 pr-6">
                     <AttendanceMeter
                       present={student.attendance.present}
                       total={student.attendance.total}
@@ -994,11 +994,16 @@ export default function TeacherAttendancePage() {
                       onCheckedChange={() => toggleStudent(student.id)}
                       onClick={(e) => e.stopPropagation()}
                       aria-label={`Mark ${student.user.firstName} ${student.user.lastName} ${isPresent ? "absent" : "present"}`}
+                      // Bigger box (28px) with the app's rounded-lg radius.
+                      // The `!` flags outrank data-checked:bg-primary AND
+                      // dark:data-checked:bg-primary — the class merger keeps
+                      // that one because its modifiers differ — so a checked
+                      // box is always catppuccin green, never the default blue.
                       // The indicator's built-in icon size ([&>svg]:size-3.5)
                       // has equal specificity to a plain [&_svg] override, so
                       // the winner would depend on stylesheet order. Target the
-                      // indicator explicitly to keep the 18px checkmark.
-                      className="size-6 cursor-pointer rounded-[7px] [&_[data-slot=checkbox-indicator]>svg]:size-4.5"
+                      // indicator explicitly to keep the 20px checkmark.
+                      className="size-7! cursor-pointer rounded-lg! data-checked:border-(--ctp-green)! data-checked:bg-(--ctp-green)! [&_[data-slot=checkbox-indicator]>svg]:size-5"
                     />
                   </div>
                 </div>
