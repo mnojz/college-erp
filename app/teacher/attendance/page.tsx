@@ -1,6 +1,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -13,11 +14,21 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  IconAlertTriangle,
   IconCalendarEvent,
+  IconCircleCheck,
+  IconCircleX,
+  IconClipboardList,
   IconFilterOff,
+  IconLoader2,
   IconLock,
   IconPencil,
+  IconSearch,
+  IconTrendingUp,
+  IconUsers,
 } from "@tabler/icons-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TeacherAttendanceRecords } from "@/app/components/teacher/TeacherAttendanceRecords";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
 import { CAMPUS_TIME_ZONE, campusNow, campusTodayISO } from "@/app/lib/campus-time";
 
@@ -142,6 +153,32 @@ export default function TeacherAttendancePage() {
   const [submittedAt, setSubmittedAt] = useState<string | null>(null);
   /** Client clock, set in an effect so render stays pure (purity lint rule). */
   const [now, setNow] = useState<number | null>(null);
+
+  /** Active top-level tab: 'mark' (live roll call) or 'records' (subject attendance analytics) */
+  const [activeTab, setActiveTab] = useState<"mark" | "records">("mark");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const tabParam = new URLSearchParams(window.location.search).get("tab");
+      if (tabParam === "records" || tabParam === "history") {
+        setTimeout(() => setActiveTab("records"), 0);
+      }
+    }
+  }, []);
+
+  function handleTabChange(value: string) {
+    const next = value === "records" ? "records" : "mark";
+    setActiveTab(next);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (next === "records") {
+        url.searchParams.set("tab", "records");
+      } else {
+        url.searchParams.delete("tab");
+      }
+      window.history.replaceState(null, "", url.toString());
+    }
+  }
 
   /** Attendance is always for the current day — shown as read-only info. */
   // Campus date, not UTC: between 00:00 and the UTC offset, toISOString()
@@ -505,16 +542,60 @@ export default function TeacherAttendancePage() {
     <TeacherShell
       active="/teacher/attendance"
       title="Class Attendance Management"
-      subtitle="Roll Call & Attendance Logs"
+      subtitle={
+        activeTab === "records"
+          ? "Subject Records & Analytics"
+          : "Daily Roll Call Checklist"
+      }
       teacherName={teacherInfo ? `${teacherInfo.firstName} ${teacherInfo.lastName}` : "Faculty Member"}
       employeeNo={teacherInfo?.employeeNo}
       avatarUrl={teacherInfo?.profileImageUrl}
     >
-      {/* Attendance Control Card */}
-      <section className="rounded-xl border bg-card p-5 shadow-xs" style={{ padding: "22px", marginBottom: "20px" }}>
-        {/* Filter bar: Program → Semester → Class → Clear. The JSX source order
-            is kept, so each column sets a CSS grid `order` for visual order. */}
-        <div className="mb-4 grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-[0.9fr_0.9fr_1.7fr_auto]">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full space-y-6">
+        <div className="flex border-b border-border/80 pb-3">
+          <TabsList className="h-10 bg-muted/60 p-1">
+            <TabsTrigger
+              value="mark"
+              className="gap-2 px-4 py-2 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-xs"
+            >
+              <IconCalendarEvent className="size-4" aria-hidden="true" />
+              Take Today&apos;s Attendance
+            </TabsTrigger>
+            <TabsTrigger
+              value="records"
+              className="gap-2 px-4 py-2 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-xs"
+            >
+              <IconClipboardList className="size-4" aria-hidden="true" />
+              Subject Records &amp; Analytics
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="mark" className="space-y-6">
+          {/* Attendance Control Card */}
+          <section className="rounded-xl border bg-card shadow-xs">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 p-5">
+              <div className="flex items-center gap-3">
+                <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <IconCalendarEvent size={18} aria-hidden="true" />
+                </span>
+                <div>
+                  <h2 className="text-sm font-bold text-foreground">Select a Class</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Filter by program and semester, then choose the class for today&apos;s roll call.
+                  </p>
+                </div>
+              </div>
+              <span
+                className="inline-flex items-center gap-2 rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs font-semibold text-primary"
+                title="Attendance is recorded for today only — there is no date picker by design"
+              >
+                <IconCalendarEvent size={15} aria-hidden="true" />
+                Today · {todayLabel}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 items-end gap-4 p-5 sm:grid-cols-2 lg:grid-cols-[0.9fr_0.9fr_1.7fr_auto]">
           <div className="grid gap-1.5">
             <Label htmlFor="att-filter-program">Program</Label>
             <Select
@@ -586,190 +667,162 @@ export default function TeacherAttendancePage() {
             title="Reset the program and semester filters"
           >
             <IconFilterOff size={15} aria-hidden="true" />
-            Clear Filters
-          </Button>
-        </div>
-        {/* Date is read-only info — attendance can only ever be taken today. */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: "12px",
-            borderTop: "1px solid var(--border)",
-            paddingTop: "12px",
-          }}
-        >
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "7px",
-              padding: "7px 12px",
-              borderRadius: "8px",
-              background: "var(--secondary)",
-              border: "1px solid var(--border)",
-              fontSize: "0.8rem",
-              fontWeight: 600,
-              color: "var(--primary)",
-            }}
-            title="Attendance is recorded for today only — there is no date picker by design"
-          >
-            <IconCalendarEvent size={15} />
-            Today · {todayLabel}
-          </span>
-
-        </div>
-      </section>
+            </Button>
+            </div>
+          </section>
 
       {/* Metrics Row */}
-      <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" style={{ marginBottom: "20px" }}>
-        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs [&>span]:text-xs [&>span]:font-semibold [&>span]:uppercase [&>span]:tracking-wide [&>span]:text-muted-foreground [&>strong]:my-1 [&>strong]:text-[34px] [&>strong]:font-bold [&>strong]:leading-none [&>strong]:tracking-tight [&>small]:text-xs [&>small]:text-muted-foreground">
-          <span>Enrolled Students</span>
-          <strong>{totalStudents}</strong>
-          <small>Total in {selectedClass?.program.code ?? "class"}</small>
+      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <article className="flex min-w-0 flex-col justify-between rounded-xl border bg-card p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Enrolled
+            </span>
+            <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <IconUsers size={16} aria-hidden="true" />
+            </span>
+          </div>
+          <strong className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            {totalStudents}
+          </strong>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Total in {selectedClass?.program.code ?? "class"}
+          </p>
         </article>
-        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs [&>span]:text-xs [&>span]:font-semibold [&>span]:uppercase [&>span]:tracking-wide [&>span]:text-muted-foreground [&>strong]:my-1 [&>strong]:text-[34px] [&>strong]:font-bold [&>strong]:leading-none [&>strong]:tracking-tight [&>small]:text-xs [&>small]:text-muted-foreground">
-          <span>Marked Present</span>
-          <strong className="text-emerald-600 dark:text-emerald-400">{presentCount}</strong>
-          <small>In-person attendance</small>
+
+        <article className="flex min-w-0 flex-col justify-between rounded-xl border bg-card p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Present
+            </span>
+            <span className="flex size-7 items-center justify-center rounded-lg bg-[color-mix(in_oklab,var(--ctp-green)_15%,transparent)] text-(--ctp-green)">
+              <IconCircleCheck size={16} aria-hidden="true" />
+            </span>
+          </div>
+          <strong className="mt-3 text-2xl font-bold tracking-tight text-(--ctp-green) sm:text-3xl">
+            {presentCount}
+          </strong>
+          <p className="mt-0.5 text-xs text-muted-foreground">Marked present</p>
         </article>
-        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs [&>span]:text-xs [&>span]:font-semibold [&>span]:uppercase [&>span]:tracking-wide [&>span]:text-muted-foreground [&>strong]:my-1 [&>strong]:text-[34px] [&>strong]:font-bold [&>strong]:leading-none [&>strong]:tracking-tight [&>small]:text-xs [&>small]:text-muted-foreground">
-          <span>Marked Absent</span>
-          <strong className="text-red-600 dark:text-red-400">{absentCount}</strong>
-          <small>Absentee students</small>
+
+        <article className="flex min-w-0 flex-col justify-between rounded-xl border bg-card p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Absent
+            </span>
+            <span className="flex size-7 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+              <IconCircleX size={16} aria-hidden="true" />
+            </span>
+          </div>
+          <strong className="mt-3 text-2xl font-bold tracking-tight text-destructive sm:text-3xl">
+            {absentCount}
+          </strong>
+          <p className="mt-0.5 text-xs text-muted-foreground">Absentee students</p>
         </article>
-        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs [&>span]:text-xs [&>span]:font-semibold [&>span]:uppercase [&>span]:tracking-wide [&>span]:text-muted-foreground [&>strong]:my-1 [&>strong]:text-[34px] [&>strong]:font-bold [&>strong]:leading-none [&>strong]:tracking-tight [&>small]:text-xs [&>small]:text-muted-foreground">
-          <span>Attendance Rate</span>
-          <strong style={{ color: "var(--accent)" }}>{attendanceRate}%</strong>
-          <small>Current session</small>
+
+        <article className="flex min-w-0 flex-col justify-between rounded-xl border bg-card p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Rate
+            </span>
+            <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <IconTrendingUp size={16} aria-hidden="true" />
+            </span>
+          </div>
+          <strong className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            {attendanceRate}%
+          </strong>
+          <p className="mt-0.5 text-xs text-muted-foreground">Current session</p>
         </article>
       </section>
 
       {/* Error & Success Messages */}
       {error && (
         <div
-          style={{
-            padding: "12px 16px",
-            borderRadius: "8px",
-            background: "color-mix(in srgb, var(--destructive) 10%, transparent)",
-            color: "var(--destructive)",
-            border: "1px solid color-mix(in srgb, var(--destructive) 25%, transparent)",
-            marginBottom: "16px",
-            fontSize: "0.88rem",
-          }}
           role="alert"
+          className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive"
         >
-          {error}
+          <IconAlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
       {message && (
         <div
-          style={{
-            padding: "12px 16px",
-            borderRadius: "8px",
-            background: "color-mix(in srgb, #10b981 14%, transparent)",
-            color: "#059669",
-            border: "1px solid color-mix(in srgb, #10b981 30%, transparent)",
-            marginBottom: "16px",
-            fontSize: "0.88rem",
-          }}
           role="status"
+          className="flex items-start gap-2.5 rounded-xl border border-[color-mix(in_oklab,var(--ctp-green)_30%,transparent)] bg-[color-mix(in_oklab,var(--ctp-green)_12%,transparent)] px-4 py-3 text-sm font-medium text-(--ctp-green)"
         >
-          {message}
+          <IconCircleCheck size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+          <span>{message}</span>
         </div>
       )}
 
       {/* Roster & Roll Call Card */}
-      <section className="rounded-xl border bg-card p-5 shadow-xs" style={{ padding: "24px" }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: "12px",
-            paddingBottom: "16px",
-            borderBottom: "1px solid var(--border)",
-          }}
-        >
+      <section className="rounded-xl border bg-card shadow-xs">
+        <div className="flex flex-col gap-3 border-b border-border/70 p-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 style={{ margin: 0, padding: 0, fontSize: "1.15rem", fontWeight: "700" }}>
-              Student Roll Call Checklist
-            </h2>
-            <span style={{ fontSize: "0.8rem", color: "var(--muted-foreground)" }}>
+            <h2 className="text-base font-bold text-foreground">Student Roll Call</h2>
+            <p className="text-xs text-muted-foreground">
               {selectedClass ? `${selectedClass.subject.code}: ${selectedClass.subject.name}` : "Select a class"}
-            </span>
+            </p>
           </div>
 
-          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            <input
-              type="search"
-              placeholder="Search student or roll..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: "200px",
-                padding: "6px 12px",
-                borderRadius: "6px",
-                border: "1px solid var(--border)",
-                fontSize: "0.82rem",
-                background: "var(--card)",
-                color: "inherit",
-              }}
-            />
-            <Button
-              type="button"
-              onClick={selectAll}
-              disabled={!selectedClass || totalStudents === 0 || isLocked || sessionStatus === "submitted"}
-              style={{
-                padding: "6px 12px",
-                borderRadius: "6px",
-                border: "1px solid var(--border)",
-                background: "var(--card)",
-                color: "inherit",
-                fontSize: "0.8rem",
-                fontWeight: "600",
-                cursor: "pointer",
-              }}
-            >
-              Mark All Present
-            </Button>
-            <Button
-              type="button"
-              onClick={clearAll}
-              disabled={!selectedClass || totalStudents === 0 || isLocked || sessionStatus === "submitted"}
-              style={{
-                padding: "6px 12px",
-                borderRadius: "6px",
-                border: "1px solid var(--border)",
-                background: "var(--card)",
-                color: "inherit",
-                fontSize: "0.8rem",
-                fontWeight: "600",
-                cursor: "pointer",
-              }}
-            >
-              Clear All
-            </Button>
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+            <div className="relative w-full sm:w-64">
+              <IconSearch className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" aria-hidden="true" />
+              <Input
+                type="search"
+                placeholder="Search student or roll..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-9 pl-8 text-xs"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={selectAll}
+                disabled={!selectedClass || totalStudents === 0 || isLocked || sessionStatus === "submitted"}
+                className="h-9 gap-1.5 text-xs font-semibold"
+              >
+                <IconCircleCheck size={15} aria-hidden="true" />
+                Mark All Present
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={clearAll}
+                disabled={!selectedClass || totalStudents === 0 || isLocked || sessionStatus === "submitted"}
+                className="h-9 gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
+              >
+                <IconCircleX size={15} aria-hidden="true" />
+                Clear All
+              </Button>
+            </div>
           </div>
         </div>
 
         {isLoading ? (
-          <p className="text-center text-sm text-muted-foreground" style={{ textAlign: "center", padding: "40px 0" }}>
-            Loading student roster...
-          </p>
+          <div className="flex flex-col items-center justify-center gap-3 p-16 text-center">
+            <IconLoader2 className="size-7 animate-spin text-primary" aria-hidden="true" />
+            <p className="text-sm text-muted-foreground">Loading student roster…</p>
+          </div>
         ) : !selectedClass || totalStudents === 0 ? (
-          <p className="text-center text-sm text-muted-foreground" style={{ textAlign: "center", padding: "40px 0" }}>
-            No enrolled students in this class program yet.
-          </p>
+          <div className="flex flex-col items-center justify-center gap-2 p-16 text-center">
+            <IconUsers className="size-8 text-muted-foreground/60" aria-hidden="true" />
+            <p className="text-sm text-muted-foreground">
+              No enrolled students in this class program yet.
+            </p>
+          </div>
         ) : filteredStudents.length === 0 ? (
-          <p className="text-center text-sm text-muted-foreground" style={{ textAlign: "center", padding: "40px 0" }}>
-            No students matching &quot;{searchQuery}&quot;
-          </p>
+          <div className="flex flex-col items-center justify-center gap-2 p-16 text-center">
+            <IconSearch className="size-8 text-muted-foreground/60" aria-hidden="true" />
+            <p className="text-sm text-muted-foreground">No students matching &quot;{searchQuery}&quot;</p>
+          </div>
         ) : (
-          <div style={{ display: "grid", gap: "8px", marginTop: "16px" }}>
+          <div className="grid gap-2 p-5">
             {filteredStudents.map((student) => {
               const isPresent = presentStudentIds.has(student.id);
               // Deactivated account: still listed on the roll, never markable.
@@ -781,58 +834,54 @@ export default function TeacherAttendancePage() {
               return (
                 <div
                   key={student.id}
+                  role="button"
+                  tabIndex={readOnly ? -1 : 0}
                   onClick={() => {
                     // Locked sessions and deactivated accounts are both read-only;
                     // the server rejects edits to either.
                     if (readOnly) return;
                     toggleStudent(student.id);
                   }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "12px 16px",
-                    borderRadius: "10px",
-                    border: `1px solid ${isPresent ? "color-mix(in oklab, var(--ctp-green) 35%, transparent)" : "var(--border)"}`,
-                    background: isPresent ? "color-mix(in oklab, var(--ctp-green) 10%, transparent)" : "var(--card)",
-                    // Greyed out while the account is deactivated.
-                    opacity: inactive ? 0.5 : 1,
-                    cursor: readOnly ? "default" : "pointer",
-                    transition: "all 120ms ease",
+                  onKeyDown={(e) => {
+                    if (readOnly) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      toggleStudent(student.id);
+                    }
                   }}
+                  className={`flex items-center justify-between gap-4 rounded-xl border px-4 py-3 transition-colors ${
+                    isPresent
+                      ? "border-[color-mix(in_oklab,var(--ctp-green)_35%,transparent)] bg-[color-mix(in_oklab,var(--ctp-green)_8%,transparent)]"
+                      : "border-border bg-card"
+                  } ${inactive ? "opacity-50" : ""} ${readOnly ? "" : "cursor-pointer hover:bg-muted/40"}`}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-                    <div
-                      style={{
-                        width: "38px",
-                        height: "38px",
-                        borderRadius: "50%",
-                        background: isPresent ? "color-mix(in oklab, var(--ctp-green) 16%, transparent)" : "var(--muted)",
-                        color: isPresent ? "var(--ctp-green)" : "var(--muted-foreground)",
-                        display: "grid",
-                        placeItems: "center",
-                        fontSize: "0.85rem",
-                        fontWeight: "700",
-                      }}
+                  <div className="flex min-w-0 items-center gap-3.5">
+                    <span
+                      className={`flex size-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${
+                        isPresent
+                          ? "bg-[color-mix(in_oklab,var(--ctp-green)_16%,transparent)] text-(--ctp-green)"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                      aria-hidden="true"
                     >
                       {student.user.firstName[0]}
                       {student.user.lastName[0]}
-                    </div>
-                    <div>
-                      <strong style={{ display: "block", fontSize: "0.92rem" }}>
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-foreground">
                         {student.user.firstName} {student.user.lastName}
-                      </strong>
-                      <span style={{ fontSize: "0.78rem", color: "var(--muted-foreground)" }}>
-                        Roll: {student.rollNumber || "N/A"} · Enrollment: {student.enrollmentNumber}
-                      </span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Roll {student.rollNumber || "N/A"} · {student.enrollmentNumber}
+                      </p>
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                  <div className="flex shrink-0 items-center gap-3">
                     <span
                       className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-bold tracking-wide ${
                         isPresent
-                          ? "border-[color-mix(in_oklab,var(--ctp-green)_35%,transparent)] bg-[color-mix(in_oklab,var(--ctp-green)_15%,transparent)] text-[var(--ctp-green)]"
+                          ? "border-[color-mix(in_oklab,var(--ctp-green)_35%,transparent)] bg-[color-mix(in_oklab,var(--ctp-green)_15%,transparent)] text-(--ctp-green)"
                           : "border-destructive/25 bg-destructive/10 text-destructive dark:border-destructive/40 dark:bg-destructive/20"
                       }`}
                     >
@@ -841,7 +890,7 @@ export default function TeacherAttendancePage() {
                     {inactive && (
                       <span
                         className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-bold tracking-wide text-muted-foreground"
-                        title="This student's account was deactivated by an admin - they cannot be marked present"
+                        title="This student's account was deactivated by an admin — they cannot be marked present"
                       >
                         INACTIVE
                       </span>
@@ -862,24 +911,13 @@ export default function TeacherAttendancePage() {
         )}
 
         {/* Submit Bar */}
-        <div
-          style={{
-            marginTop: "24px",
-            paddingTop: "16px",
-            borderTop: "1px solid var(--border)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: "12px",
-          }}
-        >
-          <span style={{ fontSize: "0.82rem", color: "var(--muted-foreground)" }}>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 p-5">
+          <span className="text-xs text-muted-foreground">
             Unchecked students are marked Absent automatically.
             {!isLocked && sessionStatus !== "idle" && editWindowEndsAt && remainingLabel && (
               <>
-                {" "}· Editable for <strong>{remainingLabel}</strong> remaining (until{" "}
-                <strong>
+                {" "}· Editable for <strong className="font-semibold text-foreground">{remainingLabel}</strong> remaining (until{" "}
+                <strong className="font-semibold text-foreground">
                   {editWindowEndsAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </strong>
                 )
@@ -890,7 +928,7 @@ export default function TeacherAttendancePage() {
             type="button"
             variant={isLocked ? "secondary" : "default"}
             size="lg"
-            className="px-6 font-semibold"
+            className="gap-2 px-6 font-semibold shadow-sm"
             onClick={() => {
               // First press after a submission switches into edit mode; the
               // next press actually updates the session on the server.
@@ -905,27 +943,33 @@ export default function TeacherAttendancePage() {
           >
             {isLocked ? (
               <>
-                <IconLock size={15} />
+                <IconLock size={16} aria-hidden="true" />
                 Locked
                 {submittedAt
                   ? ` · Saved ${new Date(submittedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
                   : ""}
               </>
             ) : sessionStatus === "editing" ? (
-              isSubmitting ? "Updating Session..." : "Update Attendance"
+              isSubmitting ? "Updating Session…" : "Update Attendance"
             ) : sessionStatus === "submitted" ? (
               <>
-                <IconPencil size={15} />
+                <IconPencil size={16} aria-hidden="true" />
                 Edit Attendance
               </>
             ) : isSubmitting ? (
-              "Submitting Session..."
+              "Submitting Session…"
             ) : (
               `Save Attendance (${presentCount} Present)`
             )}
           </Button>
         </div>
       </section>
+        </TabsContent>
+
+        <TabsContent value="records" className="space-y-6">
+          <TeacherAttendanceRecords />
+        </TabsContent>
+      </Tabs>
     </TeacherShell>
   );
 }

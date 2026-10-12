@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
+import { Skeleton } from "@/components/ui/skeleton";
+import { MetricGridSkeleton, SectionSkeleton } from "@/app/components/layout/PageSkeletons";
 import { formatTime } from "@/app/lib/timetable-layout";
 import { campusDayOfWeek } from "@/app/lib/campus-time";
 import { Badge } from "@/components/ui/badge";
@@ -99,7 +101,16 @@ export default function TeacherOverviewPage() {
   }
 
   if (loading || !data) {
-    return <main className="grid min-h-[40vh] place-items-center text-sm text-muted-foreground">Loading faculty dashboard...</main>;
+    return (
+      <TeacherShell active="/dashboard" title="Faculty Overview & Workspace" subtitle="Teacher Portal">
+        <div className="space-y-6">
+          <Skeleton className="h-32 w-full rounded-xl" />
+          <MetricGridSkeleton count={4} />
+          <SectionSkeleton rows={4} />
+          <SectionSkeleton rows={3} />
+        </div>
+      </TeacherShell>
+    );
   }
 
   const fullName = `${data.user.firstName} ${data.user.lastName}`;
@@ -213,11 +224,18 @@ export default function TeacherOverviewPage() {
           <strong className="my-1 text-[34px] font-bold leading-none tracking-tight">{totalAssessments}</strong>
           <small className="text-xs text-muted-foreground">Quizzes, mid-terms &amp; finals</small>
         </article>
-        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Attendance Sessions</span>
-          <strong className="my-1 text-[34px] font-bold leading-none tracking-tight text-primary">{totalSessionsLogged}</strong>
-          <small className="text-xs text-muted-foreground">Completed roll-call logs</small>
-        </article>
+        <Link
+          href="/teacher/attendance?tab=records"
+          className="group flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs transition-colors hover:border-primary/50 hover:bg-accent/30"
+        >
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground group-hover:text-primary">
+            Attendance Sessions
+          </span>
+          <strong className="my-1 text-[34px] font-bold leading-none tracking-tight text-primary">
+            {totalSessionsLogged}
+          </strong>
+          <small className="text-xs text-muted-foreground">View subject logs &amp; records →</small>
+        </Link>
       </section>
 
       {/* Read-only academic resources — the same pages the public site serves,
@@ -281,18 +299,26 @@ export default function TeacherOverviewPage() {
           ) : (
             <div className="mt-4 grid gap-3.5">
               {uniqueSubjects.map((sub) => (
-                <div key={sub.code} className="rounded-xl border bg-card p-4">
-                  <div className="mb-1 flex items-center gap-2">
-                    <Badge variant="outline">{sub.code}</Badge>
-                    <strong className="text-[0.95rem]">{sub.name}</strong>
+                <div key={sub.code} className="flex flex-col gap-2 rounded-xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="mb-1 flex items-center gap-2">
+                      <Badge variant="outline">{sub.code}</Badge>
+                      <strong className="text-[0.95rem]">{sub.name}</strong>
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[0.82rem] text-muted-foreground">
+                      <span>Program: {sub.program}</span>
+                      <span>•</span>
+                      <span>Semester: {sub.semester}</span>
+                      <span>•</span>
+                      <span>{sub.studentCount} Students</span>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[0.82rem] text-muted-foreground">
-                    <span>Program: {sub.program}</span>
-                    <span>•</span>
-                    <span>Semester: {sub.semester}</span>
-                    <span>•</span>
-                    <span>{sub.studentCount} Students</span>
-                  </div>
+                  <Button asChild variant="outline" size="sm" className="h-8 gap-1.5 text-xs shrink-0">
+                    <Link href="/teacher/attendance?tab=records">
+                      <IconCalendarCheck size={14} aria-hidden="true" />
+                      Attendance
+                    </Link>
+                  </Button>
                 </div>
               ))}
             </div>

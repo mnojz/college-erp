@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
+import { ListSkeleton } from "@/app/components/layout/PageSkeletons";
 import { AdminModal } from "@/app/components/admin/AdminModal";
 import { FileDropzone } from "@/app/components/common/FileDropzone";
 import {
@@ -305,7 +306,17 @@ export default function TeacherAnnouncementsPage() {
   }
 
   if (loadError) return <main className="grid min-h-[40vh] place-items-center px-6 text-sm font-semibold text-destructive">{loadError}</main>;
-  if (loading || !teacherInfo) return <main className="grid min-h-[40vh] place-items-center text-sm text-muted-foreground">Loading announcements…</main>;
+  if (loading || !teacherInfo) {
+    return (
+      <TeacherShell
+        title="Announcements & Class Notices"
+        subtitle="Notify your students"
+        active="/teacher/announcements"
+      >
+        <ListSkeleton rows={5} />
+      </TeacherShell>
+    );
+  }
 
   const userId = teacherInfo.user.id;
 

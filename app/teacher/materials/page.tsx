@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
+import { MetricGridSkeleton, ListSkeleton } from "@/app/components/layout/PageSkeletons";
 import { AdminModal } from "@/app/components/admin/AdminModal";
 import { MaterialForm, type MaterialSubmitValues } from "@/app/components/materials/MaterialForm";
 import {
@@ -203,7 +204,20 @@ export default function TeacherMaterialsPage() {
   }
 
   if (loadError) return <main className="grid min-h-[40vh] place-items-center px-6 text-sm font-semibold text-destructive">{loadError}</main>;
-  if (loading || !teacherInfo) return <main className="grid min-h-[40vh] place-items-center text-sm text-muted-foreground">Loading your uploads…</main>;
+  if (loading || !teacherInfo) {
+    return (
+      <TeacherShell
+        active="/teacher/materials"
+        title="My Uploads — Notes & Study Material"
+        subtitle="Faculty Study Library"
+      >
+        <div className="space-y-6">
+          <MetricGridSkeleton count={2} />
+          <ListSkeleton rows={5} />
+        </div>
+      </TeacherShell>
+    );
+  }
 
   const typeStyle = (m: StudyMaterialDto) => MATERIAL_TYPE_STYLE[m.materialType] ?? MATERIAL_TYPE_STYLE.OTHER;
 

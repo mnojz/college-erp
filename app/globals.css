@@ -342,3 +342,6 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* respect the tech stack and utilize tailwind and sadcn ui before writing css here */
+/* only write css here if necessary */

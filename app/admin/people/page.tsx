@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -26,16 +27,13 @@ import {
 import {
   IconAlertTriangle,
   IconCircleCheck,
-  IconPencil,
   IconPlus,
   IconSearch,
-  IconTrash,
-  IconUserCheck,
-  IconUserOff,
   IconX,
 } from "@tabler/icons-react";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { AdminModal } from "@/app/components/admin/AdminModal";
+import { PersonProfileModal } from "@/app/components/admin/PersonProfileModal";
 import {
   PaginationControls,
   type PaginationMeta,
@@ -583,6 +581,12 @@ export default function AdminPeoplePage() {
     "desc",
     ["asc", "desc"],
   );
+
+  // Person profile modal (read-only detail view: attendance, results, semesters)
+  const [profileModal, setProfileModal] = useState<{
+    kind: "student" | "teacher";
+    id: string;
+  } | null>(null);
 
   // Create Modals
   const [showTeacherModal, setShowTeacherModal] = useState(false);
@@ -1347,7 +1351,6 @@ export default function AdminPeoplePage() {
                   <TableHead>Email</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Assigned subjects</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1365,7 +1368,19 @@ export default function AdminPeoplePage() {
                   </TableRow>
                 ) : (
                   sortedTeachers.map((t) => (
-                    <TableRow key={t.id}>
+                    <TableRow
+                      key={t.id}
+                      role="button"
+                      tabIndex={0}
+                      className="cursor-pointer"
+                      onClick={() => setProfileModal({ kind: "teacher", id: t.id })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setProfileModal({ kind: "teacher", id: t.id });
+                        }
+                      }}
+                    >
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className="size-9">
@@ -1411,72 +1426,7 @@ export default function AdminPeoplePage() {
                           <span className="text-muted-foreground">None</span>
                         )}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-end gap-0.5">
-                          {t.user.status === "ACTIVE" ? (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              disabled={saving}
-                              onClick={() =>
-                                setStatusTarget({
-                                  kind: "teacher",
-                                  userId: t.user.id,
-                                  name: `${t.user.firstName} ${t.user.lastName}`,
-                                  identifier: t.employeeNo,
-                                })
-                              }
-                              title="Deactivate Account (blocks sign-in)"
-                              aria-label="Deactivate Faculty Account"
-                            >
-                              <IconUserOff size={15} />
-                            </Button>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              disabled={saving}
-                              onClick={() =>
-                                handleActivate("teacher", t.user.id, `${t.user.firstName} ${t.user.lastName}`)
-                              }
-                              title="Activate Account"
-                              aria-label="Activate Faculty Account"
-                            >
-                              <IconUserCheck size={15} />
-                            </Button>
-                          )}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => openEditTeacher(t)}
-                            title="Edit Faculty Profile"
-                            aria-label="Edit Faculty Profile"
-                          >
-                            <IconPencil size={15} />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                            onClick={() =>
-                              setDeletingTarget({
-                                type: "teacher",
-                                id: t.id,
-                                name: `${t.user.firstName} ${t.user.lastName}`,
-                                identifier: t.employeeNo,
-                              })
-                            }
-                            title="Delete Faculty Account"
-                            aria-label="Delete Faculty Account"
-                          >
-                            <IconTrash size={15} />
-                          </Button>
-                        </div>
-                      </TableCell>
+                      <TableCell />
                     </TableRow>
                   ))
                 )}
@@ -1497,22 +1447,17 @@ export default function AdminPeoplePage() {
                   <TableHead>Program · Semester</TableHead>
                   <TableHead>Admission date</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
-                      Loading directory…
-                    </TableCell>
-                  </TableRow>
-                ) : studentsBusy && students.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
-                      Loading students…
-                    </TableCell>
-                  </TableRow>
+                {loading || (studentsBusy && students.length === 0) ? (
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <TableRow key={`skeleton-${i}`}>
+                      <TableCell colSpan={7}>
+                        <Skeleton className="h-5 w-full" />
+                      </TableCell>
+                    </TableRow>
+                  ))
                 ) : students.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
@@ -1538,7 +1483,19 @@ export default function AdminPeoplePage() {
                   </TableRow>
                 ) : (
                   students.map((s) => (
-                    <TableRow key={s.id}>
+                    <TableRow
+                      key={s.id}
+                      role="button"
+                      tabIndex={0}
+                      className="cursor-pointer"
+                      onClick={() => setProfileModal({ kind: "student", id: s.id })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setProfileModal({ kind: "student", id: s.id });
+                        }
+                      }}
+                    >
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className="size-9">
@@ -1602,72 +1559,7 @@ export default function AdminPeoplePage() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-end gap-0.5">
-                          {s.user.status === "ACTIVE" ? (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              disabled={saving}
-                              onClick={() =>
-                                setStatusTarget({
-                                  kind: "student",
-                                  userId: s.user.id,
-                                  name: `${s.user.firstName} ${s.user.lastName}`,
-                                  identifier: s.enrollmentNumber,
-                                })
-                              }
-                              title="Deactivate Account (blocks sign-in)"
-                              aria-label="Deactivate Student Account"
-                            >
-                              <IconUserOff size={15} />
-                            </Button>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              disabled={saving}
-                              onClick={() =>
-                                handleActivate("student", s.user.id, `${s.user.firstName} ${s.user.lastName}`)
-                              }
-                              title="Activate Account"
-                              aria-label="Activate Student Account"
-                            >
-                              <IconUserCheck size={15} />
-                            </Button>
-                          )}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => openEditStudent(s)}
-                            title="Edit Student Profile"
-                            aria-label="Edit Student Profile"
-                          >
-                            <IconPencil size={15} />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                            onClick={() =>
-                              setDeletingTarget({
-                                type: "student",
-                                id: s.id,
-                                name: `${s.user.firstName} ${s.user.lastName}`,
-                                identifier: s.enrollmentNumber,
-                              })
-                            }
-                            title="Delete Student Account"
-                            aria-label="Delete Student Account"
-                          >
-                            <IconTrash size={15} />
-                          </Button>
-                        </div>
-                      </TableCell>
+                      <TableCell />
                     </TableRow>
                   ))
                 )}
@@ -2581,6 +2473,164 @@ export default function AdminPeoplePage() {
             </div>
           </form>
         </section>
+
+        {profileModal && profileModal.kind === "teacher" && (() => {
+          const t = teachers.find((x) => x.id === profileModal!.id);
+          if (!t) return null;
+          const isActive = t.user.status === "ACTIVE";
+          const name = `${t.user.firstName} ${t.user.lastName}`;
+          return (
+            <PersonProfileModal
+              kind="teacher"
+              id={t.id}
+              onClose={() => setProfileModal(null)}
+              onEditProfile={() => {
+                setProfileModal(null);
+                openEditTeacher(t);
+              }}
+              dangerSection={
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-muted/30 px-4 py-3">
+                    <div className="text-left">
+                      <p className="text-sm font-semibold">
+                        {isActive ? "Deactivate account" : "Activate account"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {isActive
+                          ? "Block this faculty member from signing in. Their data stays intact."
+                          : "Restore this faculty member's ability to sign in."}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={isActive ? "outline" : "default"}
+                      disabled={saving}
+                      onClick={() => {
+                        if (isActive) {
+                          setProfileModal(null);
+                          setStatusTarget({
+                            kind: "teacher",
+                            userId: t.user.id,
+                            name,
+                            identifier: t.employeeNo,
+                          });
+                        } else {
+                          void handleActivate("teacher", t.user.id, name);
+                        }
+                      }}
+                    >
+                      {isActive ? "Deactivate" : "Activate"}
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 rounded-lg border border-destructive/25 bg-destructive/5 px-4 py-3">
+                    <div className="text-left">
+                      <p className="text-sm font-semibold text-destructive">Delete account</p>
+                      <p className="text-xs text-muted-foreground">
+                        Permanently remove this faculty member and all associated data.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => {
+                        setProfileModal(null);
+                        setDeletingTarget({
+                          type: "teacher",
+                          id: t.id,
+                          name,
+                          identifier: t.employeeNo,
+                        });
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              }
+            />
+          );
+        })()}
+
+        {profileModal && profileModal.kind === "student" && (() => {
+          const s = students.find((x) => x.id === profileModal!.id);
+          if (!s) return null;
+          const isActive = s.user.status === "ACTIVE";
+          const name = `${s.user.firstName} ${s.user.lastName}`;
+          return (
+            <PersonProfileModal
+              kind="student"
+              id={s.id}
+              onClose={() => setProfileModal(null)}
+              onEditProfile={() => {
+                setProfileModal(null);
+                openEditStudent(s);
+              }}
+              dangerSection={
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-muted/30 px-4 py-3">
+                    <div className="text-left">
+                      <p className="text-sm font-semibold">
+                        {isActive ? "Deactivate account" : "Activate account"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {isActive
+                          ? "Block this student from signing in. Their data stays intact."
+                          : "Restore this student's ability to sign in."}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={isActive ? "outline" : "default"}
+                      disabled={saving}
+                      onClick={() => {
+                        if (isActive) {
+                          setProfileModal(null);
+                          setStatusTarget({
+                            kind: "student",
+                            userId: s.user.id,
+                            name,
+                            identifier: s.enrollmentNumber,
+                          });
+                        } else {
+                          void handleActivate("student", s.user.id, name);
+                        }
+                      }}
+                    >
+                      {isActive ? "Deactivate" : "Activate"}
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 rounded-lg border border-destructive/25 bg-destructive/5 px-4 py-3">
+                    <div className="text-left">
+                      <p className="text-sm font-semibold text-destructive">Delete account</p>
+                      <p className="text-xs text-muted-foreground">
+                        Permanently remove this student and all associated data.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => {
+                        setProfileModal(null);
+                        setDeletingTarget({
+                          type: "student",
+                          id: s.id,
+                          name,
+                          identifier: s.enrollmentNumber,
+                        });
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              }
+            />
+          );
+        })()}
       </div>
     </AdminShell>
   );

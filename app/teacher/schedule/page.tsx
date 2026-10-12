@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
+import { MetricGridSkeleton, SectionSkeleton } from "@/app/components/layout/PageSkeletons";
+import { readShellIdentity, writeShellIdentity } from "@/app/lib/profile-cache";
 import { campusDayOfWeek } from "@/app/lib/campus-time";
 import { formatTime } from "@/app/lib/timetable-layout";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +49,8 @@ export default function TeacherSchedulePage() {
 
   useEffect(() => {
     async function loadSchedule() {
+      const cached = readShellIdentity("teacher");
+      if (cached) setTeacherInfo(cached);
       try {
         const response = await fetch("/api/teacher/profile");
         if (response.status === 401 || response.status === 403) {
@@ -62,12 +66,14 @@ export default function TeacherSchedulePage() {
 
         setClasses(data.teacher?.classes ?? []);
         if (data.teacher) {
-          setTeacherInfo({
+          const identity = {
             firstName: data.teacher.user.firstName,
             lastName: data.teacher.user.lastName,
             employeeNo: data.teacher.employeeNo,
             profileImageUrl: data.teacher.profileImageUrl,
-          });
+          };
+          setTeacherInfo(identity);
+          writeShellIdentity("teacher", identity);
         }
       } catch {
         setError("Unable to reach the server");
@@ -88,7 +94,22 @@ export default function TeacherSchedulePage() {
   }
 
   if (loading) {
-    return <main className="grid min-h-[40vh] place-items-center text-sm text-muted-foreground">Loading teaching schedule...</main>;
+    return (
+      <TeacherShell
+        active="/teacher/schedule"
+        title="Weekly Teaching Schedule"
+        subtitle="Faculty Timetable & Lectures"
+        teacherName={teacherInfo ? `${teacherInfo.firstName} ${teacherInfo.lastName}` : "Faculty Member"}
+        employeeNo={teacherInfo?.employeeNo}
+        avatarUrl={teacherInfo?.profileImageUrl}
+      >
+        <div className="space-y-6">
+          <MetricGridSkeleton count={3} />
+          <SectionSkeleton rows={4} />
+          <SectionSkeleton rows={4} />
+        </div>
+      </TeacherShell>
+    );
   }
 
   const todayDayName = campusDayOfWeek();

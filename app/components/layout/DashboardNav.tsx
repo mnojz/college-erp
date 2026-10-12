@@ -7,6 +7,7 @@ import { LogOut, User } from "lucide-react";
 import { ThemeToggle } from "@/app/components/common/ThemeToggle";
 import { NotificationDropdown } from "@/app/components/common/NotificationDropdown";
 import { Logo } from "@/app/components/common/Logo";
+import { clearProfileCache } from "@/app/lib/profile-cache";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -44,6 +45,7 @@ export function DashboardNav({
   const router = useRouter();
 
   async function handleLogout() {
+    clearProfileCache();
     if (onLogout) {
       onLogout();
       return;

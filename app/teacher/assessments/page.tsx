@@ -5,6 +5,8 @@ import { FormEvent, useEffect, useMemo, useState, type CSSProperties } from "rea
 import { useRouter } from "next/navigation";
 import { IconEye, IconEyeOff, IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
+import { ListSkeleton } from "@/app/components/layout/PageSkeletons";
+import { readShellIdentity, writeShellIdentity } from "@/app/lib/profile-cache";
 import { AdminModal } from "@/app/components/admin/AdminModal";
 import { gradeForMarks } from "@/app/lib/grading";
 
@@ -131,6 +133,8 @@ export default function TeacherAssessmentsPage() {
 
   useEffect(() => {
     async function loadData() {
+      const cached = readShellIdentity("teacher");
+      if (cached) setTeacherInfo(cached);
       try {
         const [classesRes, assessmentsRes, profRes] = await Promise.all([
           fetch("/api/attendance"),
@@ -152,12 +156,14 @@ export default function TeacherAssessmentsPage() {
         setClasses(classesData.classes ?? []);
         setAssessments(assessmentsData.assessments ?? []);
         if (profRes.ok && profData.teacher) {
-          setTeacherInfo({
+          const identity = {
             firstName: profData.teacher.user.firstName,
             lastName: profData.teacher.user.lastName,
             employeeNo: profData.teacher.employeeNo,
             profileImageUrl: profData.teacher.profileImageUrl,
-          });
+          };
+          setTeacherInfo(identity);
+          writeShellIdentity("teacher", identity);
         }
       } catch {
         setBanner({ kind: "error", text: "Unable to load teaching and assessment records" });
@@ -434,7 +440,7 @@ export default function TeacherAssessmentsPage() {
       </div>
 
       {isLoading ? (
-        <div className="grid min-h-[40vh] place-items-center text-sm text-muted-foreground">Loading assessments…</div>
+        <ListSkeleton rows={4} />
       ) : classes.length === 0 ? (
         <div
           className="rounded-xl border bg-card p-5 shadow-xs"
