@@ -14,6 +14,13 @@ import {
   approveProfileForm,
   rejectProfileForm,
 } from "@/app/actions/profile-review";
+import {
+  IconInbox,
+  IconMapPin,
+  IconPhoto,
+  IconShieldCheck,
+  IconUserCheck,
+} from "@tabler/icons-react";
 
 /**
  * Human-readable labels for the self-service profile fields that can appear in
@@ -154,9 +161,88 @@ export default async function ProfileReviewsPage() {
       active="/admin/profile-reviews"
     >
       {pending.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No profile changes are waiting for review.
-        </p>
+        <div className="grid gap-4">
+          <Card className="overflow-hidden">
+            <CardContent className="flex flex-col items-center gap-3 px-6 py-12 text-center sm:py-16">
+              <span className="flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <IconInbox size={30} stroke={1.6} aria-hidden="true" />
+              </span>
+              <div className="grid gap-1.5">
+                <h2 className="text-xl font-semibold tracking-tight">
+                  All caught up — nothing to review
+                </h2>
+                <p className="mx-auto max-w-md text-sm text-muted-foreground">
+                  Student photo uploads and profile edits land here automatically.
+                  Review them side by side and approve with one click.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                <Badge variant="secondary" className="gap-1.5">
+                  <IconPhoto size={13} aria-hidden="true" />
+                  Photo reviews
+                </Badge>
+                <Badge variant="secondary" className="gap-1.5">
+                  <IconMapPin size={13} aria-hidden="true" />
+                  Address &amp; guardian reviews
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <IconShieldCheck
+                  size={16}
+                  className="text-muted-foreground"
+                  aria-hidden="true"
+                />
+                How profile reviews work
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-3">
+              <div className="grid content-start gap-1.5 rounded-lg border bg-muted/20 p-4">
+                <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+                  1
+                </span>
+                <p className="m-0 text-sm font-semibold">Student submits</p>
+                <p className="m-0 text-xs leading-relaxed text-muted-foreground">
+                  A new photo or edited details are staged — nothing goes live
+                  until you decide.
+                </p>
+              </div>
+              <div className="grid content-start gap-1.5 rounded-lg border bg-muted/20 p-4">
+                <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+                  2
+                </span>
+                <p className="m-0 text-sm font-semibold">You compare</p>
+                <p className="m-0 text-xs leading-relaxed text-muted-foreground">
+                  Current vs. new appears side by side, with only the changed
+                  fields shown.
+                </p>
+              </div>
+              <div className="grid content-start gap-1.5 rounded-lg border bg-muted/20 p-4">
+                <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+                  3
+                </span>
+                <p className="m-0 text-sm font-semibold">Approve or reject</p>
+                <p className="m-0 text-xs leading-relaxed text-muted-foreground">
+                  Approved changes go live instantly; rejected ones keep the
+                  old data untouched.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 py-4 text-center">
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <IconUserCheck size={14} aria-hidden="true" />
+                Queue checked just now — new submissions appear here automatically
+              </span>
+            </CardContent>
+          </Card>
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {pending.map((u) => {

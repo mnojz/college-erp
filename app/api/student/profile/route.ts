@@ -208,7 +208,7 @@ try {
     }
 
     // ── Build student update: simple strings + structured address ──
-    const studentData: Prisma.StudentUpdateInput = {};
+    let studentData: Prisma.StudentUpdateInput = {};
 
     // String fields (existing behavior)
     for (const key of SELF_EDITABLE) {
@@ -336,6 +336,52 @@ try {
     // `undefined` means "not included in this request", so absent fields are
     // left alone — re-submitting only stages the fields the user actually
     // touched this time (it does not accumulate across submissions).
+    if (Object.keys(studentData).length > 0) {
+      // Only stage fields whose value actually changed. The frontend always
+      // sends the full self-service form (and `currSameAsPerm` is always set),
+      // so without this diff a password-only save — or a save with no edits —
+      // would still flip PENDING_REVIEW, spam admins, and confuse the student.
+      // normalize: DB nulls vs "" from the form; numbers-vs-strings for ward.
+      const liveStudent = (await prisma.student.findUnique({
+        where: { id: existing.id },
+        select: {
+          bloodGroup: true,
+          phone: true,
+          emergencyContact: true,
+          permProvinceId: true,
+          permProvinceName: true,
+          permDistrictId: true,
+          permDistrictName: true,
+          permLocalLevelId: true,
+          permLocalLevelName: true,
+          permLocalLevelType: true,
+          permWard: true,
+          permTole: true,
+          currSameAsPerm: true,
+          currProvinceId: true,
+          currProvinceName: true,
+          currDistrictId: true,
+          currDistrictName: true,
+          currLocalLevelId: true,
+          currLocalLevelName: true,
+          currLocalLevelType: true,
+          currWard: true,
+          currTole: true,
+          guardianName: true,
+          guardianPhone: true,
+          guardianEmail: true,
+          guardianRelation: true,
+        },
+      })) as Record<string, string | number | boolean | null> | null;
+      const same = (a: unknown, b: unknown) =>
+        String(a ?? "") === String(b ?? "");
+      const changedData: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(studentData)) {
+        if (!same(value, liveStudent?.[key])) changedData[key] = value;
+      }
+      studentData = changedData as Prisma.StudentUpdateInput;
+    }
+
     if (Object.keys(studentData).length > 0) {
       const snapshot = JSON.parse(JSON.stringify(studentData)) as Prisma.InputJsonValue;
       await prisma.user.update({

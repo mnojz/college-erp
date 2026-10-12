@@ -26,7 +26,9 @@ import {
 } from "@/components/ui/table";
 import {
   IconAlertTriangle,
+  IconChevronRight,
   IconCircleCheck,
+  IconLock,
   IconPlus,
   IconSearch,
   IconX,
@@ -527,7 +529,7 @@ function SubjectAssigner({
 
 export default function AdminPeoplePage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"teachers" | "students">("teachers");
+  const [activeTab, setActiveTab] = useState<"teachers" | "students" | "admin">("teachers");
   const [teachers, setTeachers] = useState<TeacherItem[]>([]);
   const [students, setStudents] = useState<StudentItem[]>([]);
   const [programs, setPrograms] = useState<ProgramOption[]>([]);
@@ -1149,17 +1151,25 @@ export default function AdminPeoplePage() {
   }
 
   return (
-    <AdminShell title="People & Accounts" subtitle="Teachers & Student Directory" active="/admin/people">
+    <AdminShell
+      title="People & Accounts"
+      subtitle="Faculty, Students & Account Administration"
+      active="/admin/people"
+    >
       <div className="flex flex-col gap-5">
         {/* Toolbar: tabs + tab-scoped action, then search / program filter */}
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "teachers" | "students")}>
+            <Tabs
+              value={activeTab}
+              onValueChange={(v) => setActiveTab(v as "teachers" | "students" | "admin")}
+            >
               <TabsList>
                 <TabsTrigger value="teachers">Teachers ({teachers.length})</TabsTrigger>
                 <TabsTrigger value="students">
                   Enrolled Students ({studentPagination.total})
                 </TabsTrigger>
+                <TabsTrigger value="admin">Admin</TabsTrigger>
               </TabsList>
             </Tabs>
 
@@ -1175,7 +1185,7 @@ export default function AdminPeoplePage() {
                 <IconPlus size={15} aria-hidden="true" />
                 Add Teacher
               </Button>
-            ) : (
+            ) : activeTab === "students" ? (
               <Button
                 size="sm"
                 type="button"
@@ -1187,12 +1197,12 @@ export default function AdminPeoplePage() {
                 <IconPlus size={15} aria-hidden="true" />
                 Add Student
               </Button>
-            )}
+            ) : null}
           </div>
 
           {/* Tab-scoped filter bar */}
           {activeTab === "teachers" ? (
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-2.5 rounded-xl border bg-muted/20 p-3.5">
               <div className="relative w-full sm:w-72">
                 <IconSearch
                   size={15}
@@ -1224,8 +1234,18 @@ export default function AdminPeoplePage() {
                   setTeacherSortDir(direction);
                 }}
               />
+
+              <p className="w-full text-xs text-muted-foreground">
+                {filteredTeachers.length === 0
+                  ? teachers.length === 0
+                    ? "No faculty yet"
+                    : "No faculty match your search"
+                  : filteredTeachers.length === teachers.length
+                    ? `${teachers.length} faculty member${teachers.length === 1 ? "" : "s"}`
+                    : `Showing ${filteredTeachers.length} of ${teachers.length} faculty`}
+              </p>
             </div>
-          ) : (
+          ) : activeTab === "students" ? (
             <div className="flex flex-col gap-3 rounded-xl border bg-muted/20 p-3.5">
               <div className="flex flex-wrap items-center gap-2.5">
                 <Select
@@ -1337,8 +1357,19 @@ export default function AdminPeoplePage() {
                   : `Showing ${(studentPagination.page - 1) * studentPagination.pageSize + 1}\u2013${Math.min(studentPagination.page * studentPagination.pageSize, studentPagination.total)} of ${studentPagination.total} students`}
               </p>
             </div>
-          )}
+          ) : null}
         </div>
+
+        {error && (
+          <p className="rounded-lg border border-destructive/20 bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive">
+            {error}
+          </p>
+        )}
+        {message && (
+          <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2.5 text-[13px] text-emerald-600 dark:text-emerald-400">
+            {message}
+          </p>
+        )}
 
         {/* Tab 1: Faculty table */}
         {activeTab === "teachers" && (
@@ -1351,15 +1382,18 @@ export default function AdminPeoplePage() {
                   <TableHead>Email</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Assigned subjects</TableHead>
+                  <TableHead className="w-9" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
-                      Loading directory…
-                    </TableCell>
-                  </TableRow>
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <TableRow key={`t-skeleton-${i}`}>
+                      <TableCell colSpan={6}>
+                        <Skeleton className="h-5 w-full" />
+                      </TableCell>
+                    </TableRow>
+                  ))
                 ) : sortedTeachers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
@@ -1372,7 +1406,7 @@ export default function AdminPeoplePage() {
                       key={t.id}
                       role="button"
                       tabIndex={0}
-                      className="cursor-pointer"
+                      className="group cursor-pointer"
                       onClick={() => setProfileModal({ kind: "teacher", id: t.id })}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
@@ -1426,7 +1460,11 @@ export default function AdminPeoplePage() {
                           <span className="text-muted-foreground">None</span>
                         )}
                       </TableCell>
-                      <TableCell />
+                      <TableCell className="w-9">
+                        <div className="flex justify-end text-muted-foreground/60 transition-colors group-hover:text-foreground">
+                          <IconChevronRight size={16} aria-hidden="true" />
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -1447,6 +1485,7 @@ export default function AdminPeoplePage() {
                   <TableHead>Program · Semester</TableHead>
                   <TableHead>Admission date</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="w-9" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1487,7 +1526,7 @@ export default function AdminPeoplePage() {
                       key={s.id}
                       role="button"
                       tabIndex={0}
-                      className="cursor-pointer"
+                      className="group cursor-pointer"
                       onClick={() => setProfileModal({ kind: "student", id: s.id })}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
@@ -1559,7 +1598,11 @@ export default function AdminPeoplePage() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell />
+                      <TableCell className="w-9">
+                        <div className="flex justify-end text-muted-foreground/60 transition-colors group-hover:text-foreground">
+                          <IconChevronRight size={16} aria-hidden="true" />
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -1575,17 +1618,6 @@ export default function AdminPeoplePage() {
               }}
             />
           </div>
-        )}
-
-        {error && (
-          <p className="rounded-lg border border-destructive/20 bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive">
-            {error}
-          </p>
-        )}
-        {message && (
-          <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2.5 text-[13px] text-emerald-600 dark:text-emerald-400">
-            {message}
-          </p>
         )}
 
         {/* Modal 1: Create Faculty */}
@@ -2413,66 +2445,107 @@ export default function AdminPeoplePage() {
           </AdminModal>
         )}
 
-        {/* Admin self-service: change own password */}
-        <section className="rounded-xl border bg-card p-5 shadow-xs">
-          <h2 className="text-base font-semibold">Change my password</h2>
-          <p className="mt-1 text-[13px] text-muted-foreground">
-            Update the password for the account you are signed in with. Your current password is
-            required to confirm the change.
-          </p>
-          <form onSubmit={handleAdminPasswordChange} className="mt-4 grid max-w-md gap-3.5">
-            <div className="grid gap-1.5">
-              <Label htmlFor="admin-current-password">Current password</Label>
-              <Input
-                id="admin-current-password"
-                type="password"
-                autoComplete="current-password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                disabled={pwSaving}
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="admin-new-password">New password</Label>
-              <Input
-                id="admin-new-password"
-                type="password"
-                autoComplete="new-password"
-                placeholder="At least 8 characters"
-                value={newAdminPassword}
-                onChange={(e) => setNewAdminPassword(e.target.value)}
-                disabled={pwSaving}
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="admin-confirm-password">Confirm new password</Label>
-              <Input
-                id="admin-confirm-password"
-                type="password"
-                autoComplete="new-password"
-                value={confirmAdminPassword}
-                onChange={(e) => setConfirmAdminPassword(e.target.value)}
-                disabled={pwSaving}
-              />
-            </div>
-            {pwError && (
-              <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] text-destructive">
-                {pwError}
+        {/* Tab 3: Admin account settings — self-service password change */}
+        {activeTab === "admin" && (
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
+            <section className="rounded-xl border bg-card p-5 shadow-xs">
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <IconLock size={16} aria-hidden="true" />
+                </span>
+                <h2 className="text-base font-semibold">Change my password</h2>
+              </div>
+              <p className="mt-1.5 text-[13px] text-muted-foreground">
+                Update the password for the account you are signed in with. Your current password
+                is required to confirm the change.
               </p>
-            )}
-            {pwMessage && (
-              <p className="flex items-center gap-2 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-[13px] font-medium text-emerald-600 dark:text-emerald-400">
-                <IconCircleCheck size={15} aria-hidden="true" className="shrink-0" />
-                {pwMessage}
-              </p>
-            )}
-            <div>
-              <Button type="submit" size="sm" disabled={pwSaving}>
-                {pwSaving ? "Changing…" : "Change password"}
-              </Button>
-            </div>
-          </form>
-        </section>
+              <form onSubmit={handleAdminPasswordChange} className="mt-4 grid max-w-md gap-3.5">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="admin-current-password">Current password</Label>
+                  <Input
+                    id="admin-current-password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    disabled={pwSaving}
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="admin-new-password">New password</Label>
+                  <Input
+                    id="admin-new-password"
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="At least 8 characters"
+                    value={newAdminPassword}
+                    onChange={(e) => setNewAdminPassword(e.target.value)}
+                    disabled={pwSaving}
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="admin-confirm-password">Confirm new password</Label>
+                  <Input
+                    id="admin-confirm-password"
+                    type="password"
+                    autoComplete="new-password"
+                    value={confirmAdminPassword}
+                    onChange={(e) => setConfirmAdminPassword(e.target.value)}
+                    disabled={pwSaving}
+                  />
+                </div>
+                {pwError && (
+                  <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] text-destructive">
+                    {pwError}
+                  </p>
+                )}
+                {pwMessage && (
+                  <p className="flex items-center gap-2 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-[13px] font-medium text-emerald-600 dark:text-emerald-400">
+                    <IconCircleCheck size={15} aria-hidden="true" className="shrink-0" />
+                    {pwMessage}
+                  </p>
+                )}
+                <div>
+                  <Button type="submit" size="sm" disabled={pwSaving}>
+                    {pwSaving ? "Changing…" : "Change password"}
+                  </Button>
+                </div>
+              </form>
+            </section>
+
+            <aside className="grid content-start gap-3 rounded-xl border bg-muted/20 p-5">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Password tips
+              </h3>
+              <ul className="grid gap-2 text-[13px] text-muted-foreground">
+                <li className="flex gap-2">
+                  <IconCircleCheck
+                    size={15}
+                    aria-hidden="true"
+                    className="mt-0.5 shrink-0 text-primary"
+                  />
+                  <span>Use at least 8 characters — mix letters with numbers or symbols.</span>
+                </li>
+                <li className="flex gap-2">
+                  <IconCircleCheck
+                    size={15}
+                    aria-hidden="true"
+                    className="mt-0.5 shrink-0 text-primary"
+                  />
+                  <span>Your current password is always required to confirm the change.</span>
+                </li>
+                <li className="flex gap-2">
+                  <IconCircleCheck
+                    size={15}
+                    aria-hidden="true"
+                    className="mt-0.5 shrink-0 text-primary"
+                  />
+                  <span>You stay signed in on this device after the change.</span>
+                </li>
+              </ul>
+            </aside>
+          </div>
+        )}
 
         {profileModal && profileModal.kind === "teacher" && (() => {
           const t = teachers.find((x) => x.id === profileModal!.id);

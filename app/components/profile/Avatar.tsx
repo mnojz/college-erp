@@ -20,7 +20,7 @@ export function Avatar({ name, photoUrl, size = 44 }: AvatarProps) {
   const base = {
     width: size,
     height: size,
-    borderRadius: "50%",
+    borderRadius: "0.75rem",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",

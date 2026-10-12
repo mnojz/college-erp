@@ -155,7 +155,7 @@ export function ImageUploadCrop({
           }
         }}
       >
-        <span className="relative grid size-13 shrink-0 place-items-center overflow-hidden rounded-full border-2 bg-muted text-muted-foreground transition-colors group-hover:border-ring [&_img]:size-full [&_img]:object-cover">
+        <span className="relative grid size-13 shrink-0 place-items-center overflow-hidden rounded-lg border-2 bg-muted text-muted-foreground transition-colors group-hover:border-ring [&_img]:size-full [&_img]:object-cover">
           {value ? (
             <>
               <img src={value} alt="Profile photo preview" />
