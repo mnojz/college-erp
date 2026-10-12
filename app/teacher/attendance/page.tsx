@@ -1,4 +1,5 @@
 "use client";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -955,17 +956,32 @@ export default function TeacherAttendancePage() {
                         : "—"}
                     </span>
                     <div className="flex min-w-0 items-center">
-                      <span
-                        className={`flex size-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${
-                          isPresent
-                            ? "bg-[color-mix(in_oklab,var(--ctp-green)_16%,transparent)] text-(--ctp-green)"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                        aria-hidden="true"
-                      >
-                        {student.user.firstName[0]}
-                        {student.user.lastName[0]}
-                      </span>
+                      {/* Profile photo when one is set, tinted initials as the
+                          fallback — same rounded-lg avatar as the records
+                          table. The after: override squares the component's
+                          hairline ring to the box. */}
+                      <Avatar className="size-10 rounded-lg after:rounded-lg">
+                        {student.profileImageUrl ? (
+                          // Decorative: the student's name sits right next to
+                          // the avatar, so a duplicate alt would only add
+                          // screen-reader noise.
+                          <AvatarImage
+                            src={student.profileImageUrl}
+                            alt=""
+                            className="rounded-lg object-cover"
+                          />
+                        ) : null}
+                        <AvatarFallback
+                          className={`rounded-lg text-sm font-bold ${
+                            isPresent
+                              ? "bg-[color-mix(in_oklab,var(--ctp-green)_16%,transparent)] text-(--ctp-green)"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {student.user.firstName[0]}
+                          {student.user.lastName[0]}
+                        </AvatarFallback>
+                      </Avatar>
                       <p className="ml-3.5 min-w-0 truncate text-sm font-semibold text-foreground">
                         {student.user.firstName} {student.user.lastName}
                       </p>
