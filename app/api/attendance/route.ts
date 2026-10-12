@@ -99,6 +99,16 @@ export async function GET(request: Request) {
             code: true,
             students: {
               where: { status: "ACTIVE" },
+              // Roll call must be in roll-number order. Without an explicit
+              // ORDER BY, Postgres returns rows in physical heap order — any
+              // UPDATE rewrites a row to the end of the heap, which had put
+              // mid-roster students (e.g. BCT roll 22) dead last. Nulls fall
+              // through to enrollmentNumber, mirroring the attendance-history
+              // endpoint; enrollmentNumber is @unique so this is a total order.
+              orderBy: [
+                { rollNumber: { sort: "asc", nulls: "last" } },
+                { enrollmentNumber: "asc" },
+              ],
               select: {
                 id: true,
                 enrollmentNumber: true,

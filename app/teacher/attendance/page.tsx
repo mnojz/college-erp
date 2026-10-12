@@ -524,18 +524,32 @@ export default function TeacherAttendancePage() {
   const absentCount = totalStudents - presentCount;
   const attendanceRate = totalStudents > 0 ? ((presentCount / totalStudents) * 100).toFixed(0) : "0";
 
-  // Filter students by search
+  // Sort by roll number, then filter. The API orders students the same way,
+  // but re-sorting here guarantees roll call stays in roll order regardless
+  // of what any endpoint returns: null rolls sort last (matching the API's
+  // `nulls: "last"`), enrollment number breaks ties.
   const filteredStudents = useMemo(() => {
     if (!selectedClass) return [];
-    if (!searchQuery.trim()) return selectedClass.program.students;
+    const byRoll = (a: Student, b: Student) => {
+      if (a.rollNumber != null && b.rollNumber == null) return -1;
+      if (a.rollNumber == null && b.rollNumber != null) return 1;
+      if (a.rollNumber != null && b.rollNumber != null && a.rollNumber !== b.rollNumber) {
+        return a.rollNumber - b.rollNumber;
+      }
+      return a.enrollmentNumber.localeCompare(b.enrollmentNumber);
+    };
+    const roster = selectedClass.program.students;
+    if (!searchQuery.trim()) return [...roster].sort(byRoll);
     const q = searchQuery.toLowerCase();
-    return selectedClass.program.students.filter(
-      (s) =>
-        s.user.firstName.toLowerCase().includes(q) ||
-        s.user.lastName.toLowerCase().includes(q) ||
-        s.enrollmentNumber.toLowerCase().includes(q) ||
-        (s.rollNumber != null && String(s.rollNumber).includes(q)),
-    );
+    return roster
+      .filter(
+        (s) =>
+          s.user.firstName.toLowerCase().includes(q) ||
+          s.user.lastName.toLowerCase().includes(q) ||
+          s.enrollmentNumber.toLowerCase().includes(q) ||
+          (s.rollNumber != null && String(s.rollNumber).includes(q)),
+      )
+      .sort(byRoll);
   }, [selectedClass, searchQuery]);
 
   return (
