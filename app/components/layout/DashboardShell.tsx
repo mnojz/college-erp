@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Menu } from "lucide-react";
 import { DashboardNav, DashboardNavProps } from "./DashboardNav";
 import { DashboardSidebar, DashboardSidebarProps } from "./DashboardSidebar";
+import { UserIdentityProvider } from "./UserIdentityProvider";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -52,7 +53,12 @@ export function DashboardShell({
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <DashboardNav {...navProps} menuButton={menuButton} />
+      {/* Fetch shell identity ONCE here so every page's navbar shows the
+          correct name/avatar/subtitle, even pages that render the shell
+          without identity props (server-component wrappers). */}
+      <UserIdentityProvider>
+        <DashboardNav {...navProps} menuButton={menuButton} />
+      </UserIdentityProvider>
 
       <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col lg:flex-row">
         {/* Desktop sidebar */}

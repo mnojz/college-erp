@@ -40,8 +40,8 @@ export function AdminShell({
         brandTitle: "College-ERP",
         brandSubtitle: "Administration",
         brandHomeHref: "/dashboard",
-        userName: "Administrator",
-        userSubtitle: "Sign out",
+        // No identity props: the shared UserIdentityProvider supplies the
+        // admin's real name (and avatar, once one is uploaded) on every page.
       }}
       sidebarItems={adminLinks}
       activeHref={active}

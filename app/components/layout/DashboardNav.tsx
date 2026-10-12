@@ -8,6 +8,7 @@ import { ThemeToggle } from "@/app/components/common/ThemeToggle";
 import { NotificationDropdown } from "@/app/components/common/NotificationDropdown";
 import { Logo } from "@/app/components/common/Logo";
 import { clearProfileCache } from "@/app/lib/profile-cache";
+import { useShellIdentity } from "./UserIdentityProvider";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -21,6 +22,7 @@ export type DashboardNavProps = {
   brandTitle?: string;
   brandSubtitle?: string;
   brandHomeHref?: string;
+  /** Omit to fall back to the shared identity (see UserIdentityProvider). */
   userName?: string;
   userSubtitle?: string;
   avatarUrl?: string | null;
@@ -35,14 +37,21 @@ export function DashboardNav({
   brandTitle = "College-ERP",
   brandSubtitle = "Academic Terminal",
   brandHomeHref = "/",
-  userName = "User",
-  userSubtitle = "Sign out",
+  userName,
+  userSubtitle,
   avatarUrl,
   profileHref = "/profile",
   onLogout,
   menuButton,
 }: DashboardNavProps) {
   const router = useRouter();
+  // Shared identity fetched once in DashboardShell. Explicit props always win;
+  // when a page renders the shell WITHOUT identity props (server-component
+  // wrappers), these keep the navbar correct instead of showing "User" + initials.
+  const identity = useShellIdentity();
+  const displayName = userName ?? identity?.userName ?? "User";
+  const displaySubtitle = userSubtitle ?? identity?.userSubtitle ?? "Sign out";
+  const displayAvatar = avatarUrl ?? identity?.avatarUrl ?? null;
 
   async function handleLogout() {
     clearProfileCache();
@@ -55,7 +64,7 @@ export function DashboardNav({
   }
 
   const initials =
-    userName
+    displayName
       .trim()
       .split(/\s+/)
       .map((n) => n[0])
@@ -94,13 +103,13 @@ export function DashboardNav({
                 aria-label="Open user menu"
               >
                 <span className="hidden flex-col items-end leading-tight sm:flex">
-                  <strong className="max-w-40 truncate text-xs font-semibold">{userName}</strong>
+                  <strong className="max-w-40 truncate text-xs font-semibold">{displayName}</strong>
                   <small className="max-w-40 truncate text-[10px] text-muted-foreground">
-                    {userSubtitle}
+                    {displaySubtitle}
                   </small>
                 </span>
                 <Avatar>
-                  {avatarUrl ? <AvatarImage src={avatarUrl} alt={userName} /> : null}
+                  {displayAvatar ? <AvatarImage src={displayAvatar} alt={displayName} /> : null}
                   <AvatarFallback className="bg-primary/10 font-semibold">{initials}</AvatarFallback>
                 </Avatar>
               </Button>

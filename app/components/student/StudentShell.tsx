@@ -34,8 +34,8 @@ export type StudentShellProps = {
 
 export function StudentShell({
   active,
-  name = "Student",
-  studentId = "FWU-STUDENT",
+  name,
+  studentId,
   avatarUrl,
   title,
   subtitle,
@@ -47,8 +47,11 @@ export function StudentShell({
         brandTitle: "College-ERP",
         brandSubtitle: "Student Portal",
         brandHomeHref: "/dashboard",
+        // Pass through only when the page provides identity; otherwise the
+        // shared UserIdentityProvider fills name/subtitle/avatar so wrapper
+        // pages (e.g. /student/academics) still show the real student.
         userName: name,
-        userSubtitle: `ID: ${studentId}`,
+        userSubtitle: studentId ? `ID: ${studentId}` : undefined,
         avatarUrl,
       }}
       sidebarItems={studentLinks}

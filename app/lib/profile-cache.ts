@@ -18,6 +18,8 @@ type ShellIdentity = {
   lastName: string;
   employeeNo: string;
   profileImageUrl: string | null;
+  /** Optional pre-derived nav subtitle (e.g. "ID: 42" / "Emp ID: T-7"). */
+  subtitle?: string;
 };
 
 const cache = new Map<string, ShellIdentity>();

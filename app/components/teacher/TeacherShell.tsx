@@ -35,8 +35,8 @@ export function TeacherShell({
   title,
   subtitle,
   active,
-  teacherName = "Faculty Member",
-  employeeNo = "FWU-FACULTY",
+  teacherName,
+  employeeNo,
   avatarUrl,
   headerActions,
   children,
@@ -47,8 +47,11 @@ export function TeacherShell({
         brandTitle: "College-ERP",
         brandSubtitle: "Faculty Portal",
         brandHomeHref: "/dashboard",
+        // Pass through only when the page provides identity; otherwise the
+        // shared UserIdentityProvider fills name/subtitle/avatar so wrapper
+        // pages (e.g. /teacher/resources) still show the real faculty member.
         userName: teacherName,
-        userSubtitle: `Emp ID: ${employeeNo}`,
+        userSubtitle: employeeNo ? `Emp ID: ${employeeNo}` : undefined,
         avatarUrl,
       }}
       sidebarItems={teacherLinks}
