@@ -19,11 +19,13 @@ type AttendanceMeterProps = {
   present: number;
   /** Sessions held for the class so far. */
   total: number;
-  /** Extra classes (e.g. `self-center`) merged after the layout defaults. */
-  className?: string;
 };
 
-export function AttendanceMeter({ present, total, className }: AttendanceMeterProps) {
+/**
+ * Fixed-width (no flex growth): every row's bar must be the same length so
+ * rates stay visually comparable down the roster. The name absorbs slack.
+ */
+export function AttendanceMeter({ present, total }: AttendanceMeterProps) {
   const hasHistory = total > 0;
   // Clamp so inconsistent data can never push the bar (or its color) past 100%.
   const rate = hasHistory ? Math.min(100, Math.max(0, (present / total) * 100)) : 0;
@@ -31,7 +33,7 @@ export function AttendanceMeter({ present, total, className }: AttendanceMeterPr
 
   return (
     <div
-      className={`flex min-w-48 flex-1 items-center gap-3 ${className ?? ""}`}
+      className="flex shrink-0 items-center gap-3"
       title={
         hasHistory
           ? `Present ${present} of ${total} sessions (${percent})`
@@ -42,7 +44,7 @@ export function AttendanceMeter({ present, total, className }: AttendanceMeterPr
       <span className="w-14 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
         {hasHistory ? `${present}/${total}` : "—/0"}
       </span>
-      <div className="h-2 min-w-16 flex-1 overflow-hidden rounded-full bg-muted">
+      <div className="h-2 w-28 shrink-0 overflow-hidden rounded-full bg-muted">
         <div
           className="h-full rounded-full transition-[width] duration-500"
           style={{

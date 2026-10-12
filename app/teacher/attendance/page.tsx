@@ -972,15 +972,14 @@ export default function TeacherAttendancePage() {
                     </div>
                   </div>
 
-                  {/* Subject-scoped history meter: fills the row's slack so a
-                      scan stays roll → name → rate → mark. */}
-                  <AttendanceMeter
-                    className="self-center"
-                    present={student.attendance.present}
-                    total={student.attendance.total}
-                  />
-
+                  {/* Right cluster: the fixed-width meter sits close to the
+                      checkbox (shared gap-3) so every row's bar has the same
+                      length — the name absorbs the remaining slack. */}
                   <div className="flex shrink-0 items-center gap-3 pr-4">
+                    <AttendanceMeter
+                      present={student.attendance.present}
+                      total={student.attendance.total}
+                    />
                     {inactive && (
                       <span
                         className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-bold tracking-wide text-muted-foreground"

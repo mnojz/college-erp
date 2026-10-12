@@ -64,6 +64,14 @@ describe("AttendanceMeter — roster row markup", () => {
     );
   });
 
+  it("uses a fixed track width so every row's bar is the same length", () => {
+    const html = renderToStaticMarkup(<AttendanceMeter present={1} total={2} />);
+    // Fixed track (not flex-grow): unequal data must never mean unequal bars.
+    expect(html).toContain("w-28");
+    expect(html).not.toContain("flex-1");
+    expect(html).not.toContain("min-w-");
+  });
+
   it("rounds the percentage to an integer for column alignment", () => {
     const html = renderToStaticMarkup(<AttendanceMeter present={1} total={3} />);
     expect(html).toContain("33%");
