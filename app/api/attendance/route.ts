@@ -123,7 +123,46 @@ export async function GET(request: Request) {
       },
     });
 
-    return NextResponse.json({ classes });
+    // Per-student roll-call rate, scoped to THIS class: total = sessions held
+    // for the class so far, present = that student's PRESENT records among
+    // them. Two aggregates cover every class at once, so the meters ride along
+    // inside the roster payload — no extra round-trip, free on class switch.
+    const classIds = classes.map((c) => c.id);
+    const [sessionCounts, presentRecords] = await Promise.all([
+      prisma.attendanceSession.groupBy({
+        by: ["classId"],
+        where: { classId: { in: classIds } },
+        _count: { _all: true },
+      }),
+      // Only PRESENT rows feed the numerator — far fewer rows than pulling
+      // every record just to count successes.
+      prisma.attendanceRecord.findMany({
+        where: { status: "PRESENT", session: { classId: { in: classIds } } },
+        select: { studentId: true, session: { select: { classId: true } } },
+      }),
+    ]);
+    const totalByClass = new Map(sessionCounts.map((sc) => [sc.classId, sc._count._all]));
+    const presentByClassStudent = new Map<string, number>();
+    for (const record of presentRecords) {
+      const key = `${record.session.classId}:${record.studentId}`;
+      presentByClassStudent.set(key, (presentByClassStudent.get(key) ?? 0) + 1);
+    }
+
+    const classesWithAttendance = classes.map((c) => ({
+      ...c,
+      program: {
+        ...c.program,
+        students: c.program.students.map((s) => ({
+          ...s,
+          attendance: {
+            present: presentByClassStudent.get(`${c.id}:${s.id}`) ?? 0,
+            total: totalByClass.get(c.id) ?? 0,
+          },
+        })),
+      },
+    }));
+
+    return NextResponse.json({ classes: classesWithAttendance });
   } catch (error) {
     console.error("GET /api/attendance error:", error);
     return NextResponse.json({ error: "Unable to load classes" }, { status: 500 });

@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   IconAlertTriangle,
@@ -28,6 +28,7 @@ import {
   IconUsers,
 } from "@tabler/icons-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AttendanceMeter } from "@/app/components/teacher/AttendanceMeter";
 import { TeacherAttendanceRecords } from "@/app/components/teacher/TeacherAttendanceRecords";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
 import { CAMPUS_TIME_ZONE, campusNow, campusTodayISO } from "@/app/lib/campus-time";
@@ -39,6 +40,8 @@ type Student = {
   profileImageUrl: string | null;
   /** `user.status` — INACTIVE means an admin deactivated this account. */
   user: { firstName: string; lastName: string; status: string };
+  /** Subject-scoped roll call: PRESENT days over sessions held for this class. */
+  attendance: { present: number; total: number };
 };
 
 type ClassItem = {
@@ -360,6 +363,46 @@ export default function TeacherAttendancePage() {
     };
   }, [submittedAt, isLocked]);
 
+  /**
+   * Baseline of the last SAVED marks for the current class. An edit (PUT)
+   * only needs the PRESENT delta against this set — today's session is
+   * already counted in the roster meters — so no refetch is required.
+   */
+  const savedMarksRef = useRef<Set<string>>(new Set());
+
+  /**
+   * Adjusts one class's per-student meters in place so the bars refresh the
+   * moment attendance saves. `deltaFor` supplies the present/total increments
+   * (or decrements) for each student.
+   */
+  function applyAttendanceDelta(
+    classId: string,
+    deltaFor: (student: Student) => { present: number; total: number },
+  ) {
+    setClasses((prev) =>
+      prev.map((c) =>
+        c.id !== classId
+          ? c
+          : {
+              ...c,
+              program: {
+                ...c.program,
+                students: c.program.students.map((s) => {
+                  const delta = deltaFor(s);
+                  return {
+                    ...s,
+                    attendance: {
+                      present: s.attendance.present + delta.present,
+                      total: s.attendance.total + delta.total,
+                    },
+                  };
+                }),
+              },
+            },
+      ),
+    );
+  }
+
   function toggleStudent(studentId: string) {
     // Deactivated accounts are read-only on the roll (the server rejects them too).
     const target = selectedClass?.program.students.find((s) => s.id === studentId);
@@ -434,6 +477,7 @@ export default function TeacherAttendancePage() {
       setSessionStatus("idle");
       setSubmittedAt(null);
       setPresentStudentIds(new Set());
+      savedMarksRef.current = new Set();
     };
     if (!classId) {
       resetToIdle();
@@ -456,14 +500,16 @@ export default function TeacherAttendancePage() {
             .filter(isAccountInactive)
             .map((s) => s.id),
         );
-        setPresentStudentIds(
-          new Set(
-            (data.session.records ?? [])
-              .filter((r: { status: string }) => r.status === "PRESENT")
-              .map((r: { studentId: string }) => r.studentId)
-              .filter((studentId: string) => !inactiveIds.has(studentId)),
-          ),
+        const marks = new Set<string>(
+          (data.session.records ?? [])
+            .filter((r: { status: string }) => r.status === "PRESENT")
+            .map((r: { studentId: string }) => r.studentId)
+            .filter((studentId: string) => !inactiveIds.has(studentId)),
         );
+        setPresentStudentIds(marks);
+        // Remember the server's marks as the baseline for the next edit's
+        // meter delta (a PUT shifts PRESENT counts, never session totals).
+        savedMarksRef.current = marks;
       } else {
         resetToIdle();
       }
@@ -505,6 +551,24 @@ export default function TeacherAttendancePage() {
       }
       setSubmittedAt(result.session?.createdAt ?? new Date().toISOString());
       setSessionStatus("submitted");
+      // Refresh this class's meters locally so the bars move with the save:
+      // a first save adds one session for the whole roster (+1 present for
+      // each mark); an edit only shifts the PRESENT delta, because today's
+      // session was already counted when the sheet was first saved.
+      if (wasEditing) {
+        const previousMarks = savedMarksRef.current;
+        applyAttendanceDelta(selectedClass.id, (s) => ({
+          present:
+            (presentStudentIds.has(s.id) ? 1 : 0) - (previousMarks.has(s.id) ? 1 : 0),
+          total: 0,
+        }));
+      } else {
+        applyAttendanceDelta(selectedClass.id, (s) => ({
+          present: presentStudentIds.has(s.id) ? 1 : 0,
+          total: 1,
+        }));
+      }
+      savedMarksRef.current = new Set(presentStudentIds);
       const total = selectedClass.program.students.length;
       const present = presentStudentIds.size;
       setMessage(
@@ -908,6 +972,14 @@ export default function TeacherAttendancePage() {
                     </div>
                   </div>
 
+                  {/* Subject-scoped history meter: fills the row's slack so a
+                      scan stays roll → name → rate → mark. */}
+                  <AttendanceMeter
+                    className="self-center"
+                    present={student.attendance.present}
+                    total={student.attendance.total}
+                  />
+
                   <div className="flex shrink-0 items-center gap-3 pr-4">
                     {inactive && (
                       <span
@@ -927,7 +999,7 @@ export default function TeacherAttendancePage() {
                       // has equal specificity to a plain [&_svg] override, so
                       // the winner would depend on stylesheet order. Target the
                       // indicator explicitly to keep the 18px checkmark.
-                      className="size-6 cursor-pointer rounded-[7px] [&_[data-slot=checkbox-indicator]>svg]:size-[18px]"
+                      className="size-6 cursor-pointer rounded-[7px] [&_[data-slot=checkbox-indicator]>svg]:size-4.5"
                     />
                   </div>
                 </div>

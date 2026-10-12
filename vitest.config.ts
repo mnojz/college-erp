@@ -7,7 +7,8 @@ import path from "node:path";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["app/**/*.test.ts"],
+    // `.tsx` lets component tests render real markup via react-dom/server.
+    include: ["app/**/*.test.{ts,tsx}"],
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, ".") },
