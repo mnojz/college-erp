@@ -850,6 +850,7 @@ export default function TeacherAttendancePage() {
                   key={student.id}
                   role="button"
                   tabIndex={readOnly ? -1 : 0}
+                  aria-pressed={isPresent}
                   onClick={() => {
                     // Locked sessions and deactivated accounts are both read-only;
                     // the server rejects edits to either.
@@ -870,6 +871,21 @@ export default function TeacherAttendancePage() {
                   } ${inactive ? "opacity-50" : ""} ${readOnly ? "" : "cursor-pointer hover:bg-muted/40"}`}
                 >
                   <div className="flex min-w-0 items-center gap-3.5">
+                    {/* Roll number leads the row — teachers mark attendance by
+                        roll, so it's the primary scan target. Zero-padded so
+                        digits stay aligned down the list; the present state is
+                        carried by the green tint + checkbox, not a badge. */}
+                    <span
+                      className={`flex h-11 w-16 shrink-0 items-center justify-center rounded-lg border text-2xl font-extrabold tabular-nums ${
+                        isPresent
+                          ? "border-[color-mix(in_oklab,var(--ctp-green)_35%,transparent)] bg-[color-mix(in_oklab,var(--ctp-green)_16%,transparent)] text-(--ctp-green)"
+                          : "border-border bg-muted text-foreground"
+                      }`}
+                    >
+                      {student.rollNumber != null
+                        ? String(student.rollNumber).padStart(2, "0")
+                        : "—"}
+                    </span>
                     <span
                       className={`flex size-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${
                         isPresent
@@ -881,26 +897,12 @@ export default function TeacherAttendancePage() {
                       {student.user.firstName[0]}
                       {student.user.lastName[0]}
                     </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-foreground">
-                        {student.user.firstName} {student.user.lastName}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Roll {student.rollNumber || "N/A"} · {student.enrollmentNumber}
-                      </p>
-                    </div>
+                    <p className="min-w-0 truncate text-sm font-semibold text-foreground">
+                      {student.user.firstName} {student.user.lastName}
+                    </p>
                   </div>
 
                   <div className="flex shrink-0 items-center gap-3">
-                    <span
-                      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-bold tracking-wide ${
-                        isPresent
-                          ? "border-[color-mix(in_oklab,var(--ctp-green)_35%,transparent)] bg-[color-mix(in_oklab,var(--ctp-green)_15%,transparent)] text-(--ctp-green)"
-                          : "border-destructive/25 bg-destructive/10 text-destructive dark:border-destructive/40 dark:bg-destructive/20"
-                      }`}
-                    >
-                      {isPresent ? "PRESENT" : "ABSENT"}
-                    </span>
                     {inactive && (
                       <span
                         className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-bold tracking-wide text-muted-foreground"
@@ -915,7 +917,11 @@ export default function TeacherAttendancePage() {
                       onCheckedChange={() => toggleStudent(student.id)}
                       onClick={(e) => e.stopPropagation()}
                       aria-label={`Mark ${student.user.firstName} ${student.user.lastName} ${isPresent ? "absent" : "present"}`}
-                      className="size-5 cursor-pointer rounded-[6px]"
+                      // The indicator's built-in icon size ([&>svg]:size-3.5)
+                      // has equal specificity to a plain [&_svg] override, so
+                      // the winner would depend on stylesheet order. Target the
+                      // indicator explicitly to keep the 18px checkmark.
+                      className="size-6 cursor-pointer rounded-[7px] [&_[data-slot=checkbox-indicator]>svg]:size-[18px]"
                     />
                   </div>
                 </div>
