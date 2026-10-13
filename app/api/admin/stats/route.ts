@@ -23,7 +23,7 @@ export async function GET() {
       programs,
       subjects,
       classes,
-      assessments,
+      exams,
       studentsByProgram,
       studentsBySemester,
       lifecycleCounts,
@@ -33,7 +33,7 @@ export async function GET() {
       prisma.program.count({ where: { archivedAt: null } }),
       prisma.subject.count(),
       prisma.class.count(),
-      prisma.assessment.count(),
+      prisma.examSession.count(),
       // Distribution: active students grouped by program (drives the bar chart).
       prisma.student.groupBy({
         by: ["programId"],
@@ -83,7 +83,7 @@ export async function GET() {
     };
 
     return NextResponse.json({
-      totals: { students, teachers, programs, subjects, classes, assessments },
+      totals: { students, teachers, programs, subjects, classes, assessments: exams },
       byProgram,
       bySemester,
       lifecycle,

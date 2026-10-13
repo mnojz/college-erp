@@ -26,7 +26,7 @@ const teacherLinks = [
   ["Overview", "/dashboard", IconDashboard],
   ["Attendance", "/teacher/attendance", IconCalendarCheck],
   ["Class Schedule", "/teacher/schedule", IconCalendarClock],
-  ["Assessments & Marks", "/teacher/assessments", IconClipboardCheck],
+  ["Exam Marks", "/teacher/exams", IconClipboardCheck],
   ["Announcements", "/teacher/announcements", IconBell],
   ["My Uploads", "/teacher/materials", IconUpload],
 ] as const;

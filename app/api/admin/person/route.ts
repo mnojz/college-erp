@@ -72,24 +72,19 @@ export async function GET(request: Request) {
               },
             },
           },
-          results: {
-            where: { assessment: { publishedAt: { not: null } } },
-            orderBy: [
-              { assessment: { assessmentDate: "desc" } },
-              { assessment: { name: "asc" } },
-            ],
+          examMarks: {
+            where: { examSubject: { session: { resultsPublishedAt: { not: null } } } },
+            orderBy: { updatedAt: "desc" },
             select: {
               id: true,
               marks: true,
               grade: true,
-              assessment: {
+              examSubject: {
                 select: {
                   id: true,
-                  name: true,
-                  semester: true,
                   maxMarks: true,
-                  assessmentDate: true,
                   subject: { select: { code: true, name: true } },
+                  session: { select: { title: true, semester: true } },
                 },
               },
             },

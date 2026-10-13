@@ -34,13 +34,11 @@ type ResultItem = {
   id: string;
   marks: number | string;
   grade: string | null;
-  assessment: {
+  examSubject: {
     id: string;
-    name: string;
-    semester: number;
     maxMarks: number | string;
-    assessmentDate: string | null;
     subject: { code: string; name: string };
+    session: { title: string; semester: number };
   };
 };
 
@@ -68,7 +66,7 @@ type StudentDetail = {
     createdAt: string;
   };
   attendanceRecords: AttendanceItem[];
-  results: ResultItem[];
+  examMarks: ResultItem[];
 };
 
 type TeacherDetail = {
@@ -170,7 +168,7 @@ function StudentOverview({ student }: { student: StudentDetail }) {
       <DetailRow label="Enrollment status" value={student.status} />
       <DetailRow label="Admission date" value={formatProfileDate(student.admissionDate)} />
       <DetailRow label="Attendance (last 50)" value={pct === null ? "No records" : `${pct}% (${present}/${total})`} />
-      <DetailRow label="Results" value={`${student.results.length} published`} />
+      <DetailRow label="Results" value={`${student.examMarks.length} published`} />
     </>
   );
 }
@@ -213,7 +211,7 @@ function StudentAttendance({ student }: { student: StudentDetail }) {
 }
 
 function StudentResults({ student }: { student: StudentDetail }) {
-  if (student.results.length === 0) {
+  if (student.examMarks.length === 0) {
     return <p className="py-6 text-center text-sm text-muted-foreground">No published results yet.</p>;
   }
   return (
@@ -221,25 +219,25 @@ function StudentResults({ student }: { student: StudentDetail }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Assessment</TableHead>
+            <TableHead>Exam</TableHead>
             <TableHead>Marks</TableHead>
             <TableHead>Grade</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {student.results.map((r) => (
+          {student.examMarks.map((r) => (
             <TableRow key={r.id}>
               <TableCell>
-                <strong>{r.assessment.name}</strong>
+                <strong>{r.examSubject.session.title}</strong>
                 <div className="text-xs text-muted-foreground">
-                  {r.assessment.subject.code} · Sem {r.assessment.semester}
+                  {r.examSubject.subject.code} · Sem {r.examSubject.session.semester}
                 </div>
               </TableCell>
               <TableCell className="font-semibold whitespace-nowrap">
-                {Number(r.marks)} / {Number(r.assessment.maxMarks)}
+                {Number(r.marks)} / {Number(r.examSubject.maxMarks)}
               </TableCell>
               <TableCell>
-                <Badge variant={Number(r.marks) >= Number(r.assessment.maxMarks) * 0.4 ? "default" : "destructive"}>
+                <Badge variant={Number(r.marks) >= Number(r.examSubject.maxMarks) * 0.4 ? "default" : "destructive"}>
                   {r.grade ?? "—"}
                 </Badge>
               </TableCell>

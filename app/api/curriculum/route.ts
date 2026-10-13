@@ -3,7 +3,13 @@ import { requireAdmin } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
 import { syncSubjectsFromCurriculum } from "@/app/lib/curriculum-sync";
 
-type CourseInput = { code: string | null; name: string; credits: number };
+type CourseInput = {
+  code: string | null;
+  name: string;
+  credits: number;
+  hasTheory: boolean;
+  hasPractical: boolean;
+};
 type SemesterInput = { label: string; courses: CourseInput[] };
 type YearInput = { label: string; semesters: SemesterInput[] };
 type ElectiveInput = { group: string; code: string | null; name: string; credits: number };
@@ -91,6 +97,7 @@ export async function PUT(request: Request) {
   }
 
   const years: YearInput[] = [];
+  let courseStructureError: string | null = null;
 
   for (const rawYear of body.years as YearInput[]) {
     const label = typeof rawYear.label === "string" ? rawYear.label.trim() : "";
@@ -113,10 +120,18 @@ export async function PUT(request: Request) {
         .map((raw) => {
           const name = typeof raw.name === "string" ? raw.name.trim() : "";
           if (!name) return null;
+          const hasTheory = raw.hasTheory !== false;
+          const hasPractical = raw.hasPractical === true;
+          if (!hasTheory && !hasPractical) {
+            courseStructureError = `"${name}" needs at least one of TH or PR checked`;
+            return null;
+          }
           return {
             code: raw.code == null ? null : String(raw.code),
             name,
             credits: typeof raw.credits === "number" ? raw.credits : 3,
+            hasTheory,
+            hasPractical,
           };
         })
         .filter((c): c is CourseInput => c !== null);
@@ -125,6 +140,10 @@ export async function PUT(request: Request) {
     }
 
     years.push({ label, semesters: parsedSemesters });
+  }
+
+  if (courseStructureError) {
+    return NextResponse.json({ error: courseStructureError }, { status: 400 });
   }
 
   const electives: ElectiveInput[] = Array.isArray(body.electives)
@@ -163,6 +182,8 @@ export async function PUT(request: Request) {
                       code: c.code,
                       name: c.name,
                       credits: c.credits,
+                      hasTheory: c.hasTheory,
+                      hasPractical: c.hasPractical,
                       sortOrder: ci,
                     })),
                   },

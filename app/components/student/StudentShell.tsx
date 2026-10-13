@@ -10,11 +10,13 @@ import {
   IconNotebook,
   IconReceipt,
   IconCalendarClock,
+  IconClipboardCheck,
 } from "@tabler/icons-react";
 
 const studentLinks = [
   ["Profile", "/dashboard", IconUser],
-  ["Result", "/student/results", IconReport],
+  ["Results", "/student/results", IconReport],
+  ["Exams", "/student/exams", IconClipboardCheck],
   ["Attendance", "/student/attendance", IconCalendarCheck],
   ["Academics", "/student/academics", IconBook2],
   ["Notes", "/student/notes", IconNotebook],

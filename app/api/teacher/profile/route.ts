@@ -53,7 +53,7 @@ export async function GET() {
   }
 
   const subjectIds = teacher.classes.map((c) => c.subject.id);
-  const totalAssessments = await prisma.assessment.count({
+  const totalExamSubjects = await prisma.examSubject.count({
     where: { subjectId: { in: subjectIds } },
   });
 
@@ -61,7 +61,7 @@ export async function GET() {
     teacher,
     stats: {
       totalClasses: teacher.classes.length,
-      totalAssessments,
+      totalAssessments: totalExamSubjects,
     },
   });
 }

@@ -146,21 +146,21 @@ export async function DELETE(request: Request) {
     select: {
       id: true,
       archivedAt: true,
-      _count: { select: { students: true, classes: true, assessments: true } },
+      _count: { select: { students: true, classes: true, examSessions: true } },
     },
   });
   if (!program) {
     return NextResponse.json({ error: "Program not found" }, { status: 404 });
   }
 
-  const { students, classes, assessments } = program._count;
-  if (students || classes || assessments) {
+  const { students, classes, examSessions } = program._count;
+  if (students || classes || examSessions) {
     return NextResponse.json(
       {
         error:
           "This program is still in use. Archive it instead — archiving hides it from every " +
           "picker while keeping all subjects, classes, attendance and results intact.",
-        inUse: { students, classes, assessments },
+        inUse: { students, classes, examSessions },
         canArchive: true,
       },
       { status: 409 },

@@ -10,6 +10,7 @@ import {
   IconUsersGroup,
   IconBell,
   IconUserCheck,
+  IconCertificate,
 } from "@tabler/icons-react";
 
 const adminLinks = [
@@ -20,6 +21,7 @@ const adminLinks = [
   ["Class Scheduling", "/admin/teaching", IconCalendarClock],
   ["People", "/admin/people", IconUsersGroup],
   ["Profile Reviews", "/admin/profile-reviews", IconUserCheck],
+  ["Examinations", "/admin/exams", IconCertificate],
   ["Announcements", "/admin/announcements", IconBell],
 ] as const;
 

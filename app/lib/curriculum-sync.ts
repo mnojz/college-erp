@@ -43,7 +43,10 @@ export async function syncSubjectsFromCurriculum(
 
   // Flatten years → semesters assigning global semester numbers (1-based)
   // in curriculum order.
-  const desired = new Map<string, { name: string; semester: number }>();
+  const desired = new Map<
+    string,
+    { name: string; semester: number; hasTheory: boolean; hasPractical: boolean }
+  >();
   let globalSemesterNo = 0;
 
   for (const year of curriculum.years) {
@@ -54,6 +57,8 @@ export async function syncSubjectsFromCurriculum(
         desired.set(course.code.trim().toUpperCase(), {
           name: course.name,
           semester: globalSemesterNo,
+          hasTheory: course.hasTheory,
+          hasPractical: course.hasPractical,
         });
       }
     }
@@ -67,7 +72,14 @@ export async function syncSubjectsFromCurriculum(
 
     if (!existing) {
       await db.subject.create({
-        data: { code, name: info.name, programId, semester: info.semester },
+        data: {
+          code,
+          name: info.name,
+          programId,
+          semester: info.semester,
+          hasTheory: info.hasTheory,
+          hasPractical: info.hasPractical,
+        },
       });
       created += 1;
       continue;
@@ -76,11 +88,19 @@ export async function syncSubjectsFromCurriculum(
     if (
       existing.name !== info.name ||
       existing.programId !== programId ||
-      existing.semester !== info.semester
+      existing.semester !== info.semester ||
+      existing.hasTheory !== info.hasTheory ||
+      existing.hasPractical !== info.hasPractical
     ) {
       await db.subject.update({
         where: { code },
-        data: { name: info.name, programId, semester: info.semester },
+        data: {
+          name: info.name,
+          programId,
+          semester: info.semester,
+          hasTheory: info.hasTheory,
+          hasPractical: info.hasPractical,
+        },
       });
       updated += 1;
     }
@@ -92,7 +112,7 @@ export async function syncSubjectsFromCurriculum(
     select: {
       id: true,
       code: true,
-      _count: { select: { classes: true, assessments: true } },
+      _count: { select: { classes: true, examSubjects: true } },
     },
   });
 
@@ -100,7 +120,7 @@ export async function syncSubjectsFromCurriculum(
   for (const subject of currentSubjects) {
     const stillInCurriculum =
       subject.code !== null && desired.has(subject.code.toUpperCase());
-    const inUse = subject._count.classes > 0 || subject._count.assessments > 0;
+    const inUse = subject._count.classes > 0 || subject._count.examSubjects > 0;
     if (!stillInCurriculum && !inUse) {
       await db.subject.delete({ where: { id: subject.id } });
       removed += 1;

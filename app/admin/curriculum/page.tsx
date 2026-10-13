@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -32,7 +33,13 @@ type Program = {
   departmentName: string;
 };
 
-type DraftCourse = { code: string; name: string; credits: number };
+type DraftCourse = {
+  code: string;
+  name: string;
+  credits: number;
+  hasTheory: boolean;
+  hasPractical: boolean;
+};
 type DraftSemester = { label: string; courses: DraftCourse[] };
 type DraftYear = { label: string; semesters: DraftSemester[] };
 type DraftElective = {
@@ -103,6 +110,8 @@ export default function AdminCurriculumPage() {
                 code: string | null;
                 name: string;
                 credits: number;
+                hasTheory?: boolean;
+                hasPractical?: boolean;
               }>;
             }>;
           }) => ({
@@ -113,6 +122,8 @@ export default function AdminCurriculumPage() {
                 code: c.code ?? "",
                 name: c.name,
                 credits: c.credits,
+                hasTheory: c.hasTheory !== false,
+                hasPractical: c.hasPractical === true,
               })),
             })),
           }),
@@ -240,7 +251,16 @@ export default function AdminCurriculumPage() {
                 si === semIndex
                   ? {
                       ...s,
-                      courses: [...s.courses, { code: "", name: "", credits: 3 }],
+                      courses: [
+                        ...s.courses,
+                        {
+                          code: "",
+                          name: "",
+                          credits: 3,
+                          hasTheory: true,
+                          hasPractical: false,
+                        },
+                      ],
                     }
                   : s,
               ),
@@ -555,6 +575,30 @@ export default function AdminCurriculumPage() {
                                 aria-label="Credits"
                                 className="sm:max-w-24"
                               />
+                              <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                                <Checkbox
+                                  checked={course.hasTheory}
+                                  onCheckedChange={(checked) =>
+                                    updateCourse(yi, si, ci, {
+                                      hasTheory: checked === true,
+                                    })
+                                  }
+                                  aria-label="Has theory component"
+                                />
+                                TH
+                              </label>
+                              <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                                <Checkbox
+                                  checked={course.hasPractical}
+                                  onCheckedChange={(checked) =>
+                                    updateCourse(yi, si, ci, {
+                                      hasPractical: checked === true,
+                                    })
+                                  }
+                                  aria-label="Has practical component"
+                                />
+                                PR
+                              </label>
                               <Button
                                 type="button"
                                 variant="ghost"

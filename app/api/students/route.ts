@@ -417,7 +417,6 @@ export async function DELETE(request: Request) {
 
   try {
     await prisma.$transaction(async (tx) => {
-      await tx.result.deleteMany({ where: { studentId: id } });
       await tx.attendanceRecord.deleteMany({ where: { studentId: id } });
       await tx.student.delete({ where: { id } });
       await tx.user.delete({ where: { id: student.userId } });

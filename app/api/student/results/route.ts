@@ -1,141 +1,111 @@
-import type { Prisma } from "@/app/generated/prisma/client";
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { requireRole } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
-import { parsePageParams, paginatedResponse } from "@/app/lib/pagination";
-
-const QuerySchema = z.object({
-  subject: z.string().trim().min(1).optional(),
-  semester: z.coerce.number().int().min(1).max(12).optional(),
-  from: z.coerce.date().optional(),
-  to: z.coerce.date().optional(),
-});
-
-const RESULT_SELECT = {
-  id: true,
-  marks: true,
-  grade: true,
-  assessment: {
-    select: {
-      id: true,
-      name: true,
-      semester: true,
-      maxMarks: true,
-      assessmentDate: true,
-      publishedAt: true,
-      subject: { select: { id: true, code: true, name: true } },
-      program: { select: { name: true } },
-    },
-  },
-} satisfies Prisma.ResultSelect;
+import { sessionGpa } from "@/app/lib/grading";
 
 /**
- * GET /api/student/results — the signed-in student's published assessment
- * results, newest first. Supports pagination plus optional subject/semester/
- * date-range filters:
- *   ?page=1&pageSize=50&subject=CS101&semester=3&from=2024-01-01&to=2024-12-31
- * Returns { results, subjects, summary, pagination } — `subjects` is the
- * distinct subject list behind ALL of the student's results (drives the page
- * filter) and `summary` is computed across the full result set, independent
- * of the current page/filters.
+ * GET /api/student/results — the signed-in student's PUBLISHED exam results, as
+ * a marksheet grouped by exam session. Only sessions with results published are
+ * returned; each carries per-subject marks/grade/gradePoint plus the session
+ * GPA (mean of subject grade points, F = 0.0). Newest session first.
  */
-export async function GET(request: Request) {
+export async function GET() {
   const session = await requireRole("STUDENT");
   if (!session) {
     return NextResponse.json({ error: "Student access required" }, { status: 403 });
   }
 
-  const { searchParams } = new URL(request.url);
-  const { page, pageSize, skip, limit } = parsePageParams(searchParams, { pageSize: 50 });
-
-  // Treat empty query values (e.g. ?subject=&semester=) as "no filter".
-  const rawQuery = Object.fromEntries(
-    [...searchParams.entries()].filter(([, value]) => value !== ""),
-  );
-  const parsed = QuerySchema.safeParse(rawQuery);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid query parameters" }, { status: 400 });
-  }
-  const f = parsed.data;
-
   try {
     const student = await prisma.student.findUnique({
       where: { userId: session.userId },
-      select: { id: true },
+      select: {
+        id: true,
+        programId: true,
+        currentSemester: true,
+        user: { select: { firstName: true, lastName: true } },
+        program: { select: { name: true, code: true } },
+      },
     });
     if (!student) {
       return NextResponse.json({ error: "Student profile not found" }, { status: 404 });
     }
+    if (!student.programId || student.currentSemester === null) {
+      return NextResponse.json({
+        student: {
+          name: `${student.user.firstName} ${student.user.lastName}`.trim(),
+          program: student.program,
+          semester: student.currentSemester,
+        },
+        marksheet: [],
+        latestGpa: null,
+      });
+    }
 
-    const assessmentWhere: Prisma.AssessmentWhereInput = {
-      // Provisional (unpublished) results never reach the student.
-      publishedAt: { not: null },
-      ...(f.subject ? { subject: { code: f.subject } } : {}),
-      ...(f.semester ? { semester: f.semester } : {}),
-      ...(f.from || f.to
-        ? {
-            assessmentDate: {
-              ...(f.from ? { gte: f.from } : {}),
-              ...(f.to ? { lte: f.to } : {}),
-            },
-          }
-        : {}),
-    };
-    const where: Prisma.ResultWhereInput = {
-      studentId: student.id,
-      assessment: assessmentWhere,
-    };
+    const sessions = await prisma.examSession.findMany({
+      where: {
+        programId: student.programId,
+        semester: student.currentSemester,
+        resultsPublishedAt: { not: null },
+      },
+      orderBy: { resultsPublishedAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        type: true,
+        semester: true,
+        resultsPublishedAt: true,
+        program: { select: { name: true, code: true } },
+        subjects: {
+          orderBy: [{ part: "asc" }, { subject: { code: "asc" } }],
+          select: {
+            id: true,
+            part: true,
+            maxMarks: true,
+            subject: { select: { code: true, name: true, credits: true } },
+            marks: { where: { studentId: student.id } },
+          },
+        },
+      },
+    });
 
-    const [results, total, subjectRows, allResults] = await Promise.all([
-      prisma.result.findMany({
-        where,
-        orderBy: [
-          { assessment: { assessmentDate: "desc" } },
-          { assessment: { name: "asc" } },
-        ],
-        skip,
-        take: limit,
-        select: RESULT_SELECT,
-      }),
-      prisma.result.count({ where }),
-      // Distinct subjects across the student's FULL result set (ignores the
-      // current filters so the dropdown never hides the option in use).
-      prisma.assessment.findMany({
-        where: { publishedAt: { not: null }, results: { some: { studentId: student.id } } },
-        distinct: ["subjectId"],
-        select: { subject: { select: { code: true, name: true } } },
-      }),
-      // Unpaginated marks for the header summary cards.
-      prisma.result.findMany({
-        where: { studentId: student.id, assessment: { publishedAt: { not: null } } },
-        select: { marks: true, assessment: { select: { maxMarks: true } } },
-      }),
-    ]);
+    const marksheet = sessions.map((s) => {
+      const rows = s.subjects
+        .map((es) => {
+          const mark = es.marks[0] ?? null;
+          return {
+            subject: es.subject,
+            maxMarks: Number(es.maxMarks),
+            marks: mark ? Number(mark.marks) : null,
+            grade: mark?.grade ?? null,
+            gradePoint:
+              mark?.gradePoint === null || mark?.gradePoint === undefined
+                ? null
+                : Number(mark.gradePoint),
+          };
+        })
+        .filter((row) => row.marks !== null);
+      return {
+        id: s.id,
+        title: s.title,
+        type: s.type,
+        semester: s.semester,
+        resultsPublishedAt: s.resultsPublishedAt,
+        program: s.program,
+        rows,
+        gpa: sessionGpa(rows.map((r) => r.gradePoint)),
+      };
+    });
 
-    const subjects = subjectRows
-      .map((row) => row.subject)
-      .sort((a, b) => a.code.localeCompare(b.code));
-
-    const averagePercentage =
-      allResults.length > 0
-        ? Number(
-            (
-              allResults.reduce(
-                (acc, r) => acc + (Number(r.marks) / Number(r.assessment.maxMarks)) * 100,
-                0,
-              ) / allResults.length
-            ).toFixed(1),
-          )
-        : 0;
-
-    const { items, pagination } = paginatedResponse(results, total, page, pageSize);
+    const latestGpa = marksheet.find((m) => m.gpa !== null)?.gpa ?? null;
 
     return NextResponse.json({
-      results: items,
-      subjects,
-      summary: { totalAssessments: allResults.length, averagePercentage },
-      pagination,
+      student: {
+        name: `${student.user.firstName} ${student.user.lastName}`.trim(),
+        program: student.program,
+        semester: student.currentSemester,
+      },
+      marksheet,
+      latestGpa,
     });
   } catch (error) {
     console.error("GET /api/student/results error:", error);

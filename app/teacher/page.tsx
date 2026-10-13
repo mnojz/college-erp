@@ -199,9 +199,9 @@ export default function TeacherOverviewPage() {
             </Link>
           </Button>
           <Button asChild variant="outline">
-            <Link href="/teacher/assessments">
+            <Link href="/teacher/exams">
               <IconReportAnalytics size={16} />
-              Manage Grades
+              Enter Exam Marks
             </Link>
           </Button>
         </div>
@@ -220,9 +220,9 @@ export default function TeacherOverviewPage() {
           <small className="text-xs text-muted-foreground">Across assigned programs</small>
         </article>
         <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Assessments Held</span>
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Exam Subjects</span>
           <strong className="my-1 text-[34px] font-bold leading-none tracking-tight">{totalAssessments}</strong>
-          <small className="text-xs text-muted-foreground">Quizzes, mid-terms &amp; finals</small>
+          <small className="text-xs text-muted-foreground">Mid-term &amp; practical entries</small>
         </article>
         <Link
           href="/teacher/attendance?tab=records"

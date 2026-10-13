@@ -18,6 +18,31 @@ enum ProfileReviewStatus {
   REJECTED
 }
 
+/// Which exam event a session belongs to. Written vs practical is driven by the
+/// per-ExamSubject `part`, not this enum: an END_SEMESTER session carries both
+/// THEORY (admin-entered, written) and PRACTICAL (teacher-entered) papers.
+enum ExamType {
+  END_SEMESTER
+  MID_TERM
+}
+
+/// Lifecycle of an ExamSession. Transitions are admin-driven:
+///   DRAFT → ANNOUNCED (routine published) → RESULTS_PUBLISHED (marks published)
+enum ExamSessionStatus {
+  DRAFT
+  ANNOUNCED
+  RESULTS_PUBLISHED
+}
+
+/// Which paper of a subject an ExamSubject row covers: TH (written) and PR
+/// (practical/viva/lab) are independent papers — a subject may carry one or
+/// both — so a student passes or fails each part separately while the other
+/// stays intact.
+enum SubjectExamKind {
+  THEORY
+  PRACTICAL
+}
+
 model User {
   id                    String           @id @default(cuid())
   email                 String           @unique
@@ -83,11 +108,11 @@ model Program {
   archivedAt     DateTime?
   archivedBy     String?
   announcements  Announcement[]
-  assessments    Assessment[]
   breaks         Break[]
   classes        Class[]
   curriculum     Curriculum?
   department     Department?     @relation(fields: [departmentId], references: [id])
+  examSessions   ExamSession[]
   students       Student[]
   studyMaterials StudyMaterial[]
   subjects       Subject[]
@@ -138,7 +163,8 @@ model Student {
   permWard           Int?
   guardianName       String?
   attendanceRecords  AttendanceRecord[]
-  results            Result[]
+  examMarks          ExamMark[]
+  examRegistrations  ExamRegistration[]
   program            Program?           @relation(fields: [programId], references: [id])
   user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   studentSemesters   StudentSemester[]
@@ -174,9 +200,16 @@ model Subject {
   programId       String
   semester        Int              @default(1)
   credits         Int              @default(3)
+  /// Which papers this subject carries, set by the admin on the course
+  /// structure page. TH (written) and PR (practical/viva/lab) are independent:
+  /// a subject may be TH-only, PR-only, or both — each present part becomes a
+  /// separate ExamSubject row (its own marks and pass/fail) in a session.
+  hasTheory       Boolean          @default(true)
+  hasPractical    Boolean          @default(false)
   announcements   Announcement[]
-  assessments     Assessment[]
   classes         Class[]
+  examSubjects    ExamSubject[]
+  routineEntries  ExamRoutineEntry[]
   studyMaterials  StudyMaterial[]
   program         Program          @relation(fields: [programId], references: [id], onDelete: Cascade)
   subjectTeachers SubjectTeacher[]
@@ -279,34 +312,115 @@ model AttendanceRecord {
   @@index([studentId, status])
 }
 
-model Assessment {
-  id             String    @id @default(cuid())
-  subjectId      String
-  programId      String
-  name           String
-  maxMarks       Decimal   @db.Decimal(6, 2)
-  assessmentDate DateTime?
-  semester       Int       @default(1)
-  publishedAt    DateTime?
-  publishedBy    String?
-  program        Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
-  subject        Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  results        Result[]
+/// One exam event for a cohort: (program, semester, academic year, type).
+/// Admin-created only. An END_SEMESTER session carries both THEORY (written,
+/// admin-entered) and PRACTICAL (teacher-entered) papers in one marking table.
+/// Status moves DRAFT → ANNOUNCED (routine published to students) →
+/// RESULTS_PUBLISHED (marks published, students notified).
+model ExamSession {
+  id                 String            @id @default(cuid())
+  programId          String
+  semester           Int
+  academicYearId     String?
+  type               ExamType
+  title              String
+  status             ExamSessionStatus @default(DRAFT)
+  routinePublishedAt DateTime?
+  routinePublishedBy String?
+  /// Admin-set cutoff for the exam registration form: students may submit,
+  /// edit and resubmit until this instant; after it the form is locked.
+  /// Required before the routine can be announced (null only for sessions
+  /// announced before the deadline feature existed).
+  registrationDeadline DateTime?
+  resultsPublishedAt DateTime?
+  resultsPublishedBy String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  program            Program           @relation(fields: [programId], references: [id], onDelete: Cascade)
+  academicYear       AcademicYear?     @relation(fields: [academicYearId], references: [id])
+  subjects           ExamSubject[]
+  routine            ExamRoutineEntry[]
 
-  @@unique([subjectId, semester, name])
+  @@unique([programId, semester, academicYearId, type])
   @@index([programId, semester])
+  @@index([status])
 }
 
-model Result {
-  id           String     @id @default(cuid())
-  assessmentId String
-  studentId    String
-  marks        Decimal    @db.Decimal(6, 2)
-  grade        String?
-  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  student      Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+/// A subject part included in an exam session, with its full marks and whether
+/// its marks have been finalized (teacher-published) — a gate on publishing
+/// results. `part` makes theory and practical independent: a both-component
+/// subject produces two rows (TH + PR) in the same session, each with its own
+/// marks, pass/fail and registration set.
+model ExamSubject {
+  id               String       @id @default(cuid())
+  sessionId        String
+  subjectId        String
+  /// TH = written paper, PR = practical/viva/lab. Drives who enters marks
+  /// (admin enters TH in an END_SEMESTER session, teachers enter PR and all
+  /// MID_TERM papers), the default full marks, and per-part registration.
+  part             SubjectExamKind @default(THEORY)
+  maxMarks         Decimal      @db.Decimal(6, 2)
+  marksPublishedAt DateTime?
+  marksPublishedBy String?
+  session          ExamSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  subject          Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  marks            ExamMark[]
+  registrations    ExamRegistration[]
 
-  @@unique([assessmentId, studentId])
+  @@unique([sessionId, subjectId, part])
+  @@index([subjectId])
+}
+
+/// One row of the exam routine: a date paired with a subject. Dates are entered
+/// manually by the admin (gaps of 2–4 days between papers are their choice),
+/// `order` gives the day sequence shown to students.
+model ExamRoutineEntry {
+  id        String      @id @default(cuid())
+  sessionId String
+  subjectId String?
+  date      DateTime    @db.Date
+  order     Int
+  session   ExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  subject   Subject?    @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId, order])
+}
+
+/// A student's mark for one subject in one exam session. Grade and grade point
+/// are computed server-side from marks vs maxMarks (app/lib/grading.ts), so a
+/// tampered client can never store an inconsistent grade. Every cell of the
+/// big admin marking table and every teacher-entered subject writes here.
+model ExamMark {
+  id            String      @id @default(cuid())
+  examSubjectId String
+  studentId     String
+  marks         Decimal     @db.Decimal(6, 2)
+  grade         String?
+  gradePoint    Decimal?    @db.Decimal(3, 2)
+  enteredBy     String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  examSubject   ExamSubject @relation(fields: [examSubjectId], references: [id], onDelete: Cascade)
+  student       Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([examSubjectId, studentId])
+  @@index([studentId])
+}
+
+/// A student's exam form submission: one row per (student, subject part) they
+/// choose to appear for. Students are NOT auto-admitted — marking tables and
+/// the publish gate only cover registered students. The form may be submitted,
+/// edited and resubmitted any number of times until the session's
+/// `registrationDeadline`, then locked.
+model ExamRegistration {
+  id            String      @id @default(cuid())
+  studentId     String
+  examSubjectId String
+  createdAt     DateTime    @default(now())
+  student       Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  examSubject   ExamSubject @relation(fields: [examSubjectId], references: [id], onDelete: Cascade)
+
+  @@unique([examSubjectId, studentId])
   @@index([studentId])
 }
 
@@ -375,6 +489,10 @@ model CurriculumCourse {
   name       String
   credits    Int                @default(3)
   sortOrder  Int                @default(0)
+  /// Admin toggles on the course structure page: which papers this course has.
+  /// At least one must stay checked; curriculum-sync copies them onto Subject.
+  hasTheory    Boolean             @default(true)
+  hasPractical Boolean             @default(false)
   semester   CurriculumSemester @relation(fields: [semesterId], references: [id], onDelete: Cascade)
 
   @@index([semesterId])
@@ -491,6 +609,7 @@ model AcademicYear {
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
   semesters StudentSemester[]
+  examSessions ExamSession[]
 
   @@index([isCurrent])
   @@index([status])

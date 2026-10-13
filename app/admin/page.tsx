@@ -45,8 +45,8 @@ const METRIC_CONFIG: Record<
   subjects: { label: "Subjects", description: "Course modules", icon: <IconBook size={20} /> },
   classes: { label: "Class Slots", description: "Scheduled sessions", icon: <IconCalendar size={20} /> },
   assessments: {
-    label: "Assessments",
-    description: "Graded evaluations",
+    label: "Exam Sessions",
+    description: "Scheduled examinations",
     icon: <IconChecklist size={20} />,
   },
 };
