@@ -72,3 +72,78 @@ export function sessionGpa(gradePoints: (number | null)[]): number | null {
   const sum = values.reduce((acc, v) => acc + v, 0);
   return Math.round((sum / values.length) * 100) / 100;
 }
+
+
+/** Grading scale used by the TH/PR marksheet view. */
+export const GRADE_VALUE: Record<string, number> = {
+  A: 4.0,
+  "A-": 3.6,
+  "A--": 3.2,
+  "B+": 2.8,
+  B: 2.4,
+  "B-": 2.0,
+  C: 1.6,
+  "C-": 1.2,
+  D: 0.8,
+  F: 0.0,
+};
+
+/** Type for a row in the TH/PR marksheet. */
+export type MarkRow = {
+  /** Combined subject name shown in the row; Th+Pr together */
+  subjectName: string;
+  /** Credits offered for this subject (split across Th and Pr) */
+  totalCredits: number;
+  /** Grade for the theory part (TH) */
+  thGrade: string | null;
+  /** Grade for the practical part (PR) */
+  prGrade: string | null;
+  /** ExamSubject kind: THEORY or PRACTICAL */
+  kind: "THEORY" | "PRACTICAL";
+  /** Passed status: false when grade is F */
+  passed: boolean;
+  /** Combined grade (used for the Final column) */
+  finalGrade: string;
+  /** Grading scale used by the UI (A+=4.0, A=3.6, A-=3.2, B+=2.8, B=2.4, B-=2.0, C=1.6, C-=1.2, D=0.8, F=0.0) */
+  gradeValue: number;
+  /** Credit hours earned (only for passed subjects) */
+  creditPoints: number;
+};
+
+/** Build a marksheet row for the Th/PR table.
+ *
+ * A subject with both a TH and PR paper contributes its full credit into the
+ * theory cell (1 for the practical part) and 1 for the practical cell; the two
+ * cells sit side by side in one row. A single-part subject gets everything in
+ * its part column with 0 in the other.
+ */
+export function buildRowForSubject(s: {
+  subject: { code: string; name: string; credits: number; kind: "THEORY" | "PRACTICAL" };
+  mark: { grade: string | null; gradePoint: number | null | unknown } | null;
+  maxMarks: number;
+  marks: number | null;
+}): MarkRow {
+  const passed = s.mark?.grade !== "F";
+  const isTheory = s.subject.kind === "THEORY";
+  const thGrade = isTheory ? s.mark?.grade ?? null : null;
+  const prGrade = isTheory ? null : s.mark?.grade ?? null;
+
+  // Split credits: practical part always gets exactly 1.
+  const practicalCredits = 1;
+  const theoryCredits = Math.max(0, s.subject.credits - practicalCredits);
+
+  const partGrade = isTheory ? thGrade : prGrade;
+  const partValue = partGrade ? (GRADE_VALUE[partGrade] ?? 0) / 100 : 0;
+
+  return {
+    subjectName: `${s.subject.code} — ${s.subject.name}`,
+    totalCredits: s.subject.credits,
+    thGrade,
+    prGrade,
+    kind: s.subject.kind,
+    passed,
+    finalGrade: passed ? (partGrade ?? "—") : "F",
+    gradeValue: partValue,
+    creditPoints: passed ? theoryCredits : 0,
+  };
+}

@@ -24,7 +24,7 @@ export function marksEntryRole(
 
 /** Default full marks per exam part when the admin doesn't override. */
 export function defaultMaxMarks(part: ExamPart): number {
-  return part === "PRACTICAL" ? 50 : 100;
+  return part === "PRACTICAL" ? 40 : 60;
 }
 
 /** Whether the registration form is currently editable: the results must not

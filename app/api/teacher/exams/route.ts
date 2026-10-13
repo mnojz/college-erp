@@ -80,6 +80,7 @@ export async function GET() {
       program: es.session.program,
     },
     markCount: countById.get(es.id) ?? 0,
+    registeredCount: regCountById.get(es.id) ?? 0,
   }));
 
   return NextResponse.json({ items });

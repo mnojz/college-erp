@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
 import { jsonBody } from "@/app/lib/validation";
-import { examRoster } from "@/app/lib/exams";
 import { resolveTeacherExamSubject } from "@/app/lib/exam-teacher";
 import { gradeForMarks, gradePointForMarks } from "@/app/lib/grading";
 import { z } from "zod";
@@ -31,7 +30,27 @@ export async function GET(_request: Request, ctx: RouteContext) {
     return NextResponse.json({ error: "Exam subject not found or not assigned to you" }, { status: 404 });
   }
 
-  const roster = await examRoster(examSubject.session.programId, examSubject.session.semester);
+  // Only students who registered for THIS subject part may appear in the
+  // teacher's marking list — this also covers backlog students, whose
+  // registrations exist outside their current semester's cohort.
+  const registrations = await prisma.examRegistration.findMany({
+    where: { examSubjectId },
+    select: {
+      student: {
+        select: {
+          id: true,
+          rollNumber: true,
+          enrollmentNumber: true,
+          user: { select: { firstName: true, lastName: true } },
+        },
+      },
+    },
+    orderBy: [
+      { student: { rollNumber: { sort: "asc", nulls: "last" } } },
+      { student: { enrollmentNumber: "asc" } },
+    ],
+  });
+  const roster = registrations.map((r) => r.student);
   const marks = await prisma.examMark.findMany({
     where: { examSubjectId },
     select: { studentId: true, marks: true, grade: true, gradePoint: true },
@@ -92,10 +111,16 @@ export async function PUT(request: Request, ctx: RouteContext) {
     return NextResponse.json({ error: `Marks must be between 0 and ${maxMarks}` }, { status: 400 });
   }
 
-  const roster = await examRoster(examSubject.session.programId, examSubject.session.semester);
-  const rosterIds = new Set(roster.map((r) => r.id));
-  if (parsed.value.cells.some((c) => !rosterIds.has(c.studentId))) {
-    return NextResponse.json({ error: "Cell references a student not in this cohort" }, { status: 400 });
+  const registrations = await prisma.examRegistration.findMany({
+    where: { examSubjectId },
+    select: { studentId: true },
+  });
+  const registeredIds = new Set(registrations.map((r) => r.studentId));
+  if (parsed.value.cells.some((c) => !registeredIds.has(c.studentId))) {
+    return NextResponse.json(
+      { error: "Marks can only be entered for students who submitted the exam form" },
+      { status: 400 },
+    );
   }
 
   try {
@@ -140,12 +165,14 @@ export async function POST(_request: Request, ctx: RouteContext) {
     return NextResponse.json({ error: "Exam subject not found or not assigned to you" }, { status: 404 });
   }
 
-  // Require a mark for every rostered student before a teacher can publish.
-  const roster = await examRoster(examSubject.session.programId, examSubject.session.semester);
+  // Require a mark for every registered student before a teacher can
+  // publish. A subject with zero registrations is vacuously complete; the
+  // session-level admin gate blocks publishing an empty session overall.
+  const registeredCount = await prisma.examRegistration.count({ where: { examSubjectId } });
   const markCount = await prisma.examMark.count({ where: { examSubjectId } });
-  if (markCount < roster.length) {
+  if (markCount < registeredCount) {
     return NextResponse.json(
-      { error: `Enter marks for all ${roster.length} students before publishing (${markCount} done)` },
+      { error: `Enter marks for all ${registeredCount} registered students before publishing (${markCount} done)` },
       { status: 409 },
     );
   }

@@ -33,6 +33,7 @@ type ExamSubjectItem = {
     program: { name: string; code: string };
   };
   markCount: number;
+  registeredCount: number;
 };
 
 type RosterStudent = { id: string; rollNumber: number | null; enrollmentNumber: string; name: string };
@@ -218,7 +219,8 @@ export default function TeacherExamsPage() {
                 <Skeleton className="h-48 w-full rounded-lg" />
               ) : detail.roster.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">
-                  No active students in this cohort.
+                  No students registered for this subject yet — the marking list
+                  opens once students submit the exam form.
                 </p>
               ) : (
                 <div className="overflow-x-auto rounded-lg border">
@@ -308,7 +310,9 @@ export default function TeacherExamsPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-sm text-muted-foreground">{item.markCount} entered</span>
+                      <span className="text-sm text-muted-foreground">
+                        {item.markCount} / {item.registeredCount} entered
+                      </span>
                       <Button size="sm" onClick={() => openSubject(item)}>
                         {item.markCount > 0 ? "Edit Marks" : "Enter Marks"}
                       </Button>

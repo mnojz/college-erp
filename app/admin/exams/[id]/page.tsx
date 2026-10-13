@@ -252,34 +252,14 @@ export default function AdminExamDetailPage() {
     return times.length ? new Date(Math.min(...times)) : null;
   }, [routine]);
 
-  // Routine rows for display: sorted by date with synthetic gap rows between
-  // non-consecutive papers. Gap = days strictly between (Jan 1 → Jan 4 = "2 days
-  // gap"); consecutive or same-day papers produce no gap row.
+  // Routine rows for display, sorted by date (stable: ties keep saved order).
   const routineDisplayRows = useMemo(() => {
-    const sorted = [...routine].sort((a, b) => {
+    return [...routine].sort((a, b) => {
       const ta = a.date ? new Date(a.date).getTime() : Number.POSITIVE_INFINITY;
       const tb = b.date ? new Date(b.date).getTime() : Number.POSITIVE_INFINITY;
       if (ta !== tb) return ta - tb;
       return a.order - b.order;
     });
-    const rows: Array<
-      | { kind: "entry"; key: string; entry: RoutineEntry }
-      | { kind: "gap"; key: string; days: number }
-    > = [];
-    let prev: RoutineEntry | null = null;
-    for (const entry of sorted) {
-      if (prev && prev.date && entry.date) {
-        const diffDays = Math.round(
-          (new Date(entry.date).getTime() - new Date(prev.date).getTime()) / 86_400_000,
-        );
-        if (diffDays > 1) {
-          rows.push({ kind: "gap", key: `gap-${prev.id}-${entry.id}`, days: diffDays - 1 });
-        }
-      }
-      rows.push({ kind: "entry", key: entry.id, entry });
-      prev = entry;
-    }
-    return rows;
   }, [routine]);
 
   // The routine draft is saveable once every pre-filled slot has a date.
@@ -578,28 +558,17 @@ export default function AdminExamDetailPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {routineDisplayRows.map((row) =>
-                    row.kind === "gap" ? (
-                      <TableRow key={row.key}>
-                        <TableCell
-                          colSpan={3}
-                          className="text-center text-xs italic text-muted-foreground"
-                        >
-                          — {row.days} day{row.days === 1 ? "" : "s"} gap —
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      <TableRow key={row.key}>
-                        <TableCell className="border-r whitespace-nowrap text-xs text-muted-foreground">
-                          {routineWeekday(row.entry.date)}
-                        </TableCell>
-                        <TableCell className="border-r whitespace-nowrap text-xs text-muted-foreground">
-                          {routineDateShort(row.entry.date)}
-                        </TableCell>
-                        <TableCell>{subjectCell(row.entry.subject, "TBA")}</TableCell>
-                      </TableRow>
-                    ),
-                  )}
+                  {routineDisplayRows.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="border-r whitespace-nowrap text-xs text-muted-foreground">
+                        {routineWeekday(row.date)}
+                      </TableCell>
+                      <TableCell className="border-r whitespace-nowrap text-xs text-muted-foreground">
+                        {routineDateShort(row.date)}
+                      </TableCell>
+                      <TableCell>{subjectCell(row.subject, "TBA")}</TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </div>

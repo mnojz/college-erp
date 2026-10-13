@@ -15,14 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { IconReport } from "@tabler/icons-react";
-
-type MarkRow = {
-  subject: { code: string; name: string; kind: "THEORY" | "PRACTICAL"; credits: number };
-  maxMarks: number;
-  marks: number;
-  grade: string | null;
-  gradePoint: number | null;
-};
+import { GRADE_VALUE, buildRowForSubject, MarkRow } from "@/app/lib/grading";
 
 type Marksheet = {
   id: string;
@@ -45,6 +38,14 @@ const TYPE_LABEL: Record<string, string> = {
   END_SEMESTER: "End-Semester",
   MID_TERM: "Mid-Term",
 };
+
+/** Build a marksheet row for the Th/PR table.
+ *
+ * A subject with both a TH and PR paper contributes its full credit into the
+ * theory cell (1 for the practical part) and 1 for the practical cell; the two
+ * cells sit side by side in one row. A single-part subject gets everything in
+ * its part column with 0 in the other.
+ */
 
 export default function StudentResultsPage() {
   const router = useRouter();
@@ -114,42 +115,106 @@ export default function StudentResultsPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Subject</TableHead>
-                        <TableHead className="text-center">Marks</TableHead>
-                        <TableHead className="text-center">Max</TableHead>
-                        <TableHead className="text-center">Grade</TableHead>
+                        <TableHead>Subject Code</TableHead>
+                        <TableHead className="text-center">Subject Name</TableHead>
+                        <TableHead className="text-center">Credit Hours</TableHead>
+                        <TableHead className="text-center">Obtained Grades</TableHead>
+                        <TableHead className="text-center">Final Grade</TableHead>
+                        <TableHead className="text-center">Grade Value</TableHead>
                         <TableHead className="text-center">Grade Point</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {sheet.rows.map((row) => {
-                        const passed = row.grade !== "F";
-                        return (
-                          <TableRow key={row.subject.code}>
-                            <TableCell>
-                              <strong>{row.subject.code}</strong>
-                              <div className="text-xs text-muted-foreground">
-                                {row.subject.name}
-                                {row.subject.kind === "PRACTICAL" ? " · Practical" : ""}
+                      {sheet.rows.map((row) => (
+                        <TableRow key={row.subjectName}>
+                          <TableCell>{row.subjectName}</TableCell>
+                          <TableCell className="text-center">
+                            {row.subjectName}
+                            {row.thGrade || row.prGrade ? (
+                              <div className="mt-0.5">
+                                <div className="text-xs text-muted-foreground">
+                                  {row.thGrade ? "TH" : "PR"}
+                                  {row.thGrade || row.prGrade ? " \u25C6 " : ""}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {row.thGrade ? `TH: ${row.thGrade}` : ""}
+                                  {row.thGrade && row.prGrade ? " \u2022 " : ""}
+                                  {row.prGrade ? `PR: ${row.prGrade}` : ""}
+                                </div>
                               </div>
-                            </TableCell>
-                            <TableCell className="text-center font-semibold">{row.marks}</TableCell>
-                            <TableCell className="text-center text-muted-foreground">
-                              {row.maxMarks}
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Badge variant={passed ? "default" : "destructive"}>
-                                {row.grade ?? "—"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-center font-medium">
-                              {row.gradePoint !== null ? row.gradePoint.toFixed(1) : "—"}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                            ) : (
+                              <div className="text-xs text-muted-foreground">No grade published</div>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {row.thGrade ? (
+                              <>
+                                <span>{row.totalCredits - 1}</span>
+                                <span className="text-xs text-muted-foreground"> (TH)</span>
+                                <span className="mx-1">/</span>
+                                <span>1</span>
+                                <span className="text-xs text-muted-foreground"> (PR)</span>
+                              </>
+                            ) : (
+                              <>{row.totalCredits}</>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex items-center justify-center gap-4">
+                              <div className="flex flex-col items-center">
+                                {row.thGrade ? (
+                                  <Badge variant={row.passed ? "default" : "destructive"}>
+                                    {row.thGrade}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">—</span>
+                                )}
+                              </div>
+                              <div className="flex flex-col items-center">
+                                {row.prGrade ? (
+                                  <Badge variant={row.passed ? "default" : "destructive"}>
+                                    {row.prGrade}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">—</span>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {row.finalGrade === "F" ? (
+                              <Badge variant="destructive">F</Badge>
+                            ) : row.finalGrade ? (
+                              <Badge variant="default">{row.finalGrade}</Badge>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {row.gradeValue !== null ? row.gradeValue.toFixed(2) : "—"}
+                          </TableCell>
+                          <TableCell className="text-center font-medium">
+                            {row.creditPoints !== null ? row.creditPoints.toFixed(1) : "—"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
+                </div>
+                <div className="mt-4 flex justify-end gap-6 border-t pt-4 text-sm">
+                  <div className="text-right">
+                    <div className="font-semibold">Total</div>
+                    <div className="text-muted-foreground">Credits: {sheet.rows.reduce((acc, r) => acc + r.totalCredits, 0)}</div>
+                    <div className="text-muted-foreground">
+                      Grade points: {sheet.rows.reduce((acc, r) => acc + r.creditPoints, 0).toFixed(1)}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-semibold">Result</div>
+                    <div className={`font-bold ${sheet.rows.every((r) => r.passed) ? "text-green-600" : "text-destructive"}`}>
+                      {sheet.rows.every((r) => r.passed) ? "PASSED" : "FAILED"}
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
