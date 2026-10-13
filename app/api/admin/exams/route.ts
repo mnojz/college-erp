@@ -15,6 +15,13 @@ const CreateSessionSchema = z.object({
   type: z.enum(["END_SEMESTER", "MID_TERM"]),
   title: z.string().trim().min(1).max(200),
   academicYearId: z.string().trim().min(1).optional().nullable(),
+  // Form submission deadline, set once at creation. Required so every exam
+  // announced has a registration window students can see.
+  registrationDeadline: z
+    .string()
+    .trim()
+    .min(1)
+    .refine((v) => !isNaN(new Date(v).getTime()), { message: "Invalid registration deadline" }),
   // Optional explicit subject list; when omitted every subject in the
   // program + semester seeds one ExamSubject row per present part
   // (hasTheory → THEORY, hasPractical → PRACTICAL) with part-appropriate
@@ -40,6 +47,7 @@ const SESSION_SELECT = {
   semester: true,
   routinePublishedAt: true,
   resultsPublishedAt: true,
+  registrationDeadline: true,
   createdAt: true,
   academicYear: { select: { id: true, name: true } },
   program: { select: { id: true, name: true, code: true } },
@@ -140,6 +148,7 @@ export async function POST(request: Request) {
         type: body.type,
         title: body.title,
         academicYearId: body.academicYearId ?? null,
+        registrationDeadline: new Date(body.registrationDeadline),
         subjects: {
           create: subjectRows.map((s) => ({
             subjectId: s.subjectId,

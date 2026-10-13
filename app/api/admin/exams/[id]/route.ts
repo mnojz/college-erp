@@ -25,6 +25,7 @@ async function loadDetail(id: string) {
       semester: true,
       routinePublishedAt: true,
       resultsPublishedAt: true,
+      registrationDeadline: true,
       programId: true,
       program: { select: { id: true, name: true, code: true } },
       academicYear: { select: { id: true, name: true } },
@@ -45,6 +46,7 @@ async function loadDetail(id: string) {
           id: true,
           date: true,
           order: true,
+          subjectId: true,
           subject: { select: { code: true, name: true } },
         },
       },
@@ -96,6 +98,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
       semester: session.semester,
       routinePublishedAt: session.routinePublishedAt,
       resultsPublishedAt: session.resultsPublishedAt,
+      registrationDeadline: session.registrationDeadline,
       program: session.program,
       academicYear: session.academicYear,
     },
@@ -121,6 +124,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
       id: r.id,
       date: r.date,
       order: r.order,
+      subjectId: r.subjectId,
       subject: r.subject,
     })),
     // Flat { "examSubjectId:studentId": { marks, grade, gradePoint } } map.
@@ -129,6 +133,10 @@ export async function GET(_request: Request, ctx: RouteContext) {
         key,
         { marks: Number(m.marks), grade: m.grade, gradePoint: m.gradePoint === null ? null : Number(m.gradePoint) },
       ]),
+    ),
+    // { examSubjectId: string[] } — students who registered for each part.
+    registeredBySubject: Object.fromEntries(
+      Array.from(registeredBySubject.entries()).map(([k, set]) => [k, Array.from(set)]),
     ),
     publishGate: { canPublish: gate.canPublish, blockers: gate.blockers, subjects: gate.subjects },
   });

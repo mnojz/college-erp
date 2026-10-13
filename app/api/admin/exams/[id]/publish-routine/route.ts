@@ -7,15 +7,7 @@ import { notifyUsers, studentUserIdsForSemester } from "@/app/lib/notify";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-const PublishRoutineSchema = z.object({
-  registrationDeadline: z
-    .string()
-    .nullable()
-    .optional()
-    .refine((v) => (v === null || v === undefined) || !isNaN(new Date(v).getTime()), {
-      message: "Invalid registration deadline",
-    }),
-});
+const PublishRoutineSchema = z.object({}).passthrough();
 
 /** Build a plain-text routine body for the auto-created announcement. */
 function routineBody(
@@ -56,7 +48,6 @@ export async function POST(request: Request, ctx: RouteContext) {
   const { id } = await ctx.params;
   const parsed = await jsonBody(request, PublishRoutineSchema);
   if (!parsed.ok) return parsed.response;
-  const body = parsed.value;
 
   const session = await prisma.examSession.findUnique({
     where: { id },
@@ -83,34 +74,24 @@ export async function POST(request: Request, ctx: RouteContext) {
     );
   }
 
-  // The admin must set a form submission deadline before the exam can be
-  // announced: the deadline closes the registration window permanently once
-  // reached (or once results are published), and the UI nudges the admin if it
-  // is still unset. Legacy sessions (null deadline) stay open until results are
-  // published, but the deadline is now a required field to announce a fresh one.
-  if (body.registrationDeadline === null || body.registrationDeadline === undefined) {
+  // The form submission deadline is set when the exam is created. It must be
+  // present to announce: it closes the registration window once reached (or
+  // once results are published). Legacy sessions created before this field
+  // existed cannot be announced until a deadline is set via the edit API.
+  if (!session.registrationDeadline) {
     return NextResponse.json(
-      { error: "Set the form submission deadline before announcing" },
+      { error: "Set the form submission deadline before announcing (set at exam creation)" },
       { status: 400 },
     );
   }
-
-  const now = new Date();
-  const deadline = new Date(body.registrationDeadline);
+  const deadline = new Date(session.registrationDeadline);
   if (isNaN(deadline.getTime())) {
     return NextResponse.json(
-      { error: "Registration deadline is not a valid date" },
+      { error: "Stored registration deadline is not a valid date" },
       { status: 400 },
     );
   }
-
-  // Validate dates are in a sane range (not in the distant past).
-  if (deadline.getTime() < now.getTime() - 24 * 60 * 60 * 1000) {
-    return NextResponse.json(
-      { error: "Registration deadline must be in the future" },
-      { status: 400 },
-    );
-  }
+  const now = new Date();
 
   const bodyText = routineBody(session.title, session.program.name, session.semester, session.routine);
 

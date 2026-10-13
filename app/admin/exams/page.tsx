@@ -18,7 +18,20 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { IconCertificate, IconPlus } from "@tabler/icons-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  IconAlertTriangle,
+  IconCertificate,
+  IconPlus,
+  IconTrash,
+} from "@tabler/icons-react";
 
 type Program = { id: string; name: string; code: string; durationYears: number };
 
@@ -47,6 +60,15 @@ const STATUS_BADGE: Record<
   RESULTS_PUBLISHED: { label: "Results Published", variant: "outline" },
 };
 
+/** Default form-submission deadline for a new exam: 15 days from now, as a
+ *  local `datetime-local` input value (YYYY-MM-DDTHH:mm). Editable. */
+function defaultDeadlineInput(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 15);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export default function AdminExamsPage() {
   const router = useRouter();
   const [exams, setExams] = useState<ExamListItem[]>([]);
@@ -54,11 +76,14 @@ export default function AdminExamsPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<ExamListItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [formProgramId, setFormProgramId] = useState("");
   const [formSemester, setFormSemester] = useState("1");
   const [formType, setFormType] = useState<"END_SEMESTER" | "MID_TERM">("END_SEMESTER");
   const [formTitle, setFormTitle] = useState("");
+  const [formDeadline, setFormDeadline] = useState(() => defaultDeadlineInput());
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -95,6 +120,15 @@ export default function AdminExamsPage() {
       setFormError("Choose a program");
       return;
     }
+    if (!formDeadline) {
+      setFormError("Set the form submission deadline");
+      return;
+    }
+    const deadlineDate = new Date(formDeadline);
+    if (isNaN(deadlineDate.getTime())) {
+      setFormError("Enter a valid deadline");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch("/api/admin/exams", {
@@ -105,6 +139,7 @@ export default function AdminExamsPage() {
           semester: Number(formSemester),
           type: formType,
           title: formTitle.trim(),
+          registrationDeadline: deadlineDate.toISOString(),
         }),
       });
       const data = await res.json();
@@ -117,6 +152,26 @@ export default function AdminExamsPage() {
       setFormError("Unable to create exam");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/exams/${deleteTarget.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Unable to delete exam");
+        return;
+      }
+      setExams((prev) => prev.filter((e) => e.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch {
+      setError("Unable to delete exam");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -187,6 +242,19 @@ export default function AdminExamsPage() {
                           : "No routine yet"}
                       </div>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Delete ${exam.title}`}
+                      className="shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDeleteTarget(exam);
+                      }}
+                    >
+                      <IconTrash size={16} />
+                    </Button>
                   </CardContent>
                 </Card>
               </Link>
@@ -257,6 +325,19 @@ export default function AdminExamsPage() {
                 </Select>
               </div>
             </div>
+            <div className="grid gap-2">
+              <Label htmlFor="exam-deadline">Form submission deadline</Label>
+              <Input
+                id="exam-deadline"
+                type="datetime-local"
+                value={formDeadline}
+                onChange={(e) => setFormDeadline(e.target.value)}
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Students can fill and submit the exam form until this date (defaults to 15 days).
+              </p>
+            </div>
             <p className="text-xs text-muted-foreground">
               All subjects in this program + semester are added automatically with a default full
               marks (theory 100, practical 50).
@@ -273,6 +354,34 @@ export default function AdminExamsPage() {
           </form>
         </AdminModal>
       )}
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <IconAlertTriangle size={18} className="text-destructive" />
+              Delete exam?
+            </DialogTitle>
+            <DialogDescription>
+              This permanently deletes <span className="font-medium">{deleteTarget?.title}</span>{" "}
+              and all of its subjects, routine, registrations, and marks. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? "Deleting…" : "Delete Exam"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminShell>
   );
 }
