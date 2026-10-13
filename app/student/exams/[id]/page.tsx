@@ -23,7 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { ExamDetail, ExamSubjectCell, ExamType } from "@/app/types/exam";
+import type { ExamDetail, ExamRoutineRow, ExamSubjectCell, ExamType } from "@/app/types/exam";
 
 const TYPE_LABEL: Record<ExamType, string> = {
   END_SEMESTER: "End-Semester",
@@ -34,6 +34,12 @@ type PageState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "ready"; detail: ExamDetail };
+
+/** One rendered routine line: a real paper, or a synthetic break between two
+ *  non-consecutive papers (ported from the admin read-only view). */
+type RoutineDisplayRow =
+  | { kind: "entry"; key: string; entry: ExamRoutineRow }
+  | { kind: "gap"; key: string; days: number };
 
 function shell(children: React.ReactNode) {
   return (
@@ -81,7 +87,7 @@ function RoutineSubject({ subject }: { subject: { code: string; name: string } |
   if (!subject) return <span className="text-sm text-muted-foreground">TBA</span>;
   return (
     <span>
-      <span className="font-medium">{subject.code}</span>
+      <span className="font-semibold">{subject.code}</span>
       <span className="ml-2 text-sm text-muted-foreground">{subject.name}</span>
     </span>
   );
@@ -143,6 +149,37 @@ export default function StudentExamDetailPage() {
     const savedIds = new Set(saved);
     return selection.some((sid) => !savedIds.has(sid));
   }, [detail, selection]);
+
+  // Routine rows for display: sorted by date with synthetic gap rows between
+  // non-consecutive papers (ported from the admin read-only view). Gap = days
+  // strictly between (Jan 1 → Jan 4 = "2 days gap"); consecutive or same-day
+  // papers produce no gap row.
+  const routineRows = useMemo<RoutineDisplayRow[]>(() => {
+    const routine = detail?.routine ?? [];
+    const sorted = routine
+      .map((entry, index) => ({ entry, index }))
+      .sort((a, b) => {
+        const ta = a.entry.date ? new Date(a.entry.date).getTime() : Number.POSITIVE_INFINITY;
+        const tb = b.entry.date ? new Date(b.entry.date).getTime() : Number.POSITIVE_INFINITY;
+        if (ta !== tb) return ta - tb;
+        return a.index - b.index;
+      });
+    const rows: RoutineDisplayRow[] = [];
+    let prev: ExamRoutineRow | null = null;
+    for (const { entry, index } of sorted) {
+      if (prev && prev.date && entry.date) {
+        const diffDays = Math.round(
+          (new Date(entry.date).getTime() - new Date(prev.date).getTime()) / 86_400_000,
+        );
+        if (diffDays > 1) {
+          rows.push({ kind: "gap", key: `gap-${index}`, days: diffDays - 1 });
+        }
+      }
+      rows.push({ kind: "entry", key: `entry-${index}`, entry });
+      prev = entry;
+    }
+    return rows;
+  }, [detail]);
 
   function toggleCell(examSubjectId: string) {
     setSelection((prev) =>
@@ -318,25 +355,42 @@ export default function StudentExamDetailPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-20 border-r bg-muted/30">Day</TableHead>
-                    <TableHead className="border-r bg-muted/30">Date</TableHead>
-                    <TableHead className="bg-muted/30">Subject</TableHead>
+                    <TableHead className="w-20 border-r bg-muted/30 text-sm font-semibold text-foreground">
+                      Day
+                    </TableHead>
+                    <TableHead className="border-r bg-muted/30 text-sm font-semibold text-foreground">
+                      Date
+                    </TableHead>
+                    <TableHead className="bg-muted/30 text-sm font-semibold text-foreground">
+                      Subject
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {routine.map((entry, index) => (
-                    <TableRow key={`${entry.date}-${index}`}>
-                      <TableCell className="whitespace-nowrap border-r text-xs text-muted-foreground">
-                        {routineWeekday(entry.date)}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap border-r text-xs text-muted-foreground">
-                        {routineDateShort(entry.date)}
-                      </TableCell>
-                      <TableCell>
-                        <RoutineSubject subject={entry.subject} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {routineRows.map((row) =>
+                    row.kind === "gap" ? (
+                      <TableRow key={row.key}>
+                        <TableCell
+                          colSpan={3}
+                          className="text-center text-sm font-medium italic text-muted-foreground"
+                        >
+                          — {row.days} day{row.days === 1 ? "" : "s"} gap —
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      <TableRow key={row.key}>
+                        <TableCell className="whitespace-nowrap border-r text-sm font-medium text-foreground">
+                          {routineWeekday(row.entry.date)}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap border-r text-sm font-medium text-foreground">
+                          {routineDateShort(row.entry.date)}
+                        </TableCell>
+                        <TableCell>
+                          <RoutineSubject subject={row.entry.subject} />
+                        </TableCell>
+                      </TableRow>
+                    ),
+                  )}
                 </TableBody>
               </Table>
             </div>
