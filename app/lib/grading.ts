@@ -73,77 +73,125 @@ export function sessionGpa(gradePoints: (number | null)[]): number | null {
   return Math.round((sum / values.length) * 100) / 100;
 }
 
+// ---------------------------------------------------------------------------
+// TH/PR marksheet grading scale
+// Matches TU Nepal's standard letter-grade → GPA conversion used on marksheets.
+// ---------------------------------------------------------------------------
 
-/** Grading scale used by the TH/PR marksheet view. */
 export const GRADE_VALUE: Record<string, number> = {
+  "A+": 4.0,
   A: 4.0,
-  "A-": 3.6,
-  "A--": 3.2,
-  "B+": 2.8,
-  B: 2.4,
-  "B-": 2.0,
-  C: 1.6,
-  "C-": 1.2,
-  D: 0.8,
+  "A-": 3.56,
+  "B+": 3.2,
+  B: 2.8,
+  "B-": 2.96,
+  C: 2.56,
+  "C-": 2.0,
+  D: 1.6,
   F: 0.0,
 };
 
-/** Type for a row in the TH/PR marksheet. */
+/**
+ * One row in the TH/PR results table.
+ *
+ * Each subject part (THEORY or PRACTICAL) is its own row. A subject that has
+ * both parts produces two rows — one TH row and one PR row.
+ */
 export type MarkRow = {
-  /** Combined subject name shown in the row; Th+Pr together */
+  /** Subject course code, e.g. "EX352" */
+  subjectCode: string;
+  /**
+   * Display name: includes " TH" or " PR" suffix when the subject has a
+   * counterpart, e.g. "Instrumentation TH" / "Instrumentation PR".
+   */
   subjectName: string;
-  /** Credits offered for this subject (split across Th and Pr) */
-  totalCredits: number;
-  /** Grade for the theory part (TH) */
+  /** Credit hours for this specific part (practical part is always 1 credit). */
+  credits: number;
+  /** Grade earned in the Theory column (null for PR rows). */
   thGrade: string | null;
-  /** Grade for the practical part (PR) */
+  /** Grade earned in the Practical column (null for TH rows). */
   prGrade: string | null;
-  /** ExamSubject kind: THEORY or PRACTICAL */
+  /** Which part this row represents. */
   kind: "THEORY" | "PRACTICAL";
-  /** Passed status: false when grade is F */
+  /** True when the student passed this part (grade ≠ F and grade exists). */
   passed: boolean;
-  /** Combined grade (used for the Final column) */
+  /**
+   * Final grade for this row: same as obtained grade when passed; "F" when
+   * failed; "—" when no grade exists yet.
+   */
   finalGrade: string;
-  /** Grading scale used by the UI (A+=4.0, A=3.6, A-=3.2, B+=2.8, B=2.4, B-=2.0, C=1.6, C-=1.2, D=0.8, F=0.0) */
+  /**
+   * Numeric grade value from the GRADE_VALUE scale.
+   * 0.0 for F or when no grade exists.
+   */
   gradeValue: number;
-  /** Credit hours earned (only for passed subjects) */
-  creditPoints: number;
+  /**
+   * Grade point = credits × gradeValue.
+   * 0.0 when failed (no credit earned).
+   */
+  gradePoint: number;
 };
 
-/** Build a marksheet row for the Th/PR table.
+/**
+ * Build a single MarkRow for one subject part (THEORY or PRACTICAL).
  *
- * A subject with both a TH and PR paper contributes its full credit into the
- * theory cell (1 for the practical part) and 1 for the practical cell; the two
- * cells sit side by side in one row. A single-part subject gets everything in
- * its part column with 0 in the other.
+ * Credit hour rules:
+ *   - If the subject has a practical counterpart (hasPractical = true for a
+ *     theory row): credits = totalSubjectCredits - 1
+ *   - The practical row always gets credits = 1
+ *   - A theory-only subject keeps its full credit hours as-is
  */
 export function buildRowForSubject(s: {
-  subject: { code: string; name: string; credits: number; kind: "THEORY" | "PRACTICAL" };
-  mark: { grade: string | null; gradePoint: number | null | unknown } | null;
-  maxMarks: number;
-  marks: number | null;
+  subject: {
+    code: string;
+    name: string;
+    credits: number;
+    kind: "THEORY" | "PRACTICAL";
+    /** True when the subject has both a TH and PR component. */
+    hasPractical: boolean;
+  };
+  mark: { grade: string | null } | null;
 }): MarkRow {
-  const passed = s.mark?.grade !== "F";
-  const isTheory = s.subject.kind === "THEORY";
-  const thGrade = isTheory ? s.mark?.grade ?? null : null;
-  const prGrade = isTheory ? null : s.mark?.grade ?? null;
+  const { subject, mark } = s;
+  const isTheory = subject.kind === "THEORY";
 
-  // Split credits: practical part always gets exactly 1.
-  const practicalCredits = 1;
-  const theoryCredits = Math.max(0, s.subject.credits - practicalCredits);
+  // Credit split: PR part always 1; TH part gets the remainder.
+  const credits = isTheory
+    ? subject.hasPractical
+      ? Math.max(1, subject.credits - 1)
+      : subject.credits
+    : 1;
 
-  const partGrade = isTheory ? thGrade : prGrade;
-  const partValue = partGrade ? (GRADE_VALUE[partGrade] ?? 0) / 100 : 0;
+  const obtainedGrade = mark?.grade ?? null;
+
+  // Only show grade in the correct sub-column.
+  const thGrade = isTheory ? obtainedGrade : null;
+  const prGrade = isTheory ? null : obtainedGrade;
+
+  // Passed = grade exists and is not F.
+  const passed = !!obtainedGrade && obtainedGrade !== "F";
+
+  // Final grade: show grade when passed, "F" when failed, "—" when no data.
+  const finalGrade = obtainedGrade ? (passed ? obtainedGrade : "F") : "—";
+
+  const gradeValue = obtainedGrade ? (GRADE_VALUE[obtainedGrade] ?? 0.0) : 0.0;
+
+  // Grade point earned: 0 when failed (student earns no credit).
+  const gradePoint = passed ? credits * gradeValue : 0.0;
+
+  // Subject name suffix: append " TH" or " PR" only when the subject has both parts.
+  const nameSuffix = subject.hasPractical ? (isTheory ? " TH" : " PR") : "";
 
   return {
-    subjectName: `${s.subject.code} — ${s.subject.name}`,
-    totalCredits: s.subject.credits,
+    subjectCode: subject.code,
+    subjectName: `${subject.name}${nameSuffix}`,
+    credits,
     thGrade,
     prGrade,
-    kind: s.subject.kind,
+    kind: subject.kind,
     passed,
-    finalGrade: passed ? (partGrade ?? "—") : "F",
-    gradeValue: partValue,
-    creditPoints: passed ? theoryCredits : 0,
+    finalGrade,
+    gradeValue,
+    gradePoint,
   };
 }

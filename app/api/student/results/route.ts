@@ -1,30 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
-import { sessionGpa } from "@/app/lib/grading";
-import { GRADE_VALUE, buildRowForSubject } from "@/app/lib/grading";
+import { sessionGpa, buildRowForSubject, MarkRow } from "@/app/lib/grading";
 
-/** One subject row of the results sheet: TH/PR split grades, credits, and totals. */
-export type MarkRow = {
-  /** Combined subject name shown in the row; Th+Pr together */
-  subjectName: string;
-  /** Credits offered for this subject (split across Th and Pr) */
-  totalCredits: number;
-  /** Grade for the theory part (TH) */
-  thGrade: string | null;
-  /** Grade for the practical part (PR) */
-  prGrade: string | null;
-  /** ExamSubject kind: THEORY or PRACTICAL */
-  kind: "THEORY" | "PRACTICAL";
-  /** Passed status: false when grade is F */
-  passed: boolean;
-  /** Combined grade (used for the Final column) */
-  finalGrade: string;
-  /** Grading scale used by the UI (A+=4.0, A=3.6, A-=3.2, B+=2.8, B=2.4, B-=2.0, C=1.6, C-=1.2, D=0.8, F=0.0) */
-  gradeValue: number;
-  /** Credit hours earned (only for passed subjects) */
-  creditPoints: number;
-};
+export type { MarkRow };
 
 type Marksheet = {
   id: string;
@@ -38,7 +17,12 @@ type Marksheet = {
 };
 
 type Payload = {
-  student: { name: string; program: { name: string; code: string } | null; semester: number | null };
+  student: {
+    name: string;
+    registrationId: string | null;
+    program: { name: string; code: string } | null;
+    semester: number | null;
+  };
   marksheet: Marksheet[];
   latestGpa: number | null;
 };
@@ -56,6 +40,7 @@ export async function GET() {
         id: true,
         programId: true,
         currentSemester: true,
+        registrationId: true,
         user: { select: { firstName: true, lastName: true } },
         program: { select: { name: true, code: true } },
       },
@@ -67,12 +52,13 @@ export async function GET() {
       return NextResponse.json({
         student: {
           name: `${student.user.firstName} ${student.user.lastName}`.trim(),
+          registrationId: student.registrationId,
           program: student.program,
           semester: student.currentSemester,
         },
         marksheet: [],
         latestGpa: null,
-      });
+      } satisfies Payload);
     }
 
     const sessions = await prisma.examSession.findMany({
@@ -90,7 +76,7 @@ export async function GET() {
         resultsPublishedAt: true,
         program: { select: { name: true, code: true } },
         subjects: {
-          orderBy: [{ part: "asc" }, { subject: { code: "asc" } }],
+          orderBy: [{ subject: { code: "asc" } }, { part: "asc" }],
           select: {
             id: true,
             part: true,
@@ -102,30 +88,38 @@ export async function GET() {
       },
     });
 
-    const marksheet = sessions.map((s) => {
-      const rows = s.subjects
+    const marksheet: Marksheet[] = sessions.map((s) => {
+      // Determine which subject codes have a PRACTICAL counterpart in this session.
+      const codesWithPractical = new Set(
+        s.subjects
+          .filter((es) => es.part === "PRACTICAL")
+          .map((es) => es.subject.code),
+      );
+
+      const rows: MarkRow[] = s.subjects
         .map((es) => {
           const mark = es.marks[0] ?? null;
-          return {
+          // Skip subjects where the student has no mark at all.
+          if (!mark) return null;
+          return buildRowForSubject({
             subject: {
               code: es.subject.code,
               name: es.subject.name,
               credits: es.subject.credits,
               kind: es.part as "THEORY" | "PRACTICAL",
+              hasPractical: codesWithPractical.has(es.subject.code),
             },
-            mark,
-            maxMarks: Number(es.maxMarks),
-            marks: mark ? Number(mark.marks) : null,
-          };
+            mark: { grade: mark.grade },
+          });
         })
-        .filter((row) => row.marks !== null)
-        .map((row) => buildRowForSubject(row));
+        .filter((r): r is MarkRow => r !== null);
+
       return {
         id: s.id,
         title: s.title,
         type: s.type,
         semester: s.semester,
-        resultsPublishedAt: s.resultsPublishedAt,
+        resultsPublishedAt: s.resultsPublishedAt as unknown as string,
         program: s.program,
         rows,
         gpa: sessionGpa(rows.map((r) => r.gradeValue)),
@@ -137,12 +131,13 @@ export async function GET() {
     return NextResponse.json({
       student: {
         name: `${student.user.firstName} ${student.user.lastName}`.trim(),
+        registrationId: student.registrationId,
         program: student.program,
         semester: student.currentSemester,
       },
       marksheet,
       latestGpa,
-    });
+    } satisfies Payload);
   } catch (error) {
     console.error("GET /api/student/results error:", error);
     return NextResponse.json({ error: "Unable to load results" }, { status: 500 });
