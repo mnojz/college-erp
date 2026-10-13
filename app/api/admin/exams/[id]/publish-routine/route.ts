@@ -1,13 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
-import { jsonBody } from "@/app/lib/validation";
-import { z } from "zod";
 import { notifyUsers, studentUserIdsForSemester } from "@/app/lib/notify";
 
 type RouteContext = { params: Promise<{ id: string }> };
-
-const PublishRoutineSchema = z.object({}).passthrough();
 
 /** Build a plain-text routine body for the auto-created announcement. */
 function routineBody(
@@ -41,14 +37,11 @@ function routineBody(
  * routine, auto-creates a Program-scoped announcement carrying the routine, and
  * notifies every student in the cohort. Advances status DRAFT → ANNOUNCED.
  */
-export async function POST(request: Request, ctx: RouteContext) {
+export async function POST(_request: Request, ctx: RouteContext) {
   const auth = await requireRole("ADMIN");
   if (!auth) return NextResponse.json({ error: "Admin access required" }, { status: 403 });
 
   const { id } = await ctx.params;
-  const parsed = await jsonBody(request, PublishRoutineSchema);
-  if (!parsed.ok) return parsed.response;
-
   const session = await prisma.examSession.findUnique({
     where: { id },
     select: {
