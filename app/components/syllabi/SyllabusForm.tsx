@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { SEMESTERS, type SyllabusMeta } from "@/app/lib/syllabi-shared";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FileDropzone } from "@/app/components/common/FileDropzone";
 import {
@@ -124,9 +125,20 @@ export function SyllabusForm({
       </div>
 
       <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium">
+        <Label htmlFor="syllabus-title">Syllabus Title (optional)</Label>
+        <Input
+          id="syllabus-title"
+          placeholder="e.g. Complete Syllabus 2024 (defaults to file name)"
+          value={values.title}
+          onChange={(e) => setValues({ ...values, title: e.target.value })}
+          disabled={submitting}
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="syllabus-file">
           PDF File {mode === "create" ? "*" : "(leave empty to keep current)"}
-        </span>
+        </Label>
         <FileDropzone
           id="syllabus-file"
           accept="application/pdf"

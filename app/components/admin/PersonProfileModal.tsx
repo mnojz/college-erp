@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { IconPencil } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -394,7 +395,27 @@ export function PersonProfileModal({
   return (
     <AdminModal wide title={loading ? "Loading profile" : "Profile details"} onClose={onClose}>
       {loading ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">Loading profile…</p>
+        <div className="flex flex-col gap-5 pt-1">
+          <div className="flex flex-col items-center gap-4 rounded-xl border border-border/60 bg-muted/30 p-4 sm:flex-row sm:p-5">
+            <Skeleton className="size-16 rounded-full shrink-0 sm:size-20" />
+            <div className="w-full min-w-0 flex-1 space-y-2 text-center sm:text-left">
+              <Skeleton className="mx-auto h-6 w-44 sm:mx-0" />
+              <Skeleton className="mx-auto h-4 w-60 sm:mx-0" />
+              <div className="mt-2 flex flex-wrap justify-center gap-2 sm:justify-start">
+                <Skeleton className="h-5 w-16 rounded-full" />
+                <Skeleton className="h-5 w-20 rounded-full" />
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="space-y-2 rounded-lg border border-border/50 bg-card/60 p-3.5">
+                <Skeleton className="h-3.5 w-24" />
+                <Skeleton className="h-5 w-3/4" />
+              </div>
+            ))}
+          </div>
+        </div>
       ) : error || (!student && !teacher) ? (
         <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error || "Profile not found"}

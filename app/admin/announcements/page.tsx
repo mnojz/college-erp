@@ -1,5 +1,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { startProgress, doneProgress } from "@/app/components/layout/RouteProgress";
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -106,6 +108,7 @@ export default function AdminAnnouncementsPage() {
   useEffect(() => {
     async function load() {
       try {
+        startProgress();
         const me = await fetch("/api/auth/me");
         if (!me.ok || (await me.json()).user.role !== "ADMIN") {
           router.replace("/dashboard");
@@ -118,6 +121,7 @@ export default function AdminAnnouncementsPage() {
         setError("Unable to load announcements");
       } finally {
         setLoading(false);
+        doneProgress();
       }
     }
     load();
@@ -211,7 +215,7 @@ export default function AdminAnnouncementsPage() {
       {/* Top action bar */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
         <p style={{ margin: 0, color: "var(--muted-foreground)", fontSize: 13, fontFamily: "Arial, sans-serif" }}>
-          {loading ? "Loading notices…" : `${announcements.length} notice${announcements.length !== 1 ? "s" : ""} broadcasted`}
+          {loading ? "Fetching announcements…" : `${announcements.length} notice${announcements.length !== 1 ? "s" : ""} broadcasted`}
         </p>
         <div className="flex flex-wrap gap-2.5">
           <Button
@@ -230,8 +234,29 @@ export default function AdminAnnouncementsPage() {
 
       {/* Announcements List */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 [&>*]:h-full">
-        {announcements.length === 0 && !loading ? (
-          <div className="w-full overflow-x-auto rounded-lg border">
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex flex-col rounded-xl border border-border/70 bg-card p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-5 w-24 rounded-full" />
+                <Skeleton className="h-4 w-28" />
+              </div>
+              <Skeleton className="h-6 w-3/4" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+              </div>
+              <div className="pt-2 flex items-center justify-between">
+                <Skeleton className="h-4 w-32" />
+                <div className="flex gap-2">
+                  <Skeleton className="h-8 w-16 rounded-md" />
+                  <Skeleton className="h-8 w-16 rounded-md" />
+                </div>
+              </div>
+            </div>
+          ))
+        ) : announcements.length === 0 ? (
+          <div className="col-span-full w-full overflow-x-auto rounded-lg border">
             <div className="px-3 py-10 text-center text-sm text-muted-foreground">
               No campus announcements yet. Click <strong>+ New Announcement</strong> to publish notices.
             </div>

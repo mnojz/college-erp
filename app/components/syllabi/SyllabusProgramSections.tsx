@@ -1,17 +1,15 @@
 "use client";
 
-import { useState, type DragEvent } from "react";
-import { IconLoader2, IconPlus } from "@tabler/icons-react";
+import { useRef, useState, type DragEvent } from "react";
+import { IconCloudUpload, IconLoader2 } from "@tabler/icons-react";
 import { SEMESTERS } from "@/app/lib/syllabi-shared";
 import type { SyllabusDto } from "@/app/lib/syllabi-shared";
 import type { ProgramGroup } from "./SyllabusGroupedList";
 import { SyllabusAdminRow } from "./SyllabusAdminRow";
 import { SyllabusPublicRow } from "./SyllabusPublicRow";
-import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -22,80 +20,67 @@ type Syllabus = SyllabusDto;
 interface Props {
   groups: ProgramGroup[];
   variant: "admin" | "public";
+  onPreview?: (s: Syllabus) => void;
   onEdit?: (s: Syllabus) => void;
   onDelete?: (s: Syllabus) => void;
-  /** Admin only: an empty semester slot was activated (click) or a file dropped onto it. */
-  onAdd?: (programId: string | null, semester: number, file?: File) => void;
-  /** Admin only: the empty slot currently receiving a direct drop-upload (shows a spinner). */
+  /** Admin only: directly upload a selected or dropped file to this semester slot. */
+  onUpload?: (programId: string | null, semester: number, file: File) => void;
+  /** Admin only: the slot currently receiving a direct upload (shows spinner). */
   uploading?: { programId: string | null; semester: number } | null;
 }
 
 /**
- * Shared syllabus library renderer for admins, students and guest users.
- * Renders one shadcn Card per PROGRAM (Computer, Civil, Architecture, …) with
- * a responsive grid of 8 semester slots. Each slot is a single flat box —
- * files are listed straight on the slot (no nested boxes); empty slots show
- * a centered placeholder, or an "Add syllabus" dropzone in admin mode.
+ * Clean, distraction-free syllabus program sections.
+ * Displays program cards with simple headers and an 8-semester slot grid.
  */
 export function SyllabusProgramSections({
   groups,
   variant,
+  onPreview,
   onEdit,
   onDelete,
-  onAdd,
+  onUpload,
   uploading,
 }: Props) {
   if (groups.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-5">
-      {groups.map((group) => {
-        const totalFiles = SEMESTERS.reduce(
-          (n, sem) => n + (group.bySemester.get(sem)?.length ?? 0),
-          0,
-        );
-        return (
-          <Card key={group.key} className="overflow-hidden">
-            <CardHeader className="border-b">
-              <CardTitle className="flex flex-wrap items-center gap-2">
-                {group.program ? (
-                  <>
-                    <span className="rounded bg-muted px-2 py-0.5 font-mono text-xs font-semibold">
-                      {group.program.code}
-                    </span>
-                    <span>{group.program.name}</span>
-                  </>
-                ) : (
-                  "Unassigned"
-                )}
+    <div className="flex flex-col gap-6">
+      {groups.map((group) => (
+        <Card key={group.key} className="overflow-hidden border border-border/70 shadow-xs">
+          {/* Program Header - clean program name without code avatar or progress bars */}
+          <CardHeader className="border-b bg-muted/20 px-5 py-3.5">
+            <div>
+              <CardTitle className="text-base sm:text-lg font-bold text-foreground">
+                {group.program ? group.program.name : "Unassigned Syllabi"}
               </CardTitle>
-              <div className="flex flex-wrap items-center gap-2">
-                {group.program && (
-                  <CardDescription>{group.program.departmentName}</CardDescription>
-                )}
-                <Badge variant="secondary" className="ml-auto">
-                  {totalFiles} {totalFiles === 1 ? "file" : "files"}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {SEMESTERS.map((sem) => (
-                <SemesterSlot
-                  key={sem}
-                  semester={sem}
-                  items={group.bySemester.get(sem) ?? []}
-                  programId={group.program?.id ?? null}
-                  variant={variant}
-                  onAdd={onAdd}
-                  uploading={uploading}
-                  onEdit={onEdit}
-                  onDelete={onDelete}
-                />
-              ))}
-            </CardContent>
-          </Card>
-        );
-      })}
+              {group.program?.departmentName && (
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {group.program.departmentName}
+                </p>
+              )}
+            </div>
+          </CardHeader>
+
+          {/* 8-Semester Grid */}
+          <CardContent className="grid grid-cols-1 gap-4 p-4 sm:p-5 sm:grid-cols-2 lg:grid-cols-4 bg-muted/5">
+            {SEMESTERS.map((sem) => (
+              <SemesterSlot
+                key={sem}
+                semester={sem}
+                items={group.bySemester.get(sem) ?? []}
+                programId={group.program?.id ?? null}
+                variant={variant}
+                onUpload={onUpload}
+                uploading={uploading}
+                onPreview={onPreview}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
+            ))}
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -105,24 +90,27 @@ interface SlotProps {
   items: Syllabus[];
   programId: string | null;
   variant: "admin" | "public";
-  onAdd?: Props["onAdd"];
+  onUpload?: Props["onUpload"];
   uploading?: Props["uploading"];
+  onPreview?: Props["onPreview"];
   onEdit?: Props["onEdit"];
   onDelete?: Props["onDelete"];
 }
 
-/** One flat semester box: header row + a body of file rows, dropzone, or placeholder. */
+/** One semester slot: clean header without active badges, and direct click-to-upload or dropped files */
 function SemesterSlot({
   semester,
   items,
   programId,
   variant,
-  onAdd,
+  onUpload,
   uploading,
+  onPreview,
   onEdit,
   onDelete,
 }: SlotProps) {
   const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const uploadingHere =
     !!uploading &&
@@ -133,65 +121,96 @@ function SemesterSlot({
     e.preventDefault();
     setDragOver(false);
     const file = e.dataTransfer.files?.[0];
-    onAdd?.(programId, semester, file ?? undefined);
+    if (file) {
+      onUpload?.(programId, semester, file);
+    }
+  }
+
+  function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      onUpload?.(programId, semester, file);
+    }
+    // Clear value so the same file can be selected again if needed
+    e.target.value = "";
   }
 
   let body: React.ReactNode;
   if (uploadingHere) {
     body = (
       <div
-        className="flex min-h-20 flex-1 flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-ring/60 bg-accent/30 text-center"
+        className="flex min-h-28 flex-1 flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-primary/60 bg-primary/5 text-center p-4 animate-pulse"
         aria-live="polite"
       >
-        <IconLoader2 size={20} className="animate-spin text-muted-foreground" aria-hidden="true" />
-        <span className="text-xs font-medium">Uploading…</span>
+        <IconLoader2 size={24} className="animate-spin text-primary" aria-hidden="true" />
+        <span className="text-sm font-semibold text-primary">Uploading PDF…</span>
+        <span className="text-xs text-muted-foreground">Registering syllabus</span>
       </div>
     );
   } else if (items.length === 0) {
     if (variant === "admin") {
       body = (
-        <button
-          type="button"
-          onClick={() => onAdd?.(programId, semester)}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
-          className={cn(
-            "flex min-h-20 flex-1 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed text-center transition-colors",
-            dragOver
-              ? "border-ring bg-accent/40"
-              : "border-border hover:border-ring/60 hover:bg-muted/30",
-          )}
-          aria-label={`Add syllabus for Semester ${semester}`}
-        >
-          <IconPlus size={20} className="text-muted-foreground" aria-hidden="true" />
-          <span className="text-xs font-medium">Add syllabus</span>
-          <span className="text-[11px] text-muted-foreground">Click or drop a PDF</span>
-        </button>
+        <>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf,.pdf"
+            className="hidden"
+            onChange={handleFileInputChange}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            className={cn(
+              "group flex min-h-28 flex-1 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-center transition-all p-4",
+              dragOver
+                ? "border-primary bg-primary/10 ring-2 ring-primary/30"
+                : "border-border/80 bg-background/50 hover:border-primary/60 hover:bg-card hover:shadow-2xs",
+            )}
+            aria-label={`Upload syllabus for Semester ${semester}`}
+          >
+            <div className="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary">
+              <IconCloudUpload size={20} aria-hidden="true" />
+            </div>
+            <span className="text-sm font-semibold text-foreground group-hover:text-primary">
+              Upload Syllabus
+            </span>
+            <span className="text-xs text-muted-foreground">Click or drop PDF here</span>
+          </button>
+        </>
       );
     } else {
       body = (
-        <p className="flex min-h-20 flex-1 items-center justify-center text-xs text-muted-foreground/70">
-          No syllabus
-        </p>
+        <div className="flex min-h-28 flex-1 flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border/60 bg-muted/20 text-center p-4">
+          <span className="text-xs sm:text-sm font-medium text-muted-foreground">Not published yet</span>
+          <span className="text-xs text-muted-foreground/70">Check back later</span>
+        </div>
       );
     }
   } else {
     body = (
-      <div className="flex flex-col divide-y">
+      <div className="flex flex-col gap-2">
         {items.map((s) =>
           variant === "admin" ? (
             <SyllabusAdminRow
               key={s.id}
               syllabus={s}
+              onPreview={() => onPreview?.(s)}
               onEdit={() => onEdit?.(s)}
               onDelete={() => onDelete?.(s)}
             />
           ) : (
-            <SyllabusPublicRow key={s.id} syllabus={s} />
+            <SyllabusPublicRow
+              key={s.id}
+              syllabus={s}
+              onPreview={() => onPreview?.(s)}
+            />
           ),
         )}
       </div>
@@ -199,14 +218,16 @@ function SemesterSlot({
   }
 
   return (
-    <div className="flex flex-col rounded-lg border bg-muted/40 px-3 pb-2 pt-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold text-muted-foreground">Semester {semester}</span>
-        {items.length > 1 && (
-          <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
-            {items.length}
-          </Badge>
-        )}
+    <div
+      className={cn(
+        "flex flex-col rounded-xl border p-3.5 transition-colors",
+        items.length > 0
+          ? "border-border/80 bg-card/60 shadow-2xs"
+          : "border-dashed border-border/70 bg-card/30",
+      )}
+    >
+      <div className="mb-2.5 flex items-center justify-between">
+        <span className="text-xs sm:text-sm font-bold text-foreground">Semester {semester}</span>
       </div>
       {body}
     </div>

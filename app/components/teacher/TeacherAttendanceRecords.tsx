@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -557,11 +558,45 @@ export function TeacherAttendanceRecords() {
 
   if (loading) {
     return (
-      <div className="flex min-h-85 flex-col items-center justify-center gap-3 rounded-xl border bg-card p-12 text-center shadow-xs">
-        <IconLoader2 className="size-8 animate-spin text-primary" aria-hidden="true" />
-        <p className="text-sm font-medium text-muted-foreground">
-          Loading subjects and attendance records…
-        </p>
+      <div className="space-y-6">
+        {/* Filter bar skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-xl border border-border/60 bg-card">
+          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+        </div>
+
+        {/* Metric cards skeleton */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="p-4 rounded-xl border border-border/60 bg-card space-y-2">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-7 w-16" />
+            </div>
+          ))}
+        </div>
+
+        {/* Records table skeleton */}
+        <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+          <div className="p-4 border-b border-border/50 flex justify-between">
+            <Skeleton className="h-5 w-36" />
+            <Skeleton className="h-5 w-24" />
+          </div>
+          <div className="divide-y divide-border/40 p-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="flex items-center justify-between p-3">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="size-8 rounded-full" />
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                </div>
+                <Skeleton className="h-6 w-16 rounded-full" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }

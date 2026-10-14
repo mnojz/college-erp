@@ -23,6 +23,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AdminShell } from "@/app/components/admin/AdminShell";
+import { Skeleton } from "@/components/ui/skeleton";
+import { startProgress, doneProgress } from "@/app/components/layout/RouteProgress";
 import { IconLoader2, IconPlus, IconTrash, IconX } from "@tabler/icons-react";
 
 type Program = {
@@ -88,6 +90,7 @@ export default function AdminCurriculumPage() {
   const loadCurriculum = useCallback(async (id: string) => {
     if (!id) return;
     setLoadingCurriculum(true);
+    startProgress();
     setError("");
     setMessage("");
     try {
@@ -148,6 +151,7 @@ export default function AdminCurriculumPage() {
       );
     } finally {
       setLoadingCurriculum(false);
+      doneProgress();
     }
   }, []);
 
@@ -448,9 +452,29 @@ export default function AdminCurriculumPage() {
         )}
 
         {loadingCurriculum && (
-          <div className="rounded-xl border border-dashed px-8 py-10 text-center text-sm text-muted-foreground">
-            <IconLoader2 size={20} className="mx-auto mb-2 animate-spin" aria-hidden="true" />
-            Loading curriculum…
+          <div className="space-y-6">
+            {[1, 2].map((y) => (
+              <Card key={y} className="overflow-hidden border border-border/70">
+                <CardHeader className="border-b bg-muted/20 pb-4">
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-6 w-36" />
+                    <Skeleton className="h-8 w-28 rounded-lg" />
+                  </div>
+                </CardHeader>
+                <CardContent className="p-5 space-y-4">
+                  <div className="rounded-xl border border-border/60 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-5 w-28" />
+                      <Skeleton className="h-7 w-24 rounded-md" />
+                    </div>
+                    <div className="space-y-2">
+                      <Skeleton className="h-10 w-full rounded-lg" />
+                      <Skeleton className="h-10 w-full rounded-lg" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
 

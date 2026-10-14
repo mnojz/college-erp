@@ -1,15 +1,16 @@
 "use client";
-import { Button } from "@/components/ui/button";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { AdminModal } from "@/app/components/admin/AdminModal";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SyllabusForm, type SyllabusSubmitValues } from "@/app/components/syllabi/SyllabusForm";
-import { SyllabusToolbar } from "@/app/components/syllabi/SyllabusToolbar";
+import { SyllabusPreviewModal } from "@/app/components/syllabi/SyllabusPreviewModal";
 import { useSyllabusProgramGroups } from "@/app/components/syllabi/SyllabusGroupedList";
 import { SyllabusProgramSections } from "@/app/components/syllabi/SyllabusProgramSections";
+import { startProgress, doneProgress } from "@/app/components/layout/RouteProgress";
 import {
   formatBytes,
   MAX_SYLLABUS_BYTES,
@@ -17,7 +18,7 @@ import {
   type ProgramsMeta,
   type SyllabusDto,
 } from "@/app/lib/syllabi-shared";
-import { IconPlus, IconAlertTriangle } from "@tabler/icons-react";
+import { IconAlertTriangle, IconFileTypePdf } from "@tabler/icons-react";
 
 type Syllabus = SyllabusDto;
 
@@ -30,49 +31,47 @@ export default function AdminSyllabiPage() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
   // Modals
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createPreset, setCreatePreset] = useState<Partial<SyllabusSubmitValues> | undefined>(
-    undefined,
-  );
+  const [previewSyllabus, setPreviewSyllabus] = useState<Syllabus | null>(null);
   const [editing, setEditing] = useState<Syllabus | null>(null);
   const [deleting, setDeleting] = useState<Syllabus | null>(null);
-
-  // Search + filters
-  const [q, setQ] = useState("");
-  const [filterProgram, setFilterProgram] = useState("");
-  const [filterSemester, setFilterSemester] = useState("");
-
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
-  const [message, setMessage] = useState("");
-  /** Empty slot currently receiving a direct drop-upload (drives the slot spinner). */
+
+  /** Empty slot currently receiving a direct upload (drives the slot spinner). */
   const [uploadingSlot, setUploadingSlot] = useState<{
     programId: string | null;
     semester: number;
   } | null>(null);
 
   async function refresh() {
-    const [listRes, metaRes] = await Promise.all([
-      fetch("/api/syllabus"),
-      fetch("/api/syllabus/meta"),
-    ]);
-    if (!listRes.ok) throw new Error("Unable to load syllabus");
-    const listData = await listRes.json();
-    setSyllabi(listData.syllabi ?? []);
-    if (metaRes.ok) {
-      const metaData = await metaRes.json();
-      setMeta({
-        departments: metaData.departments ?? [],
-        programs: metaData.programs ?? [],
-      });
+    startProgress();
+    try {
+      const [listRes, metaRes] = await Promise.all([
+        fetch("/api/syllabus"),
+        fetch("/api/syllabus/meta"),
+      ]);
+      if (!listRes.ok) throw new Error("Unable to load syllabus");
+      const listData = await listRes.json();
+      setSyllabi(listData.syllabi ?? []);
+      if (metaRes.ok) {
+        const metaData = await metaRes.json();
+        setMeta({
+          departments: metaData.departments ?? [],
+          programs: metaData.programs ?? [],
+        });
+      }
+    } finally {
+      doneProgress();
     }
   }
 
   useEffect(() => {
     async function load() {
       try {
+        startProgress();
         const me = await fetch("/api/auth/me");
         if (!me.ok || (await me.json()).user.role !== "ADMIN") {
           router.replace("/dashboard");
@@ -89,54 +88,47 @@ export default function AdminSyllabiPage() {
         setError((err as Error).message ?? "Unable to load syllabus");
       } finally {
         setLoading(false);
+        doneProgress();
       }
     }
     load();
   }, [router]);
 
-  const filtered = useMemo(() => {
-    const term = q.toLowerCase().trim();
-    return syllabi.filter((s) => {
-      if (filterProgram && s.programId !== filterProgram) return false;
-      if (filterSemester) {
-        if (s.semester !== Number.parseInt(filterSemester, 10)) return false;
-      }
-      if (term) {
-        const haystack = `${s.title ?? ""} ${s.fileName} ${s.departmentName} ${s.programCode ?? ""} ${s.programName ?? ""}`.toLowerCase();
-        if (!haystack.includes(term)) return false;
-      }
-      return true;
-    });
-  }, [syllabi, q, filterProgram, filterSemester]);
+  // Include all programs so empty slots are directly visible and clickable
+  const groups = useSyllabusProgramGroups(syllabi, meta.programs, true);
 
-  const groups = useSyllabusProgramGroups(filtered, meta.programs);
-
-  async function handleCreate(values: SyllabusSubmitValues) {
-    setFormError("");
+  /** Direct-to-slot upload: triggers immediately when user picks or drops a file on any card */
+  async function handleDirectUpload(programId: string | null, semester: number, file: File) {
     setMessage("");
+    setError("");
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      setError("Only PDF files can be uploaded as syllabus.");
+      return;
+    }
+    if (file.size > MAX_SYLLABUS_BYTES) {
+      setError(`That file is too large — the maximum size is ${formatBytes(MAX_SYLLABUS_BYTES)}.`);
+      return;
+    }
     setSaving(true);
+    setUploadingSlot({ programId, semester });
     try {
       const fd = new FormData();
-      fd.append("title", values.title);
       fd.append("departmentName", meta.departments[0] ?? "");
-      fd.append("programId", values.programId);
-      fd.append("semester", values.semester);
-      if (values.file) fd.append("file", values.file);
+      fd.append("programId", programId ?? "");
+      fd.append("semester", String(semester));
+      fd.append("file", file);
 
       const res = await fetch("/api/syllabus", { method: "POST", body: fd });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Unable to upload syllabus");
-      // The POST response only returns { id } — refetch so the list always
-      // holds complete rows (an optimistic prepend of a partial object
-      // previously crashed grouping and produced undefined React keys).
       await refresh();
-      setShowCreateModal(false);
-      setCreatePreset(undefined);
       setMessage("Syllabus uploaded successfully.");
     } catch (err) {
-      setFormError((err as Error).message ?? "Unable to upload syllabus");
+      setError((err as Error).message ?? "Unable to upload syllabus");
     } finally {
       setSaving(false);
+      setUploadingSlot(null);
     }
   }
 
@@ -147,7 +139,7 @@ export default function AdminSyllabiPage() {
     setSaving(true);
     try {
       const fd = new FormData();
-      fd.append("title", values.title);
+      if (values.title) fd.append("title", values.title.trim());
       fd.append("departmentName", meta.departments[0] ?? "");
       fd.append("programId", values.programId);
       fd.append("semester", values.semester);
@@ -176,7 +168,7 @@ export default function AdminSyllabiPage() {
       if (!res.ok) throw new Error(data.error ?? "Unable to delete syllabus");
       await refresh();
       setDeleting(null);
-      setMessage("Syllabus deleted.");
+      setMessage("Syllabus deleted successfully.");
     } catch (err) {
       setFormError((err as Error).message ?? "Unable to delete syllabus");
     } finally {
@@ -184,165 +176,74 @@ export default function AdminSyllabiPage() {
     }
   }
 
-  function resetFilters() {
-    setQ("");
-    setFilterProgram("");
-    setFilterSemester("");
-  }
-
-  /** Open the upload modal, optionally pre-filled from an empty semester slot. */
-  function openCreate(preset?: Partial<SyllabusSubmitValues>) {
-    setFormError("");
-    setCreatePreset(preset);
-    setShowCreateModal(true);
-  }
-
-  /** Empty semester slot: click opens a pre-filled modal; dropping a PDF uploads it directly. */
-  function handleSlotAdd(programId: string | null, semester: number, file?: File) {
-    if (!file) {
-      openCreate({ programId: programId ?? "", semester: String(semester) });
-      return;
-    }
-    void uploadSlotFile(programId, semester, file);
-  }
-
-  /** Direct-to-slot upload used when a PDF is dropped onto an empty semester slot. */
-  async function uploadSlotFile(programId: string | null, semester: number, file: File) {
-    setMessage("");
-    setError("");
-    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-    if (!isPdf) {
-      setError("Only PDF files can be uploaded as syllabus.");
-      return;
-    }
-    if (file.size > MAX_SYLLABUS_BYTES) {
-      setError(`That file is too large — the maximum size is ${formatBytes(MAX_SYLLABUS_BYTES)}.`);
-      return;
-    }
-    setSaving(true);
-    setUploadingSlot({ programId, semester });
-    try {
-      const fd = new FormData();
-      // Title intentionally omitted (optional server-side): the library falls
-      // back to the file name until an admin edits the entry.
-      fd.append("departmentName", meta.departments[0] ?? "");
-      fd.append("programId", programId ?? "");
-      fd.append("semester", String(semester));
-      fd.append("file", file);
-
-      const res = await fetch("/api/syllabus", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Unable to upload syllabus");
-      await refresh();
-      setMessage("Syllabus uploaded successfully.");
-    } catch (err) {
-      setError((err as Error).message ?? "Unable to upload syllabus");
-    } finally {
-      setSaving(false);
-      setUploadingSlot(null);
-    }
-  }
-
   if (loading) {
     return (
       <AdminShell
-        title="Syllabus"
-        subtitle="Program syllabus library"
+        title="Syllabus Library"
+        subtitle="Curriculum outlines & semester schemes"
         active="/admin/syllabus"
       >
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-64 w-full" />
+        <div className="space-y-6">
+          {[1, 2].map((p) => (
+            <div key={p} className="rounded-xl border border-border/70 bg-card overflow-hidden">
+              <div className="border-b bg-muted/20 px-5 py-4">
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="mt-1 h-3.5 w-32" />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-5">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+                  <div key={s} className="rounded-xl border border-dashed border-border/70 p-4 space-y-3">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-20 w-full rounded-lg" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </AdminShell>
     );
   }
 
   return (
     <AdminShell
-      title="Syllabus"
-      subtitle="Program syllabus library"
+      title="Syllabus Library"
+      subtitle="Curriculum outlines & semester schemes"
       active="/admin/syllabus"
     >
-      <div>
-        {/* Top bar */}
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-          <p className="m-0 text-[13px] text-muted-foreground">
-            {`${syllabi.length} syllabus file${syllabi.length !== 1 ? "s" : ""} registered`}
+      <div className="space-y-5">
+        {/* Feedback messages */}
+        {message && (
+          <p className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-xs sm:text-sm font-medium text-emerald-600 dark:text-emerald-400">
+            {message}
           </p>
-          <div className="flex flex-wrap gap-2.5">
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => openCreate()}
-            >
-              <IconPlus size={15} aria-hidden="true" />
-              Upload Syllabus
-            </Button>
-          </div>
-        </div>
-
-        {message && <p className="mb-4 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2.5 text-[13px] text-emerald-600 dark:text-emerald-400">{message}</p>}
-        {error && <p className="mb-4 rounded-lg border border-destructive/20 bg-destructive/10 px-3.5 py-2.5 text-[13px] font-medium text-destructive">{error}</p>}
-
-        {/* Search + filters */}
-        <div className="mb-5">
-          <SyllabusToolbar
-            q={q}
-            filterProgram={filterProgram}
-            filterSemester={filterSemester}
-            programs={meta.programs}
-            onChange={(p) => {
-              if (p.q !== undefined) setQ(p.q);
-              if (p.filterProgram !== undefined) setFilterProgram(p.filterProgram);
-              if (p.filterSemester !== undefined) setFilterSemester(p.filterSemester);
-            }}
-            onReset={resetFilters}
-          />
-        </div>
-
-        {/* Program sections — one card per program, shared with student/public views */}
-        {filtered.length > 0 ? (
-          <SyllabusProgramSections
-            variant="admin"
-            groups={groups}
-            onEdit={setEditing}
-            onDelete={setDeleting}
-            onAdd={handleSlotAdd}
-            uploading={uploadingSlot}
-          />
-        ) : (
-          !error && (
-            <div className="rounded-xl border border-dashed bg-card px-8 py-12 text-center">
-              <h3 className="mb-2 text-base font-semibold">No syllabus found</h3>
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                {syllabi.length === 0
-                  ? "No syllabus files have been uploaded yet. Click “Upload Syllabus” to get started."
-                  : "No syllabus files match the selected filters. Try adjusting your search or filters."}
-              </p>
-            </div>
-          )
+        )}
+        {error && (
+          <p className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-xs sm:text-sm font-medium text-destructive">
+            {error}
+          </p>
         )}
 
-        {/* Create modal */}
-        {showCreateModal && (
-          <AdminModal title="Upload Syllabus" wide onClose={() => setShowCreateModal(false)}>
-            <SyllabusForm
-              mode="create"
-              meta={meta}
-              initial={createPreset}
-              submitting={saving}
-              error={formError}
-              onSubmit={handleCreate}
-              onCancel={() => {
-                setShowCreateModal(false);
-                setCreatePreset(undefined);
-              }}
-            />
-          </AdminModal>
-        )}
+        {/* Program Sections Matrix */}
+        <SyllabusProgramSections
+          variant="admin"
+          groups={groups}
+          onPreview={(s) => setPreviewSyllabus(s)}
+          onEdit={(s) => setEditing(s)}
+          onDelete={(s) => setDeleting(s)}
+          onUpload={handleDirectUpload}
+          uploading={uploadingSlot}
+        />
 
-        {/* Edit modal */}
+        {/* On-Page PDF Preview Modal */}
+        <SyllabusPreviewModal
+          syllabus={previewSyllabus}
+          onClose={() => setPreviewSyllabus(null)}
+        />
+
+        {/* Edit Modal */}
         {editing && (
-          <AdminModal title="Edit Syllabus" wide onClose={() => setEditing(null)}>
+          <AdminModal title="Edit Syllabus Details" wide onClose={() => setEditing(null)}>
             <SyllabusForm
               mode="edit"
               meta={meta}
@@ -359,31 +260,38 @@ export default function AdminSyllabiPage() {
           </AdminModal>
         )}
 
-        {/* Delete confirmation */}
+        {/* Delete Confirmation Modal */}
         {deleting && (
           <AdminModal title="Delete Syllabus" onClose={() => setDeleting(null)}>
-            <div className="grid gap-3 text-sm text-muted-foreground">
-              <p>
-                Are you sure you want to delete <strong>&ldquo;{resolveTitle(deleting)}&rdquo;</strong>?
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-3.5">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                  <IconFileTypePdf size={24} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="truncate text-sm sm:text-base font-semibold text-foreground">
+                    {resolveTitle(deleting)}
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    Semester {deleting.semester} • {formatBytes(deleting.fileSize)}
+                  </p>
+                </div>
+              </div>
+
+              <p className="flex items-start gap-2 text-xs sm:text-sm leading-relaxed text-muted-foreground">
+                <IconAlertTriangle size={18} className="shrink-0 text-destructive mt-0.5" aria-hidden="true" />
+                <span>
+                  This PDF will be permanently deleted and will no longer be accessible to students or faculty.
+                </span>
               </p>
-              <p className="flex items-center gap-2 rounded-lg border border-destructive/25 bg-destructive/10 px-3.5 py-2.5 text-[13px] font-medium text-destructive dark:border-destructive/40 dark:bg-destructive/20">
-                <IconAlertTriangle size={16} aria-hidden="true" />
-                This PDF will be immediately removed and no longer downloadable by students.
-              </p>
+
               {formError && (
-                <p className="mt-1 text-[13px] text-destructive">
+                <p className="rounded-lg border border-destructive/20 bg-destructive/10 p-2.5 text-xs text-destructive">
                   {formError}
                 </p>
               )}
-              <div className="mt-5 flex flex-wrap justify-end gap-2.5">
-                <Button
-                  variant="destructive"
-                  type="button"
-                  onClick={handleDelete}
-                  disabled={saving}
-                >
-                  {saving ? "Deleting…" : "Yes, Delete"}
-                </Button>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/50">
                 <Button
                   variant="outline"
                   type="button"
@@ -391,6 +299,14 @@ export default function AdminSyllabiPage() {
                   disabled={saving}
                 >
                   Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={saving}
+                >
+                  {saving ? "Deleting…" : "Yes, Delete PDF"}
                 </Button>
               </div>
             </div>
@@ -400,4 +316,3 @@ export default function AdminSyllabiPage() {
     </AdminShell>
   );
 }
-

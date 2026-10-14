@@ -8,8 +8,8 @@ import { ProfileShell } from "@/app/components/profile/ProfileShell";
 import type { DirectoryEntry, RoleName } from "@/app/lib/profile-shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "cn";
 
 const ROLE_FILTERS: { value: "" | RoleName; label: string }[] = [
@@ -97,7 +97,21 @@ export default function DirectoryPage() {
       )}
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <div className="grid grid-cols-1 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="flex items-center gap-3.5 rounded-xl border bg-card p-3.5 sm:p-4"
+            >
+              <Skeleton className="size-11 rounded-full shrink-0" />
+              <div className="min-w-40 flex-1 space-y-2">
+                <Skeleton className="h-4 w-36" />
+                <Skeleton className="h-3 w-48" />
+              </div>
+              <Skeleton className="h-6 w-20 rounded-full" />
+            </div>
+          ))}
+        </div>
       ) : entries.length === 0 ? (
         <p className="rounded-md border bg-muted/40 px-4 py-8 text-center text-sm text-muted-foreground">
           No people found.

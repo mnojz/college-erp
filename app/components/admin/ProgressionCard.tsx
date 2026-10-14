@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -134,7 +135,17 @@ export function ProgressionCard() {
       </CardHeader>
       <CardContent>
         {loading ? (
-          <p className="m-0 text-sm text-muted-foreground">Loading cohorts…</p>
+          <div className="grid gap-3">
+            {[1, 2].map((i) => (
+              <div key={i} className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/20 p-3.5">
+                <div className="space-y-1.5">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-48" />
+                </div>
+                <Skeleton className="h-8 w-24 rounded-lg" />
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="grid gap-3">
             <p className="m-0 text-sm text-muted-foreground">

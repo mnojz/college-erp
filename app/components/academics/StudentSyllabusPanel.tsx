@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SyllabusPreviewModal } from "@/app/components/syllabi/SyllabusPreviewModal";
 
 type Profile = {
   enrollmentNumber: string;
@@ -55,6 +56,7 @@ export function StudentSyllabusPanel({ initialProfile }: Props) {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [previewSyllabus, setPreviewSyllabus] = useState<SyllabusDto | null>(null);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -196,18 +198,13 @@ export function StudentSyllabusPanel({ initialProfile }: Props) {
               {currentSemesterSyllabi.map((s) => (
                 <div key={s.id} className="flex items-center gap-1.5">
                   <Button
-                    asChild
+                    type="button"
                     size="sm"
+                    onClick={() => setPreviewSyllabus(s)}
                     className="h-8 text-xs font-semibold px-3 gap-1.5 shadow-xs"
                   >
-                    <a
-                      href={`/api/syllabus/${s.id}/file?inline=1`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <IconEye size={14} />
-                      Preview PDF
-                    </a>
+                    <IconEye size={14} />
+                    Preview PDF
                   </Button>
                   <Button
                     asChild
@@ -415,19 +412,14 @@ export function StudentSyllabusPanel({ initialProfile }: Props) {
                         </span>
                         <div className="flex items-center gap-1.5">
                           <Button
-                            asChild
+                            type="button"
                             variant="ghost"
                             size="sm"
+                            onClick={() => setPreviewSyllabus(doc)}
                             className="h-7 text-xs font-semibold px-2 hover:bg-muted"
                           >
-                            <a
-                              href={`/api/syllabus/${doc.id}/file?inline=1`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <IconEye size={13} className="mr-1" />
-                              Preview
-                            </a>
+                            <IconEye size={13} className="mr-1" />
+                            Preview
                           </Button>
                           <Button
                             asChild
@@ -450,6 +442,12 @@ export function StudentSyllabusPanel({ initialProfile }: Props) {
           })}
         </div>
       )}
+
+      {/* On-Page PDF Preview Modal */}
+      <SyllabusPreviewModal
+        syllabus={previewSyllabus}
+        onClose={() => setPreviewSyllabus(null)}
+      />
     </div>
   );
 }

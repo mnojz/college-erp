@@ -340,9 +340,8 @@
   }
 }
 
-/* respect the tech stack and utilize tailwind and sadcn ui before writing css here */
 /* A tighter radius cap keeps legacy page-level utility classes in line with
-   the compact, professional shape language of the shared components. */
+the compact, professional shape language of the shared components. */
 :where([class*="rounded-"]:not([class*="rounded-full"])) {
   border-radius: min(0.375rem, 6px);
 }
@@ -350,3 +349,5 @@
 :where([data-slot="card"], [data-slot="dialog-content"], [data-slot="sheet-content"]) {
   border-radius: min(0.5rem, 8px);
 }
+
+/* respect the tech stack and utilize tailwind and sadcn ui before writing css here */

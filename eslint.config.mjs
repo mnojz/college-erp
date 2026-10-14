@@ -15,7 +15,7 @@ const eslintConfig = defineConfig([
     // Generated/downloaded artifacts (gitignored): Prisma client output and
     // the MediaPipe/ORT model weights fetched by `npm run setup:models`.
     "app/generated/**",
-    "public/models/**",
+    "public/**",
   ]),
 ]);
 

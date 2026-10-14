@@ -8,6 +8,7 @@ import { Menu, X } from "lucide-react";
 import { ThemeToggle } from "@/app/components/common/ThemeToggle";
 import { Logo } from "@/app/components/common/Logo";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "cn";
 
 const NAV_LINKS = [
@@ -26,16 +27,28 @@ export function PublicNavbar({
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/70 bg-card/95 backdrop-blur supports-backdrop-filter:bg-card/90">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-2.5">
-          <Logo className="size-8 text-foreground" />
-          <span className="flex flex-col leading-tight">
-            <strong className="text-sm font-semibold">College-ERP</strong>
-            <small className="hidden text-xs text-muted-foreground sm:block">
+    <header className="sticky top-0 z-40 w-full border-b border-border/80 bg-background/85 backdrop-blur-md supports-backdrop-filter:bg-background/70 shadow-2xs transition-colors duration-150">
+      <div className="mx-auto flex h-14 sm:h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+        <Link href="/" className="group flex items-center gap-2.5">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-2xs group-hover:bg-primary/15 transition-all duration-200">
+            <Logo className="size-5 text-primary" />
+          </div>
+          <div className="flex flex-col leading-tight">
+            <div className="flex items-center gap-2">
+              <span className="text-sm sm:text-base font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
+                College-ERP
+              </span>
+              <Badge
+                variant="outline"
+                className="hidden sm:inline-flex text-[10px] font-semibold py-0 px-1.5 bg-muted/40 text-muted-foreground border-border/70"
+              >
+                Far Western University
+              </Badge>
+            </div>
+            <span className="sm:hidden text-[10px] text-muted-foreground">
               Far Western University
-            </small>
-          </span>
+            </span>
+          </div>
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex" aria-label="Primary">
@@ -44,7 +57,10 @@ export function PublicNavbar({
               <Link
                 href={link.href}
                 className={cn(
-                  pathname === link.href && "bg-accent text-accent-foreground"
+                  "text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors",
+                  pathname === link.href
+                    ? "bg-accent text-accent-foreground shadow-2xs"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {link.label}
@@ -53,19 +69,24 @@ export function PublicNavbar({
           ))}
         </nav>
 
-        <div className="flex items-center gap-1.5">
-          <ThemeToggle />
+        <div className="flex items-center gap-2">
+          <div className="flex items-center bg-muted/30 p-0.5 rounded-lg border border-border/50">
+            <ThemeToggle className="size-8 rounded-md hover:bg-background hover:text-foreground text-muted-foreground transition-colors" />
+          </div>
+
           <Button
             type="button"
-            className="hidden sm:inline-flex"
+            size="sm"
+            className="hidden sm:inline-flex gap-1.5 font-semibold shadow-2xs"
             onClick={onSignInClick}
           >
-            <IconLogin size={16} aria-hidden="true" />
-            Sign In
+            <IconLogin size={15} aria-hidden="true" />
+            <span>Sign In</span>
           </Button>
+
           <Button
             type="button"
-            className="sm:hidden"
+            className="sm:hidden size-9"
             size="icon"
             variant="outline"
             aria-label={mobileOpen ? "Close menu" : "Open menu"}
@@ -84,7 +105,7 @@ export function PublicNavbar({
       {/* Mobile menu */}
       {mobileOpen && (
         <nav
-          className="border-t bg-background px-4 py-3 md:hidden"
+          className="border-t border-border/70 bg-card px-4 py-3 md:hidden shadow-lg"
           aria-label="Mobile"
         >
           <div className="flex flex-col gap-1">
@@ -94,24 +115,28 @@ export function PublicNavbar({
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                  pathname === link.href && "bg-accent font-semibold text-accent-foreground"
+                  "rounded-lg px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors",
+                  pathname === link.href && "bg-accent font-bold text-accent-foreground",
                 )}
               >
                 {link.label}
               </Link>
             ))}
-            <Button
-              type="button"
-              className="mt-2 sm:hidden"
-              onClick={() => {
-                setMobileOpen(false);
-                onSignInClick();
-              }}
-            >
-              <IconLogin size={16} aria-hidden="true" />
-              Sign In
-            </Button>
+
+            <div className="pt-2 mt-1 border-t border-border/60">
+              <Button
+                type="button"
+                size="sm"
+                className="w-full gap-1.5 font-semibold"
+                onClick={() => {
+                  setMobileOpen(false);
+                  onSignInClick();
+                }}
+              >
+                <IconLogin size={15} aria-hidden="true" />
+                <span>Sign In to Portal</span>
+              </Button>
+            </div>
           </div>
         </nav>
       )}

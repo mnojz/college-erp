@@ -22,6 +22,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { startProgress, doneProgress } from "@/app/components/layout/RouteProgress";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -325,6 +327,7 @@ export default function StudentPage() {
   }
 
   useEffect(() => {
+    startProgress();
     fetch("/api/student/profile")
       .then(async (response) => {
         const result = await response.json();
@@ -334,7 +337,10 @@ export default function StudentPage() {
         }
         setProfile(result.student);
       })
-      .catch(() => setError("Unable to reach the server"));
+      .catch(() => setError("Unable to reach the server"))
+      .finally(() => {
+        doneProgress();
+      });
 
     // Campus bulletins + teacher notices scoped to this student's program/semester.
     fetch("/api/announcements")
@@ -348,8 +354,87 @@ export default function StudentPage() {
       });
   }, [router]);
 
-  if (error) return <main className="p-6 text-sm text-destructive">{error}</main>;
-  if (!profile) return <main className="p-6 text-sm text-muted-foreground">Loading profile...</main>;
+  if (error) {
+    return (
+      <StudentShell active="/dashboard" name="Student Portal" studentId="">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-center">
+          <IconAlertCircle className="mx-auto size-8 text-destructive mb-2" />
+          <p className="text-sm font-semibold text-destructive">{error}</p>
+        </div>
+      </StudentShell>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <StudentShell active="/dashboard" name="" studentId="">
+        <div className="space-y-6">
+          {/* Hero Skeleton */}
+          <div className="rounded-2xl border border-border/70 bg-card p-6 shadow-xs">
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+              <Skeleton className="size-24 rounded-2xl shrink-0" />
+              <div className="space-y-3 flex-1 min-w-0">
+                <Skeleton className="h-8 w-56" />
+                <Skeleton className="h-4 w-72" />
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Skeleton className="h-6 w-24 rounded-full" />
+                  <Skeleton className="h-6 w-32 rounded-full" />
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                </div>
+              </div>
+              <Skeleton className="h-10 w-28 rounded-lg shrink-0" />
+            </div>
+          </div>
+
+          {/* Quick Metrics Skeleton */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="rounded-xl border border-border/70 bg-card p-4 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="size-5 rounded" />
+                </div>
+                <Skeleton className="h-7 w-28" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            ))}
+          </div>
+
+          {/* Quick Navigation Cards Skeleton */}
+          <div className="rounded-xl border border-border/70 bg-card p-4 space-y-3">
+            <Skeleton className="h-5 w-32" />
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-16 rounded-xl" />
+              ))}
+            </div>
+          </div>
+
+          {/* Details Section Skeleton */}
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="rounded-xl border border-border/70 bg-card p-6 space-y-4">
+              <Skeleton className="h-6 w-44" />
+              <div className="space-y-3">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-5/6" />
+                <Skeleton className="h-4 w-2/3" />
+              </div>
+            </div>
+            <div className="rounded-xl border border-border/70 bg-card p-6 space-y-4">
+              <Skeleton className="h-6 w-44" />
+              <div className="space-y-3">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-5/6" />
+                <Skeleton className="h-4 w-2/3" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </StudentShell>
+    );
+  }
 
   const fullName = `${profile.user.firstName} ${profile.user.lastName}`;
   const programName = profile.program?.name || "Not assigned";

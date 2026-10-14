@@ -24,10 +24,25 @@ export interface ProgramGroup {
 export function useSyllabusProgramGroups(
   syllabi: Syllabus[],
   programs: Program[],
+  includeAllPrograms: boolean = false,
 ): ProgramGroup[] {
   return useMemo(() => {
     const knownById = new Map(programs.map((p) => [p.id, p]));
     const byProgram = new Map<string, { program: ProgramGroup["program"]; items: Syllabus[] }>();
+
+    if (includeAllPrograms) {
+      for (const p of programs) {
+        byProgram.set(p.id, {
+          program: {
+            id: p.id,
+            name: p.name,
+            code: p.code,
+            departmentName: p.departmentName,
+          },
+          items: [],
+        });
+      }
+    }
 
     for (const s of syllabi) {
       const pid = s.programId ?? "";
@@ -95,7 +110,7 @@ export function useSyllabusProgramGroups(
     }
 
     return groups;
-  }, [syllabi, programs]);
+  }, [syllabi, programs, includeAllPrograms]);
 }
 
 function indexBySemester(items: Syllabus[]): Map<number, Syllabus[]> {

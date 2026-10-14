@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { startProgress, doneProgress } from "@/app/components/layout/RouteProgress";
 import {
   Select,
   SelectContent,
@@ -21,7 +23,6 @@ import {
   IconCircleX,
   IconClipboardList,
   IconFilterOff,
-  IconLoader2,
   IconLock,
   IconPencil,
   IconSearch,
@@ -300,6 +301,7 @@ export default function TeacherAttendancePage() {
   useEffect(() => {
     async function loadData() {
       try {
+        startProgress();
         const [attRes, profRes] = await Promise.all([
           fetch("/api/attendance"),
           fetch("/api/teacher/profile"),
@@ -341,6 +343,7 @@ export default function TeacherAttendancePage() {
         setError("Unable to reach the server");
       } finally {
         setIsLoading(false);
+        doneProgress();
       }
     }
 
@@ -884,9 +887,25 @@ export default function TeacherAttendancePage() {
         </div>
 
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center gap-3 p-16 text-center">
-            <IconLoader2 className="size-7 animate-spin text-primary" aria-hidden="true" />
-            <p className="text-sm text-muted-foreground">Loading student roster…</p>
+          <div className="grid gap-2.5 p-5">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between rounded-xl border border-border/60 bg-card p-3 sm:p-4"
+              >
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <Skeleton className="size-10 rounded-full shrink-0" />
+                  <div className="space-y-1.5 min-w-0">
+                    <Skeleton className="h-4 w-36" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-8 w-20 rounded-lg" />
+                  <Skeleton className="h-8 w-8 rounded-lg" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : !selectedClass || totalStudents === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 p-16 text-center">
