@@ -4,112 +4,105 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ─────────────────────────────────────────────
-   Catppuccin theme — 🌻 Latte (light) on :root,
-   🌿 Mocha (dark) on .dark.  Accent: Blue.
-   Palette: https://catppuccin.com/palette
-   Values are hsl()-wrapped for Tailwind v4.
-   ───────────────────────────────────────────── */
+/* Tokyo Night inspired palette: deep blue charcoal, cool slate, and clear blue accents. */
 :root {
-  --background: hsl(220 23.08% 94.9%); /* base */
-  --foreground: hsl(234 16.02% 35.49%); /* text */
-  --card: hsl(220 23.08% 94.9%); /* base */
-  --card-foreground: hsl(234 16.02% 35.49%); /* text */
-  --popover: hsl(220 23.08% 94.9%); /* base */
-  --popover-foreground: hsl(234 16.02% 35.49%); /* text */
-  --primary: hsl(220 91.49% 53.92%); /* blue */
-  --primary-foreground: hsl(220 23.08% 94.9%); /* base */
-  --secondary: hsl(223 15.91% 82.75%); /* surface0 */
-  --secondary-foreground: hsl(234 16.02% 35.49%); /* text */
-  --muted: hsl(223 15.91% 82.75%); /* surface0 */
-  --muted-foreground: hsl(233 12.8% 41.37%); /* subtext1 */
-  --accent: hsl(223 15.91% 82.75%); /* surface0 */
-  --accent-foreground: hsl(234 16.02% 35.49%); /* text */
-  --destructive: hsl(347 86.67% 44.12%); /* red */
-  --border: hsl(225 13.56% 76.86%); /* surface1 */
-  --input: hsl(225 13.56% 76.86%); /* surface1 */
-  --ring: hsl(234 16.02% 35.49%); /* text */
-  --chart-1: hsl(347 86.67% 44.12%); /* red */
-  --chart-2: hsl(183 74.36% 33.33%); /* teal */
-  --chart-3: hsl(220 91.49% 53.92%); /* blue */
-  --chart-4: hsl(35 76.96% 49.41%); /* yellow */
-  --chart-5: hsl(115 58.19% 39.8%); /* green */
-  --sidebar: hsl(218 25.1% 93.73%); /* mantle */
-  --sidebar-foreground: hsl(234 16.02% 35.49%); /* text */
-  --sidebar-primary: hsl(220 91.49% 53.92%); /* blue */
-  --sidebar-primary-foreground: hsl(220 23.08% 94.9%); /* base */
-  --sidebar-accent: hsl(223 15.91% 82.75%); /* surface0 */
-  --sidebar-accent-foreground: hsl(234 16.02% 35.49%); /* text */
-  --sidebar-border: hsl(225 13.56% 76.86%); /* surface1 */
-  --sidebar-ring: hsl(225 13.56% 76.86%); /* surface1 */
-  --radius: 0.625rem;
+  --background: hsl(220 24% 96%);
+  --foreground: hsl(224 34% 16%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(224 35% 17%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(224 35% 17%);
+  --primary: hsl(222 68% 43%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(220 22% 91%);
+  --secondary-foreground: hsl(224 31% 24%);
+  --muted: hsl(220 20% 92%);
+  --muted-foreground: hsl(220 12% 43%);
+  --accent: hsl(216 44% 90%);
+  --accent-foreground: hsl(222 55% 30%);
+  --destructive: hsl(0 68% 45%);
+  --border: hsl(220 17% 86%);
+  --input: hsl(220 17% 86%);
+  --ring: hsl(218 77% 53%);
+  --chart-1: hsl(222 68% 43%);
+  --chart-2: hsl(169 48% 34%);
+  --chart-3: hsl(263 48% 53%);
+  --chart-4: hsl(12 63% 48%);
+  --chart-5: hsl(195 55% 40%);
+  --sidebar: hsl(220 22% 93%);
+  --sidebar-foreground: hsl(224 34% 16%);
+  --sidebar-primary: hsl(220 20% 86%);
+  --sidebar-primary-foreground: hsl(224 34% 16%);
+  --sidebar-accent: hsl(220 20% 89%);
+  --sidebar-accent-foreground: hsl(224 34% 16%);
+  --sidebar-border: hsl(220 17% 86%);
+  --sidebar-ring: hsl(218 77% 53%);
+  --radius: 0.375rem;
 
-  /* Catppuccin accents — reusable via var(--ctp-*) in components,
-     arbitrary Tailwind values, and inline styles. */
-  --ctp-rosewater: #dc8a78;
-  --ctp-flamingo: #dd7878;
-  --ctp-pink: #ea76cb;
-  --ctp-mauve: #8839ef;
-  --ctp-red: #d20f39;
-  --ctp-maroon: #e64553;
-  --ctp-peach: #fe640b;
-  --ctp-yellow: #df8e1d;
-  --ctp-green: #40a02b;
-  --ctp-teal: #179299;
-  --ctp-sky: #04a5e5;
-  --ctp-sapphire: #209fb5;
-  --ctp-blue: #1e66f5;
-  --ctp-lavender: #7287fd;
+  /* Semantic accent aliases used throughout charts and status panels. */
+  --ctp-rosewater: #b87386;
+  --ctp-flamingo: #bd6878;
+  --ctp-pink: #a35d9b;
+  --ctp-mauve: #7659ac;
+  --ctp-red: #bd3f55;
+  --ctp-maroon: #9f354f;
+  --ctp-peach: #bd6548;
+  --ctp-yellow: #587daf;
+  --ctp-green: #38815a;
+  --ctp-teal: #287e78;
+  --ctp-sky: #3485a8;
+  --ctp-sapphire: #327b99;
+  --ctp-blue: #3157a5;
+  --ctp-lavender: #6258af;
 }
 
 .dark {
-  --background: hsl(240 21.05% 14.9%); /* base */
-  --foreground: hsl(226 63.93% 88.04%); /* text */
-  --card: hsl(240 21.05% 14.9%); /* base */
-  --card-foreground: hsl(226 63.93% 88.04%); /* text */
-  --popover: hsl(240 21.05% 14.9%); /* base */
-  --popover-foreground: hsl(226 63.93% 88.04%); /* text */
-  --primary: hsl(217 91.87% 75.88%); /* blue */
-  --primary-foreground: hsl(240 21.05% 14.9%); /* base */
-  --secondary: hsl(237 16.24% 22.94%); /* surface0 */
-  --secondary-foreground: hsl(226 63.93% 88.04%); /* text */
-  --muted: hsl(237 16.24% 22.94%); /* surface0 */
-  --muted-foreground: hsl(227 35.29% 80%); /* subtext1 */
-  --accent: hsl(237 16.24% 22.94%); /* surface0 */
-  --accent-foreground: hsl(226 63.93% 88.04%); /* text */
-  --destructive: hsl(343 81.25% 74.9%); /* red */
-  --border: hsl(234 13.21% 31.18%); /* surface1 */
-  --input: hsl(234 13.21% 31.18%); /* surface1 */
-  --ring: hsl(226 63.93% 88.04%); /* text */
-  --chart-1: hsl(343 81.25% 74.9%); /* red */
-  --chart-2: hsl(170 57.42% 73.33%); /* teal */
-  --chart-3: hsl(217 91.87% 75.88%); /* blue */
-  --chart-4: hsl(41 86.32% 83.14%); /* yellow */
-  --chart-5: hsl(115 53.88% 76.08%); /* green */
-  --sidebar: hsl(240 21.18% 14.12%); /* mantle */
-  --sidebar-foreground: hsl(226 63.93% 88.04%); /* text */
-  --sidebar-primary: hsl(217 91.87% 75.88%); /* blue */
-  --sidebar-primary-foreground: hsl(240 21.05% 14.9%); /* base */
-  --sidebar-accent: hsl(237 16.24% 22.94%); /* surface0 */
-  --sidebar-accent-foreground: hsl(226 63.93% 88.04%); /* text */
-  --sidebar-border: hsl(234 13.21% 31.18%); /* surface1 */
-  --sidebar-ring: hsl(234 13.21% 31.18%); /* surface1 */
+  --background: hsl(228 34% 10%);
+  --foreground: hsl(225 24% 91%);
+  --card: hsl(228 27% 14%);
+  --card-foreground: hsl(225 24% 91%);
+  --popover: hsl(228 27% 14%);
+  --popover-foreground: hsl(225 24% 91%);
+  --primary: hsl(218 82% 68%);
+  --primary-foreground: hsl(228 34% 10%);
+  --secondary: hsl(225 20% 21%);
+  --secondary-foreground: hsl(225 24% 91%);
+  --muted: hsl(225 20% 18%);
+  --muted-foreground: hsl(222 14% 67%);
+  --accent: hsl(223 31% 24%);
+  --accent-foreground: hsl(218 82% 82%);
+  --destructive: hsl(0 65% 62%);
+  --border: hsl(226 16% 24%);
+  --input: hsl(226 16% 24%);
+  --ring: hsl(218 82% 68%);
+  --chart-1: hsl(218 82% 68%);
+  --chart-2: hsl(165 45% 53%);
+  --chart-3: hsl(276 55% 72%);
+  --chart-4: hsl(15 70% 64%);
+  --chart-5: hsl(190 65% 65%);
+  --sidebar: hsl(228 27% 12%);
+  --sidebar-foreground: hsl(225 24% 91%);
+  --sidebar-primary: hsl(225 20% 20%);
+  --sidebar-primary-foreground: hsl(225 24% 91%);
+  --sidebar-accent: hsl(225 20% 18%);
+  --sidebar-accent-foreground: hsl(225 24% 91%);
+  --sidebar-border: hsl(226 16% 22%);
+  --sidebar-ring: hsl(218 82% 68%);
 
-  /* Catppuccin accents (Mocha) */
-  --ctp-rosewater: #f5e0dc;
-  --ctp-flamingo: #f2cdcd;
-  --ctp-pink: #f5c2e7;
-  --ctp-mauve: #cba6f7;
-  --ctp-red: #f38ba8;
-  --ctp-maroon: #eba0ac;
-  --ctp-peach: #fab387;
-  --ctp-yellow: #f9e2af;
-  --ctp-green: #a6e3a1;
-  --ctp-teal: #94e2d5;
-  --ctp-sky: #89dceb;
-  --ctp-sapphire: #74c7ec;
-  --ctp-blue: #89b4fa;
-  --ctp-lavender: #b4befe;
+  --ctp-rosewater: #d496aa;
+  --ctp-flamingo: #e58c9c;
+  --ctp-pink: #d991d0;
+  --ctp-mauve: #b7a0eb;
+  --ctp-red: #ef777c;
+  --ctp-maroon: #dc748a;
+  --ctp-peach: #e4947c;
+  --ctp-yellow: #88a8dc;
+  --ctp-green: #76c292;
+  --ctp-teal: #69bcb3;
+  --ctp-sky: #78b9d6;
+  --ctp-sapphire: #72afc8;
+  --ctp-blue: #82aaff;
+  --ctp-lavender: #b8a8f0;
 }
 
 @theme inline {
@@ -147,13 +140,13 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-sm: 0.2rem;
+  --radius-md: 0.3rem;
+  --radius-lg: 0.4rem;
+  --radius-xl: 0.55rem;
+  --radius-2xl: 0.7rem;
+  --radius-3xl: 0.9rem;
+  --radius-4xl: 1.1rem;
 }
 
 /* ─────────────────────────────────────────────
@@ -260,10 +253,9 @@
     @apply border-border outline-ring/50;
   }
 
-  /* Hide focus outlines app-wide (shadcn rings still indicate focus). */
-  *:focus,
-  *:focus-visible {
-    outline: none;
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
 
   html {
@@ -308,7 +300,12 @@
   }
 
   .form-control {
-    @apply h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply h-10 w-full rounded-xl border border-transparent bg-muted/70 px-3 py-1 text-sm text-foreground transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:bg-card focus-visible:ring-3 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  textarea.form-control,
+  select.form-control {
+    @apply rounded-xl border-transparent bg-muted/70;
   }
 
   textarea.form-control {
@@ -344,4 +341,12 @@
 }
 
 /* respect the tech stack and utilize tailwind and sadcn ui before writing css here */
-/* only write css here if necessary */
+/* A tighter radius cap keeps legacy page-level utility classes in line with
+   the compact, professional shape language of the shared components. */
+:where([class*="rounded-"]:not([class*="rounded-full"])) {
+  border-radius: min(0.375rem, 6px);
+}
+
+:where([data-slot="card"], [data-slot="dialog-content"], [data-slot="sheet-content"]) {
+  border-radius: min(0.5rem, 8px);
+}

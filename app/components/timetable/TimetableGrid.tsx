@@ -188,7 +188,7 @@ export function TimetableGrid({
                     top: b.top,
                     height: b.height,
                     borderLeftColor: b.color,
-                    background: `linear-gradient(to right, color-mix(in oklab, ${b.color} 15%, transparent), color-mix(in oklab, ${b.color} 7%, transparent))`,
+                    backgroundColor: `color-mix(in oklab, ${b.color} 15%, var(--card))`,
                   } as CSSProperties;
 
                   // The slot's time is already expressed by its position on the
@@ -218,7 +218,7 @@ export function TimetableGrid({
                   );
 
                   const blockClasses = cn(
-                    "absolute z-[2] overflow-hidden rounded-md border border-border/60 border-l-[3px] px-2 py-1 text-left text-foreground shadow-sm transition-shadow",
+                    "absolute z-[2] overflow-hidden rounded-md border border-border/60 border-l-4 px-2.5 py-1.5 text-left text-foreground shadow-sm transition-shadow",
                     !readonly && "cursor-pointer hover:z-[3] hover:shadow-md",
                     b.conflict && "ring-2 ring-destructive/50",
                   );

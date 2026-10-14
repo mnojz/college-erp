@@ -30,7 +30,7 @@ export function DashboardSidebar({
 
   return (
     <aside className="flex h-full flex-col">
-      <nav aria-label="Workspace navigation" className="flex flex-1 flex-col gap-1 p-3">
+      <nav aria-label="Workspace navigation" className="flex flex-1 flex-col gap-1.5 p-4 pt-6">
         {items.map((item) => {
           const isTuple = Array.isArray(item);
           const label = isTuple ? item[0] : (item as SidebarItem).label;
@@ -45,8 +45,8 @@ export function DashboardSidebar({
               href={href}
               onClick={onNavigate}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-                isActive && "bg-accent font-semibold text-foreground"
+                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                isActive && "bg-sidebar-primary font-semibold text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
               )}
             >
               <span className="flex shrink-0 items-center justify-center">

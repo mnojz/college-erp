@@ -22,21 +22,17 @@ export const FALLBACK_START = 9 * 60;
 export const FALLBACK_END = 15 * 60;
 
 /**
- * Accent colors for timetable subject blocks. These resolve through the
- * theme-aware Catppuccin accent variables (Latte on light, Mocha on dark),
- * so one palette renders correctly in both themes.
+ * Cool, restrained subject colors for timetable blocks. These resolve through
+ * theme-aware aliases so their contrast stays balanced in light and dark mode.
  */
 export const PALETTE = [
   "var(--ctp-blue)",
-  "var(--ctp-mauve)",
-  "var(--ctp-peach)",
-  "var(--ctp-green)",
-  "var(--ctp-red)",
   "var(--ctp-sapphire)",
-  "var(--ctp-pink)",
+  "var(--ctp-sky)",
   "var(--ctp-teal)",
-  "var(--ctp-yellow)",
   "var(--ctp-lavender)",
+  "var(--ctp-mauve)",
+  "var(--ctp-green)",
 ];
 
 const TIME_RE = /^(\d{1,2}):(\d{2})$/;

@@ -73,7 +73,7 @@ export function DashboardNav({
       .toUpperCase() || "US";
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80">
+    <header className="sticky top-0 z-40 border-b border-border/70 bg-card/95 backdrop-blur supports-backdrop-filter:bg-card/90">
       <div className="mx-auto flex h-14 w-full max-w-7xl items-center gap-2 px-4 sm:h-16 sm:px-6 lg:px-8">
         {menuButton}
 

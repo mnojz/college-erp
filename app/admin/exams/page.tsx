@@ -175,9 +175,13 @@ export default function AdminExamsPage() {
     }
   }
 
+  const draftCount = exams.filter((exam) => exam.status === "DRAFT").length;
+  const announcedCount = exams.filter((exam) => exam.status === "ANNOUNCED").length;
+  const subjectCount = exams.reduce((count, exam) => count + exam._count.subjects, 0);
+
   return (
     <AdminShell title="Examinations" subtitle="Create and manage exam sessions" active="/admin/exams">
-      <div className="mb-5 flex items-center justify-between gap-3">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Exam Sessions</h2>
           <p className="text-sm text-muted-foreground">
@@ -190,6 +194,29 @@ export default function AdminExamsPage() {
         </Button>
       </div>
 
+      {!loading && exams.length > 0 && (
+        <section aria-label="Examination summary" className="mb-5 grid gap-3 sm:grid-cols-3">
+          {[
+            { label: "Total sessions", value: exams.length, detail: "Across all programs" },
+            { label: "Awaiting announcement", value: draftCount, detail: `${announcedCount} announced` },
+            { label: "Subject entries", value: subjectCount, detail: "Configured across sessions" },
+          ].map((metric) => (
+            <Card key={metric.label}>
+              <CardContent className="flex items-center justify-between gap-3 py-4">
+                <div>
+                  <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{metric.label}</p>
+                  <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">{metric.value}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{metric.detail}</p>
+                </div>
+                <span className="grid size-10 shrink-0 place-items-center bg-primary/10 text-primary">
+                  <IconCertificate size={20} aria-hidden="true" />
+                </span>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+      )}
+
       {loading ? (
         <div className="grid gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -197,7 +224,7 @@ export default function AdminExamsPage() {
           ))}
         </div>
       ) : exams.length === 0 ? (
-        <Card className="rounded-xl border-dashed">
+        <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
             <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
               <IconCertificate size={26} />
@@ -219,22 +246,30 @@ export default function AdminExamsPage() {
           {exams.map((exam) => {
             const badge = STATUS_BADGE[exam.status];
             return (
-              <Link key={exam.id} href={`/admin/exams/${exam.id}`} className="block">
-                <Card className="rounded-xl transition-colors hover:border-primary/40 hover:bg-muted/30">
-                  <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="truncate font-semibold">{exam.title}</h3>
-                        <Badge variant={badge.variant}>{badge.label}</Badge>
+              <div key={exam.id} className="group relative">
+                <Card className="transition-all duration-200 group-hover:bg-accent/30 group-hover:shadow-md">
+                  <CardContent className="flex flex-wrap items-center gap-4 py-4 pl-5 pr-14 sm:px-5">
+                    <span className="hidden size-11 shrink-0 place-items-center bg-primary/10 text-primary sm:grid">
+                      <IconCertificate size={22} aria-hidden="true" />
+                    </span>
+                    <Link href={`/admin/exams/${exam.id}`} className="min-w-0 flex-1 rounded-sm focus-visible:outline-none">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="truncate font-semibold tracking-tight group-hover:text-primary">{exam.title}</h3>
+                          <Badge
+                            variant={badge.variant}
+                            className={exam.status === "ANNOUNCED" ? "bg-primary text-primary-foreground" : exam.status === "RESULTS_PUBLISHED" ? "bg-emerald-600 text-white" : ""}
+                          >{badge.label}</Badge>
+                        </div>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {exam.program.name} · Semester {exam.semester} · {TYPE_LABEL[exam.type]}
+                          {exam.academicYear ? ` · ${exam.academicYear.name}` : ""}
+                        </p>
                       </div>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {exam.program.name} · Semester {exam.semester} · {TYPE_LABEL[exam.type]}
-                        {exam.academicYear ? ` · ${exam.academicYear.name}` : ""}
-                      </p>
-                    </div>
-                    <div className="text-right text-sm text-muted-foreground">
+                    </Link>
+                    <div className="mr-auto text-left text-sm text-muted-foreground sm:mr-0 sm:text-right">
                       <div>
-                        {exam._count.subjects} subject{exam._count.subjects === 1 ? "" : "s"}
+                        <strong className="font-semibold text-foreground">{exam._count.subjects}</strong> subject{exam._count.subjects === 1 ? "" : "s"}
                       </div>
                       <div className="text-xs">
                         {exam._count.routine > 0
@@ -244,20 +279,16 @@ export default function AdminExamsPage() {
                     </div>
                     <Button
                       variant="ghost"
-                      size="icon"
+                      size="icon-sm"
                       aria-label={`Delete ${exam.title}`}
-                      className="shrink-0 text-muted-foreground hover:text-destructive"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setDeleteTarget(exam);
-                      }}
+                      className="absolute top-3 right-3 text-muted-foreground hover:bg-destructive/10 hover:text-destructive sm:static"
+                      onClick={() => setDeleteTarget(exam)}
                     >
                       <IconTrash size={16} />
                     </Button>
                   </CardContent>
                 </Card>
-              </Link>
+              </div>
             );
           })}
         </div>

@@ -93,10 +93,10 @@ export default function Home() {
         <div className="relative mx-auto flex max-w-4xl flex-col items-center text-center">
           <Badge
             variant="secondary"
-            className="animate-in fade-in-0 zoom-in-95 gap-2 rounded-full px-4 py-1.5 duration-500"
+            className="animate-in fade-in-0 zoom-in-95 gap-2 rounded-full bg-primary px-4 py-1.5 text-primary-foreground duration-500"
           >
             <span
-              className="size-1.5 animate-pulse rounded-full bg-primary"
+              className="size-1.5 animate-pulse rounded-full bg-current"
               aria-hidden="true"
             />
             Far Western University • Central Academic Portal
@@ -132,9 +132,9 @@ export default function Home() {
                 // Staggered entrance: each card starts 80ms after the last.
                 style={{ animationDelay: `${400 + i * 80}ms` }}
               >
-                <Card className="h-full transition-all duration-300 group-hover:-translate-y-1 group-hover:border-ring group-hover:bg-accent/5 group-hover:shadow-lg">
+                <Card className="h-full bg-card transition-all duration-300 group-hover:-translate-y-1 group-hover:bg-accent/50 group-hover:shadow-lg">
                   <CardContent className="flex h-full flex-col p-5">
-                    <span className="mb-4 flex size-11 items-center justify-center rounded-lg bg-muted text-foreground transition-all duration-300 group-hover:scale-105 group-hover:bg-primary/10 group-hover:text-primary">
+                    <span className="mb-4 flex size-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-all duration-300 group-hover:scale-105 group-hover:bg-primary/90">
                       {card.icon}
                     </span>
                     <h2 className="mb-1.5 text-base font-semibold">{card.title}</h2>

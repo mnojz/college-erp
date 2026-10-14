@@ -26,7 +26,7 @@ export function PublicNavbar({
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80">
+    <header className="sticky top-0 z-40 border-b border-border/70 bg-card/95 backdrop-blur supports-backdrop-filter:bg-card/90">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2.5">
           <Logo className="size-8 text-foreground" />

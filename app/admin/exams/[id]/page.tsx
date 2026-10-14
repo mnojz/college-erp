@@ -422,12 +422,13 @@ export default function AdminExamDetailPage() {
       subtitle={`${exam.program.name} · Semester ${exam.semester} · ${TYPE_LABEL[exam.type]}`}
       active="/admin/exams"
     >
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <section className="mb-5 flex flex-col gap-4 bg-sidebar/70 p-4 sm:p-5 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           <Badge
             variant={
               exam.status === "DRAFT" ? "secondary" : exam.status === "ANNOUNCED" ? "default" : "outline"
             }
+            className={exam.status === "RESULTS_PUBLISHED" ? "bg-emerald-600 text-white" : ""}
           >
             {exam.status === "DRAFT" ? "Draft" : exam.status === "ANNOUNCED" ? "Announced" : "Results Published"}
           </Badge>
@@ -455,15 +456,15 @@ export default function AdminExamDetailPage() {
             Delete Exam
           </Button>
         </div>
-      </div>
+      </section>
 
       {/* Read-only exam info: form deadline (set at creation) + exam start. */}
       <div className="mb-5 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border bg-card p-4">
+        <div className="bg-card p-4 shadow-sm">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Form submission deadline</p>
           <p className="mt-1 text-sm font-semibold text-foreground">{formatDateTime(deadline)}</p>
         </div>
-        <div className="rounded-xl border bg-card p-4">
+        <div className="bg-card p-4 shadow-sm">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Exam starts</p>
           <p className="mt-1 text-sm font-semibold text-foreground">
             {earliestRoutineDate ? routineDayLabel(earliestRoutineDate) : "Not scheduled yet"}
@@ -473,10 +474,10 @@ export default function AdminExamDetailPage() {
 
       {notice && (
         <p
-          className={`mb-4 rounded-lg border px-3 py-2 text-sm ${
+          className={`mb-4 border-l-4 px-4 py-3 text-sm ${
             notice.kind === "ok"
-              ? "border-[var(--ctp-green)]/40 text-[var(--ctp-green)]"
-              : "border-destructive/40 text-destructive"
+              ? "border-l-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+              : "border-l-destructive bg-destructive/10 text-destructive"
           }`}
         >
           {notice.text}
@@ -484,9 +485,12 @@ export default function AdminExamDetailPage() {
       )}
 
       {/* Routine builder */}
-      <Card className="mb-5 rounded-xl">
-        <div className="flex items-center justify-between px-4 pt-4">
-          <h3 className="font-semibold">Exam Routine</h3>
+      <Card className="mb-5">
+        <div className="flex items-center justify-between border-b border-border/70 px-5 py-4">
+          <div>
+            <h3 className="font-semibold tracking-tight">Exam routine</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">Set and publish theory examination dates.</p>
+          </div>
           {!resultsPublished && (routineEditing || routineDraft.length > 0) && (
             <Button
               variant={routineEditing ? "default" : "outline"}
@@ -577,10 +581,10 @@ export default function AdminExamDetailPage() {
       </Card>
 
       {/* Marking table */}
-      <Card className="rounded-xl">
-        <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4">
+      <Card>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 px-5 py-4">
           <div>
-            <h3 className="font-semibold">Marking Table</h3>
+            <h3 className="font-semibold tracking-tight">Marking table</h3>
             <p className="text-sm text-muted-foreground">
               {adminSubjects.length > 0
                 ? `${markableRoster.length} student(s) registered. Enter marks for the theory (admin-entered) subjects below.`

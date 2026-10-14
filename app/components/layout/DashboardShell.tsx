@@ -60,15 +60,15 @@ export function DashboardShell({
         <DashboardNav {...navProps} menuButton={menuButton} />
       </UserIdentityProvider>
 
-      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col lg:flex-row">
+      <div className="mx-auto flex w-full max-w-[90rem] flex-1 flex-col lg:flex-row">
         {/* Desktop sidebar */}
-        <aside className="hidden w-60 shrink-0 border-r lg:block">
+        <aside className="hidden w-60 shrink-0 bg-sidebar/70 lg:block">
           <div className="sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto">
             <DashboardSidebar items={sidebarItems} activeHref={activeHref} />
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <main className="min-w-0 flex-1 px-4 py-7 sm:px-6 lg:px-10">
           {(title || subtitle || headerActions) && (
             <header className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
               <div className="min-w-0">
@@ -90,7 +90,7 @@ export function DashboardShell({
 
       {/* Mobile sidebar drawer */}
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-        <SheetContent side="left" className="w-72 gap-0 p-0 sm:max-w-sm">
+        <SheetContent side="left" className="w-72 gap-0 border-0 bg-sidebar p-0 text-sidebar-foreground sm:max-w-sm">
           <SheetHeader className="border-b px-4 py-3">
             <SheetTitle className="text-sm font-semibold">Navigation</SheetTitle>
           </SheetHeader>

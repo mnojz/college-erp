@@ -142,9 +142,9 @@ function AccountStatusBadge({ status }: { status: string }) {
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   if (value === null || value === undefined || value === "") return null;
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-border/60 py-2 last:border-0">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-right text-sm font-medium break-words">{value}</span>
+    <div className="flex min-w-0 flex-col gap-1 border-b border-border/60 py-2.5 last:border-0">
+      <span className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</span>
+      <span className="break-words text-sm font-medium">{value}</span>
     </div>
   );
 }
@@ -392,7 +392,7 @@ export function PersonProfileModal({
   const photoUrl = student?.profileImageUrl ?? teacher?.profileImageUrl ?? null;
 
   return (
-    <AdminModal wide title={loading ? "Profile" : name} onClose={onClose}>
+    <AdminModal wide title={loading ? "Loading profile" : "Profile details"} onClose={onClose}>
       {loading ? (
         <p className="py-8 text-center text-sm text-muted-foreground">Loading profile…</p>
       ) : error || (!student && !teacher) ? (
@@ -401,46 +401,41 @@ export function PersonProfileModal({
         </p>
       ) : (
         <div className="flex flex-col gap-5 pt-1">
-          <div className="flex flex-col items-center gap-2.5 text-center">
-            <div className="flex items-center gap-3">
-              <Avatar className="size-20">
+          <section className="flex flex-col items-center gap-4 bg-muted/60 p-4 text-center sm:flex-row sm:text-left sm:p-5">
+              <Avatar className="size-16 shrink-0 sm:size-20">
                 <AvatarImage src={photoUrl ?? undefined} alt={name} />
-                <AvatarFallback className="bg-muted text-lg font-semibold text-muted-foreground">
+                <AvatarFallback className="bg-primary/10 text-lg font-semibold text-primary">
                   {initials(
                     student?.user.firstName ?? teacher?.user.firstName ?? "",
                     student?.user.lastName ?? teacher?.user.lastName ?? "",
                   )}
                 </AvatarFallback>
               </Avatar>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-xl font-semibold tracking-tight">{name}</h2>
+                <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                  {student?.user.email ?? teacher?.user.email}
+                </p>
+                <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 sm:justify-start">
+                  <Badge variant="secondary">{kind === "student" ? "Student" : "Faculty"}</Badge>
+                  <AccountStatusBadge status={student?.user.status ?? teacher?.user.status ?? ""} />
+                  {student && <Badge variant="outline">{student.program ? `${student.program.code} · Sem ${student.currentSemester ?? "—"}` : "No program"}</Badge>}
+                  {teacher && <Badge variant="outline">{teacher.employeeNo}</Badge>}
+                </div>
+              </div>
               {onEditProfile && (
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="gap-1.5 self-center"
+                  className="gap-1.5 shrink-0"
                   onClick={onEditProfile}
                 >
                   <IconPencil size={14} />
                   Edit profile
                 </Button>
               )}
-            </div>
-            <div>
-              <p className="text-lg font-semibold">{name}</p>
-              <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5">
-                <Badge variant="secondary">{kind === "student" ? "Student" : "Faculty"}</Badge>
-                <AccountStatusBadge
-                  status={student?.user.status ?? teacher?.user.status ?? ""}
-                />
-                {student && (
-                  <Badge variant="outline">
-                    {student.program ? `${student.program.code} · Sem ${student.currentSemester ?? "—"}` : "No program"}
-                  </Badge>
-                )}
-                {teacher && <Badge variant="outline">{teacher.employeeNo}</Badge>}
-              </div>
-            </div>
-          </div>
+          </section>
           {student ? <StudentModalTabs student={student} /> : null}
           {teacher ? <TeacherModalTabs teacher={teacher} /> : null}
           {dangerSection && (
@@ -465,7 +460,7 @@ function StudentModalTabs({ student }: { student: StudentDetail }) {
         <TabsTrigger value="attendance">Attendance</TabsTrigger>
         <TabsTrigger value="results">Results</TabsTrigger>
       </TabsList>
-      <TabsContent value="overview" className="pt-3">
+      <TabsContent value="overview" className="grid gap-x-6 px-1 pt-3 sm:grid-cols-2">
         <StudentOverview student={student} />
       </TabsContent>
       <TabsContent value="attendance" className="pt-3">
@@ -485,7 +480,7 @@ function TeacherModalTabs({ teacher }: { teacher: TeacherDetail }) {
         <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="teaching">Subjects & Classes</TabsTrigger>
       </TabsList>
-      <TabsContent value="overview" className="pt-3">
+      <TabsContent value="overview" className="grid gap-x-6 px-1 pt-3 sm:grid-cols-2">
         <TeacherOverview teacher={teacher} />
       </TabsContent>
       <TabsContent value="teaching" className="pt-3">
