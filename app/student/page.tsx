@@ -3,7 +3,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { InfoCard } from "@/app/components/student/InfoCard";
 import { ProfileHero } from "@/app/components/student/ProfileHero";
 import { StudentShell } from "@/app/components/student/StudentShell";
 import {
@@ -18,6 +17,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -25,9 +31,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  IconBook2,
+  IconBuilding,
+  IconCalendar,
+  IconCalendarCheck,
+  IconChecklist,
+  IconChevronRight,
+  IconClipboardCheck,
+  IconCompass,
+  IconDroplet,
+  IconHome,
   IconLayoutList,
+  IconMail,
+  IconMapPin,
   IconPhone,
+  IconReport,
   IconSchool,
+  IconAlertCircle,
   IconUser,
   IconUsersGroup,
 } from "@tabler/icons-react";
@@ -356,68 +376,541 @@ export default function StudentPage() {
         department={departmentName}
         admissionNo={profile.registrationId}
         rollNumber={profile.rollNumber}
+        enrollmentNumber={profile.enrollmentNumber}
+        batch={batch !== "Not provided" ? batch : undefined}
+        semester={profile.currentSemester}
         profileImageUrl={profile.profileImageUrl}
+        reviewStatus={profile.user.profileReviewStatus}
         onEdit={openEditModal}
       />
-      <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <InfoCard
-          title="Personal Information"
-          icon={IconUser}
-          rows={[
-            ["Full Name", fullName],
-            ["Admission Date", new Date(profile.admissionDate).toLocaleDateString()],
-            ["Gender", profile.gender || "Not provided"],
-            ["Blood Group", profile.bloodGroup || "Not provided"],
-            ["Nationality", profile.nationality || "Not provided"],
-            ["Religion", profile.religion || "Not provided"],
-            ["Category", profile.category || "Not provided"],
-          ]}
-        />
-        <InfoCard
-          title="Contact Information"
-          icon={IconPhone}
-          rows={[
-            ["Email Address", profile.user.email],
-            ["Phone Number", profile.phone || "Not provided"],
-            ["Current Address", formatAddressConcise({
-              localLevelName: profile.currLocalLevelName,
-              localLevelType: profile.currLocalLevelType,
-              ward: profile.currWard,
-              districtName: profile.currDistrictName,
-            }) || (profile.currSameAsPerm ? "Same as permanent address" : "Not provided")],
-            ["Permanent Address", formatAddressConcise({
-              localLevelName: profile.permLocalLevelName,
-              localLevelType: profile.permLocalLevelType,
-              ward: profile.permWard,
-              districtName: profile.permDistrictName,
-            }) || "Not provided"],
-            ["Emergency Contact", profile.emergencyContact || "Not provided"],
-          ]}
-        />
-        <InfoCard
-          title="Academic Details"
-          icon={IconSchool}
-          rows={[
-            ["Program", programName],
-            ["Current Semester", semesterName],
-            ["Department", departmentName],
-            ["Batch / Year", batch],
-            ["Enrollment No.", profile.enrollmentNumber],
-            ["Registration ID", profile.registrationId],
-            ["Roll Number", profile.rollNumber != null ? String(profile.rollNumber) : "Not assigned"],
-            ["Current CGPA", "Not provided"],
-          ]}
-        />
-        <InfoCard
-          title="Guardian / Parent Details"
-          icon={IconUsersGroup}
-          rows={[
-            ["Guardian's Name", profile.guardianName || "Not provided"],
-            ["Guardian Phone", profile.guardianPhone || "Not provided"],
-            ["Guardian Email", profile.guardianEmail || "Not provided"],
-            ["Relation", profile.guardianRelation || "Not provided"],
-          ]}
-        />
+
+      {/* ── Quick Overview / Metric Ribbon ── */}
+      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {/* Current Term */}
+        <Card className="p-3.5 sm:p-4 rounded-xl border border-border/70 bg-card shadow-xs">
+          <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium">
+            <IconCalendar className="size-4 text-primary shrink-0" />
+            <span>Current Term</span>
+          </div>
+          <div className="mt-2 text-base sm:text-lg font-bold tracking-tight text-foreground">
+            {semesterName}
+          </div>
+          <div className="text-[11px] text-muted-foreground mt-0.5 truncate">
+            {profile.program ? `${profile.program.durationYears} Years Duration` : "Academic Cycle"}
+          </div>
+        </Card>
+
+        {/* Enrollment Status */}
+        <Card className="p-3.5 sm:p-4 rounded-xl border border-border/70 bg-card shadow-xs">
+          <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium">
+            <IconChecklist className="size-4 text-emerald-500 shrink-0" />
+            <span>Enrollment Status</span>
+          </div>
+          <div className="mt-2 flex items-center gap-1.5 text-base sm:text-lg font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
+            <span className="size-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            {profile.user.status === "ACTIVE" ? "Enrolled" : "Inactive"}
+          </div>
+          <div className="text-[11px] text-muted-foreground mt-0.5">
+            Good Standing
+          </div>
+        </Card>
+
+        {/* Department / Faculty */}
+        <Card className="p-3.5 sm:p-4 rounded-xl border border-border/70 bg-card shadow-xs">
+          <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium">
+            <IconBuilding className="size-4 text-blue-500 shrink-0" />
+            <span>Department</span>
+          </div>
+          <div className="mt-2 text-base sm:text-lg font-bold tracking-tight text-foreground truncate" title={departmentName}>
+            {departmentName}
+          </div>
+          <div className="text-[11px] text-muted-foreground mt-0.5 truncate">
+            {profile.program?.code ? `Code: ${profile.program.code}` : "Faculty Assigned"}
+          </div>
+        </Card>
+
+        {/* Blood Group / Medical */}
+        <Card className="p-3.5 sm:p-4 rounded-xl border border-border/70 bg-card shadow-xs">
+          <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium">
+            <IconDroplet className="size-4 text-rose-500 shrink-0" />
+            <span>Blood Group</span>
+          </div>
+          <div className="mt-2 flex items-center gap-1.5 text-base sm:text-lg font-bold tracking-tight text-foreground">
+            {profile.bloodGroup ? (
+              <Badge variant="outline" className="border-rose-500/40 bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 font-bold px-2 py-0.5 text-xs">
+                {profile.bloodGroup}
+              </Badge>
+            ) : (
+              <span className="text-xs text-muted-foreground/70 font-normal italic">Not specified</span>
+            )}
+          </div>
+          <div className="text-[11px] text-muted-foreground mt-0.5">
+            Medical Emergency Info
+          </div>
+        </Card>
+      </div>
+
+      {/* ── Main Detail Grid (Asymmetric 12-col) ── */}
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
+        {/* ── Left Column (4 cols): Contacts, Guardian & Shortcuts ── */}
+        <div className="space-y-6 lg:col-span-4">
+          {/* Contact & Emergency Card */}
+          <Card className="rounded-2xl border border-border/70 shadow-xs overflow-hidden">
+            <CardHeader className="p-4 sm:px-5 pb-3 border-b border-border/50 bg-muted/20">
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-7.5 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <IconPhone size={16} />
+                </span>
+                <div>
+                  <CardTitle className="text-sm font-semibold">Contact &amp; Emergency</CardTitle>
+                  <p className="text-[11px] text-muted-foreground">Official contact details</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-5 space-y-4 text-sm">
+              <div>
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Email Address
+                </span>
+                <a
+                  href={`mailto:${profile.user.email}`}
+                  className="mt-0.5 flex items-center gap-2 font-medium text-foreground hover:text-primary transition-colors break-all"
+                >
+                  <IconMail size={15} className="text-muted-foreground shrink-0" />
+                  <span>{profile.user.email}</span>
+                </a>
+              </div>
+
+              <div>
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Phone Number
+                </span>
+                {profile.phone ? (
+                  <a
+                    href={`tel:${profile.phone}`}
+                    className="mt-0.5 flex items-center gap-2 font-medium text-foreground hover:text-primary transition-colors font-mono"
+                  >
+                    <IconPhone size={15} className="text-muted-foreground shrink-0" />
+                    <span>{profile.phone}</span>
+                  </a>
+                ) : (
+                  <p className="text-xs italic text-muted-foreground/60 mt-0.5">Not provided</p>
+                )}
+              </div>
+
+              {/* Emergency Contact Highlight Box */}
+              <div className="rounded-xl border border-rose-500/25 bg-rose-50/60 dark:bg-rose-950/20 p-3 text-xs">
+                <div className="flex items-center gap-1.5 font-semibold text-rose-800 dark:text-rose-300">
+                  <IconAlertCircle size={15} />
+                  <span>Emergency Contact</span>
+                </div>
+                {profile.emergencyContact ? (
+                  <a
+                    href={`tel:${profile.emergencyContact}`}
+                    className="mt-1 block font-mono font-bold text-rose-900 dark:text-rose-200 hover:underline"
+                  >
+                    {profile.emergencyContact}
+                  </a>
+                ) : (
+                  <p className="text-rose-700/70 dark:text-rose-400/70 italic mt-1">
+                    No emergency contact assigned
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Guardian / Parent Details Card */}
+          <Card className="rounded-2xl border border-border/70 shadow-xs overflow-hidden">
+            <CardHeader className="p-4 sm:px-5 pb-3 border-b border-border/50 bg-muted/20">
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-7.5 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <IconUsersGroup size={16} />
+                </span>
+                <div>
+                  <CardTitle className="text-sm font-semibold">Parent &amp; Guardian</CardTitle>
+                  <p className="text-[11px] text-muted-foreground">Family &amp; primary contact</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-5 space-y-3.5 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Guardian Name
+                  </span>
+                  <p className="font-semibold text-foreground truncate">
+                    {profile.guardianName || <span className="text-xs italic font-normal text-muted-foreground/60">Not provided</span>}
+                  </p>
+                </div>
+                {profile.guardianRelation && (
+                  <Badge variant="outline" className="text-xs font-semibold shrink-0">
+                    {profile.guardianRelation}
+                  </Badge>
+                )}
+              </div>
+
+              <div>
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Guardian Phone
+                </span>
+                {profile.guardianPhone ? (
+                  <a
+                    href={`tel:${profile.guardianPhone}`}
+                    className="mt-0.5 flex items-center gap-2 font-medium font-mono text-foreground hover:text-primary transition-colors"
+                  >
+                    <IconPhone size={14} className="text-muted-foreground shrink-0" />
+                    <span>{profile.guardianPhone}</span>
+                  </a>
+                ) : (
+                  <p className="text-xs italic text-muted-foreground/60 mt-0.5">Not provided</p>
+                )}
+              </div>
+
+              <div>
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Guardian Email
+                </span>
+                {profile.guardianEmail ? (
+                  <a
+                    href={`mailto:${profile.guardianEmail}`}
+                    className="mt-0.5 flex items-center gap-2 font-medium text-foreground hover:text-primary transition-colors break-all text-xs"
+                  >
+                    <IconMail size={14} className="text-muted-foreground shrink-0" />
+                    <span>{profile.guardianEmail}</span>
+                  </a>
+                ) : (
+                  <p className="text-xs italic text-muted-foreground/60 mt-0.5">Not provided</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Portal Navigation */}
+          <Card className="rounded-2xl border border-border/70 shadow-xs overflow-hidden">
+            <CardHeader className="p-4 sm:px-5 pb-3 border-b border-border/50 bg-muted/20">
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-7.5 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <IconCompass size={16} />
+                </span>
+                <div>
+                  <CardTitle className="text-sm font-semibold">Student Portal Services</CardTitle>
+                  <p className="text-[11px] text-muted-foreground">Quick academic access</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-2 sm:p-2.5 divide-y divide-border/40">
+              <Link
+                href="/student/results"
+                className="flex items-center justify-between p-2.5 rounded-lg hover:bg-muted/60 transition-colors text-xs font-medium group"
+              >
+                <span className="flex items-center gap-2.5 text-foreground">
+                  <IconReport size={16} className="text-primary group-hover:scale-110 transition-transform" />
+                  Exam Results &amp; Marksheets
+                </span>
+                <IconChevronRight size={14} className="text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+              <Link
+                href="/student/attendance"
+                className="flex items-center justify-between p-2.5 rounded-lg hover:bg-muted/60 transition-colors text-xs font-medium group"
+              >
+                <span className="flex items-center gap-2.5 text-foreground">
+                  <IconCalendarCheck size={16} className="text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
+                  Attendance History
+                </span>
+                <IconChevronRight size={14} className="text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+              <Link
+                href="/student/exams"
+                className="flex items-center justify-between p-2.5 rounded-lg hover:bg-muted/60 transition-colors text-xs font-medium group"
+              >
+                <span className="flex items-center gap-2.5 text-foreground">
+                  <IconClipboardCheck size={16} className="text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform" />
+                  Exam Registrations &amp; Schedules
+                </span>
+                <IconChevronRight size={14} className="text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+              <Link
+                href="/student/academics"
+                className="flex items-center justify-between p-2.5 rounded-lg hover:bg-muted/60 transition-colors text-xs font-medium group"
+              >
+                <span className="flex items-center gap-2.5 text-foreground">
+                  <IconBook2 size={16} className="text-violet-600 dark:text-violet-400 group-hover:scale-110 transition-transform" />
+                  Curriculum &amp; Syllabus
+                </span>
+                <IconChevronRight size={14} className="text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ── Right Column (8 cols): Academic, Personal & Addresses ── */}
+        <div className="space-y-6 lg:col-span-8">
+          {/* Card 1: Academic & Program Details */}
+          <Card className="rounded-2xl border border-border/70 shadow-xs overflow-hidden">
+            <CardHeader className="p-4 sm:px-6 pb-3 border-b border-border/50 bg-muted/20">
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-7.5 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <IconSchool size={16} />
+                </span>
+                <div>
+                  <CardTitle className="text-sm font-semibold">Academic &amp; Enrollment Records</CardTitle>
+                  <p className="text-[11px] text-muted-foreground">Program, department, and registration particulars</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-5 sm:p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                <div>
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Enrolled Program
+                  </span>
+                  <p className="font-semibold text-foreground mt-0.5">
+                    {programName}
+                  </p>
+                  {profile.program?.code && (
+                    <span className="font-mono text-xs text-muted-foreground">
+                      Code: {profile.program.code}
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Department
+                  </span>
+                  <p className="font-semibold text-foreground mt-0.5">
+                    {departmentName}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Current Semester
+                  </span>
+                  <div className="mt-0.5 flex items-center gap-2">
+                    <Badge variant="outline" className="font-bold text-xs bg-primary/10 text-primary border-primary/30">
+                      {semesterName}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Academic Batch / Duration
+                  </span>
+                  <p className="font-semibold text-foreground mt-0.5">
+                    {batch}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Registration ID
+                  </span>
+                  <p className="font-mono font-semibold text-foreground mt-0.5">
+                    {profile.registrationId}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Enrollment Number
+                  </span>
+                  <p className="font-mono font-semibold text-foreground mt-0.5">
+                    {profile.enrollmentNumber}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Class Roll Number
+                  </span>
+                  <p className="font-mono font-semibold text-foreground mt-0.5">
+                    {profile.rollNumber != null ? `#${profile.rollNumber}` : "Not assigned"}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Admission Date
+                  </span>
+                  <p className="font-semibold text-foreground mt-0.5">
+                    {new Date(profile.admissionDate).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card 2: Personal & Demographic Information */}
+          <Card className="rounded-2xl border border-border/70 shadow-xs overflow-hidden">
+            <CardHeader className="p-4 sm:px-6 pb-3 border-b border-border/50 bg-muted/20">
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-7.5 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <IconUser size={16} />
+                </span>
+                <div>
+                  <CardTitle className="text-sm font-semibold">Personal &amp; Identity Details</CardTitle>
+                  <p className="text-[11px] text-muted-foreground">Government &amp; personal records</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-5 sm:p-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
+                <div>
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Full Legal Name
+                  </span>
+                  <p className="font-semibold text-foreground mt-0.5">{fullName}</p>
+                </div>
+
+                <div>
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Gender
+                  </span>
+                  <p className="font-semibold text-foreground mt-0.5">
+                    {profile.gender || <span className="text-xs italic font-normal text-muted-foreground/60">Not specified</span>}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Blood Group
+                  </span>
+                  <div className="mt-0.5">
+                    {profile.bloodGroup ? (
+                      <Badge variant="outline" className="border-rose-500/40 text-rose-700 dark:text-rose-400 font-bold text-xs">
+                        {profile.bloodGroup}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs italic font-normal text-muted-foreground/60">Not specified</span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Nationality
+                  </span>
+                  <p className="font-semibold text-foreground mt-0.5">
+                    {profile.nationality || "Nepali"}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Religion
+                  </span>
+                  <p className="font-semibold text-foreground mt-0.5">
+                    {profile.religion || <span className="text-xs italic font-normal text-muted-foreground/60">Not specified</span>}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Category / Caste
+                  </span>
+                  <p className="font-semibold text-foreground mt-0.5">
+                    {profile.category || <span className="text-xs italic font-normal text-muted-foreground/60">Not specified</span>}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card 3: Residential Addresses */}
+          <Card className="rounded-2xl border border-border/70 shadow-xs overflow-hidden">
+            <CardHeader className="p-4 sm:px-6 pb-3 border-b border-border/50 bg-muted/20">
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-7.5 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <IconMapPin size={16} />
+                </span>
+                <div>
+                  <CardTitle className="text-sm font-semibold">Residential Addresses</CardTitle>
+                  <p className="text-[11px] text-muted-foreground">Permanent domicile and current residence</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-5 sm:p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Permanent Address Box */}
+                <div className="rounded-xl border border-border/70 bg-muted/30 p-4 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-primary">
+                      <IconMapPin size={14} />
+                      Permanent Address
+                    </span>
+                    {profile.permProvinceName && (
+                      <Badge variant="outline" className="text-[10px] font-medium">
+                        {profile.permProvinceName}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-sm font-semibold text-foreground leading-relaxed">
+                    {formatAddressConcise({
+                      localLevelName: profile.permLocalLevelName,
+                      localLevelType: profile.permLocalLevelType,
+                      ward: profile.permWard,
+                      districtName: profile.permDistrictName,
+                    }) || <span className="text-xs italic font-normal text-muted-foreground/60">Not provided</span>}
+                  </p>
+                  {profile.permTole && (
+                    <p className="text-xs text-muted-foreground">
+                      Street / Tole: <span className="font-medium text-foreground">{profile.permTole}</span>
+                    </p>
+                  )}
+                </div>
+
+                {/* Current Address Box */}
+                <div className="rounded-xl border border-border/70 bg-muted/30 p-4 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-foreground">
+                      <IconHome size={14} className="text-muted-foreground" />
+                      Current Address
+                    </span>
+                    {profile.currSameAsPerm ? (
+                      <Badge variant="outline" className="border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-[10px] font-medium">
+                        Same as Permanent
+                      </Badge>
+                    ) : (
+                      profile.currProvinceName && (
+                        <Badge variant="outline" className="text-[10px] font-medium">
+                          {profile.currProvinceName}
+                        </Badge>
+                      )
+                    )}
+                  </div>
+                  {profile.currSameAsPerm ? (
+                    <div className="text-xs text-muted-foreground pt-1">
+                      Current living address matches permanent domicile registered with the college.
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm font-semibold text-foreground leading-relaxed">
+                        {formatAddressConcise({
+                          localLevelName: profile.currLocalLevelName,
+                          localLevelType: profile.currLocalLevelType,
+                          ward: profile.currWard,
+                          districtName: profile.currDistrictName,
+                        }) || <span className="text-xs italic font-normal text-muted-foreground/60">Not provided</span>}
+                      </p>
+                      {profile.currTole && (
+                        <p className="text-xs text-muted-foreground">
+                          Street / Tole: <span className="font-medium text-foreground">{profile.currTole}</span>
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {announcements.length > 0 && (

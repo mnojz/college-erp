@@ -1,19 +1,19 @@
 "use client";
 
-import type { CSSProperties, MouseEvent } from "react";
+import { useMemo, type CSSProperties, type MouseEvent } from "react";
 import { IconAlertTriangle } from "@tabler/icons-react";
 import {
   WORK_DAYS,
   layoutDay,
-  colorIndexFor,
-  PALETTE,
+  buildSubjectColorMap,
+  getColorForSubject,
   weekRange,
   timeToMinutes,
-  minutesToHHMM,
   formatTime,
   ROW_H,
   SLOT_MARGIN,
 } from "@/app/lib/timetable-layout";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "cn";
 
 export type TimetableItem = {
@@ -33,7 +33,7 @@ export type TimetableGridProps = {
   items: TimetableItem[];
   /**
    * The timetable's break window (Break model), if set — rendered as the
-   * hatched "Break" band across every day row. It is NOT an item: no class
+   * "Break" band across every day row. It is NOT an item: no class
    * can overlap it (enforced server-side).
    */
   breakPeriod?: { start: string; end: string } | null;
@@ -50,6 +50,15 @@ export type TimetableGridProps = {
   trackHint?: (day: string) => string;
 };
 
+function formatAxisTime(minutes: number) {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  const ampm = h >= 12 ? "PM" : "AM";
+  const displayH = h % 12 === 0 ? 12 : h % 12;
+  if (m === 0) return `${displayH} ${ampm}`;
+  return `${displayH}:${String(m).padStart(2, "0")}`;
+}
+
 export function TimetableGrid({
   items,
   breakPeriod = null,
@@ -61,12 +70,27 @@ export function TimetableGrid({
   onBreakClick,
   trackHint,
 }: TimetableGridProps) {
-  const normalized = items.map((item) => ({
-    ...item,
-    startMin: timeToMinutes(item.startTime) ?? 9 * 60,
-    endMin: timeToMinutes(item.endTime) ?? 10 * 60 + 30,
-    color: PALETTE[colorIndexFor(item.subject.code)],
-  }));
+  const todayDayName = useMemo(
+    () => new Date().toLocaleDateString("en-US", { weekday: "long" }).toUpperCase(),
+    []
+  );
+
+  // Deterministically assign unique colors to distinct subjects in this timetable (NO REPEATS)
+  const colorMap = useMemo(() => {
+    const codes = items.map((i) => i.subject.code);
+    return buildSubjectColorMap(codes);
+  }, [items]);
+
+  const normalized = useMemo(
+    () =>
+      items.map((item) => ({
+        ...item,
+        startMin: timeToMinutes(item.startTime) ?? 9 * 60,
+        endMin: timeToMinutes(item.endTime) ?? 10 * 60 + 30,
+        colorTheme: colorMap.get(item.subject.code) ?? getColorForSubject(item.subject.code),
+      })),
+    [items, colorMap]
+  );
 
   const range = weekRange(normalized, breakPeriod);
   const dayStart = dayStartProp ?? range.dayStart;
@@ -87,52 +111,94 @@ export function TimetableGrid({
     [
       `${b.subject.code} · ${b.subject.name}`,
       b.group ? `Group ${b.group}` : "",
-      b.subjectTeacherName ? b.subjectTeacherName : "",
-      b.type === "Practical" ? "Practical" : "Lecture",
-      `${formatTime(b.startTime)} – ${formatTime(b.endTime)}`,
-      b.conflict ? "⚠ Overlapping slots" : "",
+      b.subjectTeacherName ? `Faculty: ${b.subjectTeacherName}` : "",
+      b.type === "Practical" ? "Type: Practical / Lab" : "Type: Lecture",
+      `Time: ${formatTime(b.startTime)} – ${formatTime(b.endTime)}`,
+      b.conflict ? "⚠ WARNING: Overlapping class slots" : "",
     ]
       .filter(Boolean)
       .join("\n");
 
-  const gridBackground = `repeating-linear-gradient(to right, color-mix(in oklab, var(--border) 60%, transparent) 0px, color-mix(in oklab, var(--border) 60%, transparent) 1px, transparent 1px, transparent ${halfHourPeriod}), repeating-linear-gradient(to right, var(--border) 0px, var(--border) 1px, transparent 1px, transparent ${hourPeriod})`;
+  const gridBackground = `repeating-linear-gradient(to right, color-mix(in oklab, var(--border) 35%, transparent) 0px, color-mix(in oklab, var(--border) 35%, transparent) 1px, transparent 1px, transparent ${halfHourPeriod}), repeating-linear-gradient(to right, color-mix(in oklab, var(--border) 80%, transparent) 0px, color-mix(in oklab, var(--border) 80%, transparent) 1px, transparent 1px, transparent ${hourPeriod})`;
 
   return (
     <div className="overflow-x-auto pb-2">
-      <div className="relative min-w-190">
+      <div className="relative min-w-[760px]">
         {/* Time axis header */}
-        <div className="flex">
-          <div className="w-14 shrink-0" />
-          <div className="relative h-9 flex-1 border-b border-border">
+        <div className="flex border-b border-border/80 pb-1.5">
+          <div className="w-20 sm:w-24 shrink-0 text-left px-2.5">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Day
+            </span>
+          </div>
+          <div className="relative h-7 flex-1">
             {timeMarks.map((m) => {
               const isHour = m % 60 === 0;
               return (
                 <span
                   key={m}
                   className={cn(
-                    "absolute bottom-1 -translate-x-1/2 text-[10px] text-muted-foreground tabular-nums",
-                    !isHour && "text-muted-foreground/60",
+                    "absolute bottom-0.5 -translate-x-1/2 font-mono tabular-nums transition-colors",
+                    isHour
+                      ? "text-xs font-bold text-foreground"
+                      : "text-[11px] font-medium text-muted-foreground/70",
                   )}
                   style={{ left: `${((m - dayStart) / gridMinutes) * 100}%` }}
                 >
-                  {minutesToHHMM(m)}
+                  {formatAxisTime(m)}
                 </span>
               );
             })}
           </div>
         </div>
 
-        {/* One row per weekday. Weekends (Sat/Sun) are omitted — no classes. */}
+        {/* Weekday rows */}
         {WORK_DAYS.map((day) => {
+          const isToday = todayDayName === day;
           const dayBlocks = normalized.filter((b) => b.dayOfWeek === day);
           const laid = layoutDay(dayBlocks);
           const hint = readonly ? "" : trackHint?.(day) ?? `Click to schedule a ${day.toLowerCase()} class`;
 
           return (
-            <div key={day} className="flex border-b border-border/60 last:border-b-0" style={{ height: ROW_H }}>
-              <div className="flex w-14 shrink-0 flex-col justify-center px-2">
-                <span className="text-xs font-semibold text-muted-foreground">{day.slice(0, 3)}</span>
+            <div
+              key={day}
+              className={cn(
+                "flex border-b border-border/60 last:border-b-0 transition-colors",
+                isToday ? "bg-primary/[0.02]" : ""
+              )}
+              style={{ height: ROW_H }}
+            >
+              {/* Day Label Column */}
+              <div
+                className={cn(
+                  "flex w-20 sm:w-24 shrink-0 flex-col justify-center px-2.5 py-1.5 border-r border-border/60",
+                  isToday ? "bg-primary/[0.04]" : "bg-muted/10"
+                )}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={cn(
+                      "text-xs sm:text-sm font-bold uppercase tracking-wider",
+                      isToday ? "text-primary font-extrabold" : "text-foreground"
+                    )}
+                  >
+                    {day.slice(0, 3)}
+                  </span>
+                  {isToday && (
+                    <Badge
+                      variant="outline"
+                      className="text-[9px] font-extrabold px-1 py-0 bg-primary/15 text-primary border-primary/30"
+                    >
+                      TODAY
+                    </Badge>
+                  )}
+                </div>
+                <span className="text-[11px] text-muted-foreground hidden sm:block capitalize">
+                  {day.toLowerCase()}
+                </span>
               </div>
+
+              {/* Day Track Column */}
               <div
                 className={cn("relative flex-1", !readonly && "cursor-crosshair")}
                 style={{
@@ -151,13 +217,18 @@ export function TimetableGrid({
                       }
                 }
               >
+                {/* Neutral Grayish Break Band */}
                 {breakPeriod && breakActive && (
                   <div
                     className={cn(
-                      "absolute inset-y-1 z-1 flex items-center justify-center overflow-hidden rounded-md border border-border/60 bg-muted/30",
+                      "absolute inset-y-1 z-1 flex items-center justify-center rounded-md border border-border/80 bg-muted/60 dark:bg-muted/40 transition-colors",
                       !readonly && onBreakClick && "cursor-pointer hover:border-ring/60",
                     )}
-                    title={!readonly && onBreakClick ? "Click to edit the break" : undefined}
+                    title={
+                      !readonly && onBreakClick
+                        ? "Click to edit break schedule"
+                        : `Break (${formatTime(breakPeriod.start)} – ${formatTime(breakPeriod.end)})`
+                    }
                     onClick={
                       readonly || !onBreakClick
                         ? undefined
@@ -169,63 +240,103 @@ export function TimetableGrid({
                     style={{
                       left: `calc(${((breakStartMin! - dayStart) / gridMinutes) * 100}% + ${SLOT_MARGIN}px)`,
                       width: `calc(${((breakEndMin! - breakStartMin!) / gridMinutes) * 100}% - ${SLOT_MARGIN * 2}px)`,
-                      backgroundImage:
-                        "repeating-linear-gradient(-45deg, color-mix(in oklab, var(--muted-foreground) 14%, transparent) 0px, color-mix(in oklab, var(--muted-foreground) 14%, transparent) 1.5px, transparent 1.5px, transparent 7px)",
                     }}
                   >
-                    <span className="rounded-sm border border-border/60 bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase">
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground select-none">
                       Break
                     </span>
                   </div>
                 )}
 
+                {/* Class Blocks */}
                 {laid.map((b) => {
+                  const color = b.colorTheme;
+                  const isLab = b.type === "Practical";
+                  const isSmall = b.sm || b.height < 50 || (b.endMin - b.startMin) <= 45;
+
                   const blockStyle = {
-                    // Centered inside its time span with an equal SLOT_MARGIN
-                    // inset on all four sides (top/bottom come from layoutDay).
                     left: `calc(${((b.startMin - dayStart) / gridMinutes) * 100}% + ${SLOT_MARGIN}px)`,
                     width: `calc(${((b.endMin - b.startMin) / gridMinutes) * 100}% - ${SLOT_MARGIN * 2}px)`,
                     top: b.top,
                     height: b.height,
-                    borderLeftColor: b.color,
-                    backgroundColor: `color-mix(in oklab, ${b.color} 15%, var(--card))`,
+                    borderLeftColor: color.border,
+                    backgroundColor: color.bg,
+                    ...(isLab && isSmall
+                      ? {
+                          borderColor: color.border,
+                          boxShadow: `0 0 0 1px ${color.border}, 0 0 10px 1.5px ${color.border}80`,
+                        }
+                      : {}),
                   } as CSSProperties;
 
-                  // The slot's time is already expressed by its position on the
-                  // grid (and precisely in the hover tooltip), so no time text
-                  // inside the block. The subject NAME is the primary line and
-                  // the code/type/group are secondary.
-                  const inner = (
-                    <>
-                      <strong className="flex items-start gap-1 text-[12px] leading-snug font-semibold">
-                        <span className="min-w-0 flex-1 truncate">{b.subject.name}</span>
+                  const inner = isSmall ? (
+                    <div className="flex items-center justify-between h-full w-full overflow-hidden select-none px-1">
+                      <span
+                        className="font-bold text-foreground leading-snug line-clamp-2 text-xs truncate"
+                        title={b.subject.name}
+                      >
+                        {b.subject.name}
+                      </span>
+                      {b.conflict && (
+                        <IconAlertTriangle
+                          size={13}
+                          className="shrink-0 text-destructive ml-1"
+                          aria-hidden="true"
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col justify-center h-full w-full overflow-hidden select-none px-0.5">
+                      {/* Subject Name - Big, Bold & Clear */}
+                      <div className="flex items-start gap-1">
+                        <span
+                          className="font-bold text-foreground leading-snug line-clamp-2 text-xs sm:text-[13px]"
+                          title={b.subject.name}
+                        >
+                          {b.subject.name}
+                        </span>
                         {b.conflict && (
                           <IconAlertTriangle
-                            size={12}
-                            className="mt-px shrink-0 text-destructive"
+                            size={14}
+                            className="shrink-0 text-destructive mt-0.5"
                             aria-hidden="true"
                           />
                         )}
-                      </strong>
-                      {!b.sm && (
-                        <span className="mt-0.5 block truncate text-[10px] leading-tight opacity-70">
+                      </div>
+
+                      {/* Secondary row: Code & Type / Group */}
+                      <div className="flex items-center gap-1.5 mt-1 text-[11px] text-muted-foreground font-medium">
+                        <span className="font-mono font-bold text-foreground/80">
                           {b.subject.code}
-                          {b.type === "Practical" ? " · Lab" : ""}
-                          {b.group ? ` · ${b.group}` : ""}
                         </span>
-                      )}
-                    </>
+                        {isLab && (
+                          <Badge variant="outline" className="text-[10px] font-bold py-0 px-1 bg-muted/60">
+                            Lab
+                          </Badge>
+                        )}
+                        {b.group && (
+                          <span className="text-[10px] text-muted-foreground">
+                            · Grp {b.group}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   );
 
                   const blockClasses = cn(
-                    "absolute z-[2] overflow-hidden rounded-md border border-border/60 border-l-4 px-2.5 py-1.5 text-left text-foreground shadow-sm transition-shadow",
-                    !readonly && "cursor-pointer hover:z-[3] hover:shadow-md",
-                    b.conflict && "ring-2 ring-destructive/50",
+                    "absolute z-[2] overflow-hidden rounded-md border border-border/80 border-l-[3.5px] px-2.5 py-1.5 text-left shadow-2xs transition-all",
+                    !readonly && "cursor-pointer hover:z-[3] hover:shadow-md hover:border-border",
+                    b.conflict && "ring-2 ring-destructive/60",
                   );
 
                   if (readonly) {
                     return (
-                      <div key={b.id} className={blockClasses} style={blockStyle} title={blockTip(b)}>
+                      <div
+                        key={b.id}
+                        className={blockClasses}
+                        style={blockStyle}
+                        title={blockTip(b)}
+                      >
                         {inner}
                       </div>
                     );

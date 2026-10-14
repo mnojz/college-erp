@@ -21,19 +21,159 @@ export const SLOT_GAP = 6; // px gap between two stacked blocks in one slot
 export const FALLBACK_START = 9 * 60;
 export const FALLBACK_END = 15 * 60;
 
+export type TimetableColorTheme = {
+  id: string;
+  name: string;
+  border: string; // Vibrant accent border
+  bg: string;     // Semi-transparent comfortable background
+  hoverBg: string;
+  badgeBg: string;
+  badgeText: string;
+  accent: string;
+};
+
 /**
- * Cool, restrained subject colors for timetable blocks. These resolve through
- * theme-aware aliases so their contrast stays balanced in light and dark mode.
+ * Modern, high-contrast palette for timetable blocks.
+ * Designed with solid borders and comfortable contrast in both light and dark mode.
  */
-export const PALETTE = [
-  "var(--ctp-blue)",
-  "var(--ctp-sapphire)",
-  "var(--ctp-sky)",
-  "var(--ctp-teal)",
-  "var(--ctp-lavender)",
-  "var(--ctp-mauve)",
-  "var(--ctp-green)",
+export const COLOR_PALETTE: TimetableColorTheme[] = [
+  {
+    id: "indigo",
+    name: "Indigo",
+    border: "#4f46e5",
+    bg: "rgba(79, 70, 229, 0.09)",
+    hoverBg: "rgba(79, 70, 229, 0.16)",
+    badgeBg: "rgba(79, 70, 229, 0.16)",
+    badgeText: "#4338ca",
+    accent: "#6366f1",
+  },
+  {
+    id: "emerald",
+    name: "Emerald",
+    border: "#059669",
+    bg: "rgba(5, 150, 105, 0.09)",
+    hoverBg: "rgba(5, 150, 105, 0.16)",
+    badgeBg: "rgba(5, 150, 105, 0.16)",
+    badgeText: "#047857",
+    accent: "#10b981",
+  },
+  {
+    id: "amber",
+    name: "Amber",
+    border: "#d97706",
+    bg: "rgba(217, 119, 6, 0.09)",
+    hoverBg: "rgba(217, 119, 6, 0.16)",
+    badgeBg: "rgba(217, 119, 6, 0.16)",
+    badgeText: "#b45309",
+    accent: "#f59e0b",
+  },
+  {
+    id: "sky",
+    name: "Sky",
+    border: "#0284c7",
+    bg: "rgba(2, 132, 199, 0.09)",
+    hoverBg: "rgba(2, 132, 199, 0.16)",
+    badgeBg: "rgba(2, 132, 199, 0.16)",
+    badgeText: "#0369a1",
+    accent: "#0ea5e9",
+  },
+  {
+    id: "rose",
+    name: "Rose",
+    border: "#e11d48",
+    bg: "rgba(225, 29, 72, 0.09)",
+    hoverBg: "rgba(225, 29, 72, 0.16)",
+    badgeBg: "rgba(225, 29, 72, 0.16)",
+    badgeText: "#be123c",
+    accent: "#f43f5e",
+  },
+  {
+    id: "violet",
+    name: "Violet",
+    border: "#7c3aed",
+    bg: "rgba(124, 58, 237, 0.09)",
+    hoverBg: "rgba(124, 58, 237, 0.16)",
+    badgeBg: "rgba(124, 58, 237, 0.16)",
+    badgeText: "#6d28d9",
+    accent: "#8b5cf6",
+  },
+  {
+    id: "teal",
+    name: "Teal",
+    border: "#0d9488",
+    bg: "rgba(13, 148, 136, 0.09)",
+    hoverBg: "rgba(13, 148, 136, 0.16)",
+    badgeBg: "rgba(13, 148, 136, 0.16)",
+    badgeText: "#0f766e",
+    accent: "#14b8a6",
+  },
+  {
+    id: "orange",
+    name: "Orange",
+    border: "#ea580c",
+    bg: "rgba(234, 88, 12, 0.09)",
+    hoverBg: "rgba(234, 88, 12, 0.16)",
+    badgeBg: "rgba(234, 88, 12, 0.16)",
+    badgeText: "#c2410c",
+    accent: "#f97316",
+  },
+  {
+    id: "blue",
+    name: "Blue",
+    border: "#2563eb",
+    bg: "rgba(37, 99, 235, 0.09)",
+    hoverBg: "rgba(37, 99, 235, 0.16)",
+    badgeBg: "rgba(37, 99, 235, 0.16)",
+    badgeText: "#1d4ed8",
+    accent: "#3b82f6",
+  },
+  {
+    id: "fuchsia",
+    name: "Fuchsia",
+    border: "#c026d3",
+    bg: "rgba(192, 38, 211, 0.09)",
+    hoverBg: "rgba(192, 38, 211, 0.16)",
+    badgeBg: "rgba(192, 38, 211, 0.16)",
+    badgeText: "#a21caf",
+    accent: "#d946ef",
+  },
+  {
+    id: "cyan",
+    name: "Cyan",
+    border: "#0891b2",
+    bg: "rgba(8, 145, 178, 0.09)",
+    hoverBg: "rgba(8, 145, 178, 0.16)",
+    badgeBg: "rgba(8, 145, 178, 0.16)",
+    badgeText: "#0e7490",
+    accent: "#06b6d4",
+  },
+  {
+    id: "lime",
+    name: "Lime",
+    border: "#65a30d",
+    bg: "rgba(101, 163, 13, 0.09)",
+    hoverBg: "rgba(101, 163, 13, 0.16)",
+    badgeBg: "rgba(101, 163, 13, 0.16)",
+    badgeText: "#4d7c0f",
+    accent: "#84cc16",
+  },
 ];
+
+export const PALETTE = COLOR_PALETTE.map((c) => c.border);
+
+/** Deterministic unique color mapping across a given set of subject codes (no collisions). */
+export function buildSubjectColorMap(subjectCodes: string[]): Map<string, TimetableColorTheme> {
+  const map = new Map<string, TimetableColorTheme>();
+  const unique = Array.from(new Set(subjectCodes)).sort();
+  unique.forEach((code, index) => {
+    map.set(code, COLOR_PALETTE[index % COLOR_PALETTE.length]);
+  });
+  return map;
+}
+
+export function getColorForSubject(code: string): TimetableColorTheme {
+  return COLOR_PALETTE[colorIndexFor(code)];
+}
 
 const TIME_RE = /^(\d{1,2}):(\d{2})$/;
 

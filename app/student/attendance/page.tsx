@@ -3,14 +3,27 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  IconAlertTriangle,
+  IconBook2,
+  IconCalendar,
   IconCalendarCheck,
+  IconCheck,
+  IconChevronLeft,
+  IconChevronRight,
   IconCircleCheck,
   IconCircleX,
-  IconClipboardList,
+  IconFilter,
+  IconInfoCircle,
+  IconListCheck,
+  IconSearch,
+  IconTrendingUp,
+  IconX,
 } from "@tabler/icons-react";
 import { StudentShell } from "@/app/components/student/StudentShell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -18,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -26,7 +40,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cn } from "cn";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Profile = {
   enrollmentNumber: string;
@@ -38,7 +52,6 @@ type Profile = {
   program: { id: string; name: string; code: string } | null;
 };
 
-/** A subject in the current semester — shown whether or not attendance exists yet. */
 type SubjectOption = {
   id: string;
   name: string;
@@ -48,51 +61,42 @@ type SubjectOption = {
 };
 
 type AttendanceRecord = {
-  /** Stable row key — a subject can have two slots on the same day. */
   id: string;
   status: "PRESENT" | "ABSENT";
+  note?: string | null;
   session: {
     sessionDate: string;
     class: {
-      subject: { code: string; name: string };
+      dayOfWeek?: string;
+      startTime?: string;
+      endTime?: string;
       semester?: number;
+      subject: { code: string; name: string };
     };
   };
 };
 
-/**
- * Catppuccin accents used for the per-subject squares in the log + legend.
- * Scoped to this page rather than reusing the timetable PALETTE, so every
- * subject a student has records for gets its own colour and the legend stays
- * unambiguous even with 40+ subjects across a full program.
- */
-const SUBJECT_COLORS = [
-  "blue", "green", "peach", "mauve", "teal", "red", "yellow",
-  "lavender", "pink", "sapphire", "maroon", "sky", "flamingo", "rosewater",
-] as const;
-
-/**
- * Attendance is advisory, not a pass/fail gate — there is no eligibility
- * threshold. The percentage is colour-banded only: red below 50%, yellow from
- * 50–70%, green above 70%.
- */
-function attendanceBand(pct: number): "red" | "yellow" | "green" {
-  if (pct < 50) return "red";
-  if (pct <= 70) return "yellow";
-  return "green";
+/** Calculate smart forecast for 75% attendance */
+function calculateForecast(present: number, total: number) {
+  if (total === 0) return { status: "neutral", text: "No sessions conducted yet" };
+  const pct = (present / total) * 100;
+  if (pct >= 75) {
+    const buffer = Math.floor((4 * present - 3 * total) / 3);
+    if (buffer === 0) {
+      return { status: "borderline", text: "On the 75% threshold — maintain regular attendance" };
+    }
+    return {
+      status: "safe",
+      text: `Can miss up to ${buffer} class${buffer > 1 ? "es" : ""} and stay above 75%`,
+    };
+  } else {
+    const needed = Math.ceil(3 * total - 4 * present);
+    return {
+      status: "needed",
+      text: `Attend next ${needed} consecutive class${needed > 1 ? "es" : ""} to reach 75%`,
+    };
+  }
 }
-
-const BAND_COLOR = {
-  red: "var(--ctp-red)",
-  yellow: "var(--ctp-yellow)",
-  green: "var(--ctp-green)",
-} as const;
-
-const BAND_MESSAGE = {
-  red: "Attendance is low — attend more classes",
-  yellow: "Attendance is getting low",
-  green: "Attendance is healthy",
-} as const;
 
 export default function StudentAttendancePage() {
   const router = useRouter();
@@ -101,7 +105,13 @@ export default function StudentAttendancePage() {
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Filters & View state
+  const [activeTab, setActiveTab] = useState<"subjects" | "timeline">("subjects");
   const [selectedSubject, setSelectedSubject] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "PRESENT" | "ABSENT">("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     async function loadData() {
@@ -122,8 +132,6 @@ export default function StudentAttendancePage() {
 
         setProfile(profileData.student);
         setRecords(attData.student?.attendanceRecords ?? []);
-        // The subject catalog is public and optional: if it fails we fall back
-        // to the records-only view so the page still renders.
         if (subjRes.ok) {
           const subjData = await subjRes.json();
           setSubjects(subjData.subjects ?? []);
@@ -138,12 +146,7 @@ export default function StudentAttendancePage() {
     loadData();
   }, [router]);
 
-  /**
-   * Subjects the student is enrolled in THIS semester. Prefer the real
-   * catalog (so a subject shows up the moment the semester starts, before any
-   * attendance is taken); fall back to the subjects seen in the records if the
-   * catalog is unavailable or program/semester isn't set.
-   */
+  /** Subjects the student is enrolled in this semester */
   const enrolledSubjects = useMemo(() => {
     const fromCatalog =
       profile?.program && profile.currentSemester != null
@@ -166,22 +169,7 @@ export default function StudentAttendancePage() {
     return Array.from(seen.values());
   }, [subjects, records, profile]);
 
-  /**
-   * One colour per subject, assigned in the enrolled-subject order (not the
-   * filtered subset) so a colour never shifts when the filter changes.
-   */
-  const subjectColorByCode = useMemo(() => {
-    const map = new Map<string, string>();
-    enrolledSubjects.forEach((sub, i) => {
-      map.set(sub.code, `var(--ctp-${SUBJECT_COLORS[i % SUBJECT_COLORS.length]})`);
-    });
-    return map;
-  }, [enrolledSubjects]);
-
-  /**
-   * Per-subject present/total, seeded from the enrolled-subject list so every
-   * subject appears (0/0 until attendance is recorded), then filled from records.
-   */
+  /** Per-subject stats aggregated */
   const subjectStats = useMemo(() => {
     const map = new Map<string, { code: string; name: string; present: number; total: number }>();
     for (const sub of enrolledSubjects) {
@@ -202,57 +190,137 @@ export default function StudentAttendancePage() {
     return Array.from(map.values());
   }, [enrolledSubjects, records]);
 
+  // Overall metric totals
+  const totalSessions = records.length;
+  const presentSessions = records.filter((r) => r.status === "PRESENT").length;
+  const absentSessions = totalSessions - presentSessions;
+  const overallPercentage =
+    totalSessions > 0 ? (presentSessions / totalSessions) * 100 : 0;
+
+  // Per-subject eligibility counts
+  const qualifiedSubjects = useMemo(
+    () => subjectStats.filter((s) => s.total > 0 && (s.present / s.total) * 100 >= 75),
+    [subjectStats]
+  );
+  const atRiskSubjects = useMemo(
+    () => subjectStats.filter((s) => s.total > 0 && (s.present / s.total) * 100 < 75),
+    [subjectStats]
+  );
+
+  // Filtered session records
+  const filteredRecords = useMemo(() => {
+    return records.filter((r) => {
+      // Subject filter
+      if (selectedSubject !== "ALL" && r.session.class.subject.code !== selectedSubject) {
+        return false;
+      }
+      // Status filter
+      if (statusFilter !== "ALL" && r.status !== statusFilter) {
+        return false;
+      }
+      // Search query
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim();
+        const codeMatch = r.session.class.subject.code.toLowerCase().includes(query);
+        const nameMatch = r.session.class.subject.name.toLowerCase().includes(query);
+        const dateMatch = r.session.sessionDate.includes(query);
+        return codeMatch || nameMatch || dateMatch;
+      }
+      return true;
+    });
+  }, [records, selectedSubject, statusFilter, searchQuery]);
+
+  // Group filtered records by date (YYYY-MM-DD)
+  const groupedByDate = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        dateKey: string;
+        displayDate: string;
+        weekday: string;
+        records: AttendanceRecord[];
+        presentCount: number;
+        absentCount: number;
+      }
+    >();
+
+    for (const record of filteredRecords) {
+      const rawDate = record.session.sessionDate;
+      const key = rawDate.includes("T") ? rawDate.split("T")[0] : rawDate.slice(0, 10);
+
+      if (!map.has(key)) {
+        const [year, month, day] = key.split("-").map(Number);
+        const dateObj = new Date(year, (month || 1) - 1, day || 1);
+        const displayDate = dateObj.toLocaleDateString("en-US", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        });
+        const weekday =
+          record.session.class.dayOfWeek ||
+          dateObj.toLocaleDateString("en-US", { weekday: "long" });
+
+        map.set(key, {
+          dateKey: key,
+          displayDate,
+          weekday,
+          records: [],
+          presentCount: 0,
+          absentCount: 0,
+        });
+      }
+
+      const dayGroup = map.get(key)!;
+      dayGroup.records.push(record);
+      if (record.status === "PRESENT") {
+        dayGroup.presentCount += 1;
+      } else {
+        dayGroup.absentCount += 1;
+      }
+    }
+
+    // Sort descending by date (most recent first)
+    return Array.from(map.values()).sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+  }, [filteredRecords]);
+
+  // Pagination by date groups (10 dates per page)
+  const datesPerPage = 10;
+  const totalPages = Math.max(1, Math.ceil(groupedByDate.length / datesPerPage));
+  const paginatedDateGroups = useMemo(() => {
+    const start = (currentPage - 1) * datesPerPage;
+    return groupedByDate.slice(start, start + datesPerPage);
+  }, [groupedByDate, currentPage]);
+
   if (error) {
     return (
-      <StudentShell title="Lecture & Lab Attendance Records" active="/student/attendance">
-        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+      <StudentShell title="My Attendance Records" active="/student/attendance">
+        <p className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive font-medium">
           {error}
         </p>
       </StudentShell>
     );
   }
+
   if (loading || !profile) {
     return (
-      <StudentShell title="Lecture & Lab Attendance Records" active="/student/attendance">
-        <Skeleton className="h-40 w-full" />
+      <StudentShell title="My Attendance Records" active="/student/attendance">
+        <div className="space-y-4">
+          <Skeleton className="h-28 w-full rounded-2xl" />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Skeleton className="h-18 w-full rounded-xl" />
+            <Skeleton className="h-18 w-full rounded-xl" />
+            <Skeleton className="h-18 w-full rounded-xl" />
+            <Skeleton className="h-18 w-full rounded-xl" />
+          </div>
+          <Skeleton className="h-64 w-full rounded-2xl" />
+        </div>
       </StudentShell>
     );
   }
 
   const fullName = `${profile.user.firstName} ${profile.user.lastName}`;
-  // Roll numbers are integers now; StudentShell takes a display string.
-  const studentId = profile.rollNumber != null ? String(profile.rollNumber) : profile.enrollmentNumber;
-
-  const totalSessions = records.length;
-  const presentSessions = records.filter((r) => r.status === "PRESENT").length;
-  const absentSessions = totalSessions - presentSessions;
-  const overallPercentage =
-    totalSessions > 0 ? ((presentSessions / totalSessions) * 100).toFixed(1) : "0";
-
-  const filteredRecords =
-    selectedSubject === "ALL"
-      ? records
-      : records.filter((r) => r.session.class.subject.code === selectedSubject);
-
-  /**
-   * The log is grouped by date: one row per session date, each holding that
-   * day's subject chips. Newest date first.
-   */
-  const recordsByDate = new Map<string, AttendanceRecord[]>();
-  for (const record of filteredRecords) {
-    const date = record.session.sessionDate;
-    const bucket = recordsByDate.get(date);
-    if (bucket) bucket.push(record);
-    else recordsByDate.set(date, [record]);
-  }
-  const datedLogs = Array.from(recordsByDate.entries()).sort((a, b) =>
-    b[0].localeCompare(a[0]),
-  );
-
-  /** Subjects shown in the legend — every enrolled subject, so it never empties. */
-  const legendSubjects = enrolledSubjects;
-
-  const overallBand = attendanceBand(Number(overallPercentage));
+  const studentId =
+    profile.rollNumber != null ? String(profile.rollNumber) : profile.enrollmentNumber;
 
   return (
     <StudentShell
@@ -260,242 +328,580 @@ export default function StudentAttendancePage() {
       name={fullName}
       studentId={studentId}
       avatarUrl={profile.profileImageUrl}
-      title="Lecture & Lab Attendance Records"
-      subtitle="Attendance Tracking"
+      title="Attendance & Engagement"
+      subtitle="Track your subject-wise attendance and individual exam qualification"
     >
-      <div className="flex flex-col gap-5">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Card>
-            <CardContent className="py-3 px-3.5">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-muted-foreground">Overall Attendance</p>
-                <span
-                  className="flex size-6 items-center justify-center rounded-lg"
-                  style={{ background: `color-mix(in oklab, ${BAND_COLOR[overallBand]} 15%, transparent)`, color: BAND_COLOR[overallBand] }}
-                >
-                  <IconClipboardList size={16} aria-hidden="true" />
+      <div className="space-y-5">
+        {/* ── Compact Academic Hero Banner ── */}
+        <Card className="rounded-2xl border border-border/70 shadow-xs bg-linear-to-r from-primary/10 via-primary/5 to-background p-4 sm:p-5 overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="flex size-6 items-center justify-center rounded-md bg-primary/15 text-primary">
+                  <IconCalendarCheck size={14} />
+                </span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Semester {profile.currentSemester ?? "—"} Attendance
                 </span>
               </div>
-              <p className="mt-1.5 text-xl font-bold" style={{ color: BAND_COLOR[overallBand] }}>
-                {overallPercentage}%
+              <h1 className="mt-1 text-lg sm:text-xl font-bold tracking-tight text-foreground">
+                {profile.program?.name ?? "Academic Program"}
+              </h1>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Exam eligibility is evaluated per subject. You must maintain at least <strong>75% in each subject</strong> to be qualified for its semester final exam.
               </p>
-              <small className="block text-xs leading-tight text-muted-foreground">{BAND_MESSAGE[overallBand]}</small>
-            </CardContent>
+            </div>
+
+            {/* Per-Subject Eligibility Status Pill */}
+            <div className="shrink-0">
+              {subjectStats.length === 0 || totalSessions === 0 ? (
+                <Badge variant="outline" className="px-3 py-1.5 text-xs text-muted-foreground font-semibold">
+                  No sessions recorded yet
+                </Badge>
+              ) : atRiskSubjects.length > 0 ? (
+                <div className="inline-flex items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3.5 py-1.5 text-amber-700 dark:text-amber-300 font-bold text-xs shadow-xs">
+                  <IconAlertTriangle size={16} className="text-amber-500 shrink-0" />
+                  <span>
+                    {atRiskSubjects.length} of {subjectStats.length} Subject{atRiskSubjects.length > 1 ? "s" : ""} Below 75%
+                  </span>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3.5 py-1.5 text-emerald-700 dark:text-emerald-300 font-bold text-xs shadow-xs">
+                  <IconCircleCheck size={16} className="text-emerald-500 shrink-0" />
+                  <span>All Subjects Qualified ({qualifiedSubjects.length}/{subjectStats.length})</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+
+        {/* ── Compact Metric Stat Strip (Space-Efficient) ── */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {/* Stat 1: Subject Eligibility */}
+          <Card className="rounded-xl border border-border/70 p-3 shadow-xs bg-card">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span className="text-[11px] font-medium">Exam Qualified</span>
+              {atRiskSubjects.length === 0 ? (
+                <IconCircleCheck size={15} className="text-emerald-500" />
+              ) : (
+                <IconAlertTriangle size={15} className="text-amber-500" />
+              )}
+            </div>
+            <div className="mt-1 flex items-baseline gap-1.5">
+              <span className="text-xl font-bold tracking-tight text-foreground">
+                {qualifiedSubjects.length}
+              </span>
+              <span className="text-xs text-muted-foreground font-medium">
+                / {subjectStats.length} subjects
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground truncate">
+              {atRiskSubjects.length === 0
+                ? "All courses above 75%"
+                : `${atRiskSubjects.length} course${atRiskSubjects.length > 1 ? "s" : ""} at risk (<75%)`}
+            </p>
           </Card>
-          <Card>
-            <CardContent className="py-3 px-3.5">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-muted-foreground">Total Classes</p>
-                <span className="flex size-6 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <IconCalendarCheck size={16} aria-hidden="true" />
-                </span>
-              </div>
-              <p className="mt-1.5 text-xl font-bold">{totalSessions}</p>
-              <small className="block text-xs leading-tight text-muted-foreground">Conducted sessions</small>
-            </CardContent>
+
+          {/* Stat 2: Overall Average */}
+          <Card className="rounded-xl border border-border/70 p-3 shadow-xs bg-card">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span className="text-[11px] font-medium">Overall Rate</span>
+              <IconTrendingUp size={15} className="text-primary" />
+            </div>
+            <div className="mt-1 text-xl font-bold tracking-tight text-foreground">
+              {overallPercentage.toFixed(1)}%
+            </div>
+            <div className="mt-1.5 h-1 w-full rounded-full bg-muted overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  overallPercentage >= 75
+                    ? "bg-emerald-500"
+                    : overallPercentage >= 60
+                    ? "bg-amber-500"
+                    : "bg-destructive"
+                }`}
+                style={{ width: `${Math.min(100, overallPercentage)}%` }}
+              />
+            </div>
           </Card>
-          <Card>
-            <CardContent className="py-3 px-3.5">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-muted-foreground">Present</p>
-                <span className="flex size-6 items-center justify-center rounded-lg bg-[color-mix(in_oklab,var(--ctp-green)_15%,transparent)] text-(--ctp-green)">
-                  <IconCircleCheck size={16} aria-hidden="true" />
-                </span>
-              </div>
-              <p className="mt-1.5 text-xl font-bold text-(--ctp-green)">{presentSessions}</p>
-              <small className="block text-xs leading-tight text-muted-foreground">Attended classes</small>
-            </CardContent>
+
+          {/* Stat 3: Total Attended */}
+          <Card className="rounded-xl border border-border/70 p-3 shadow-xs bg-card">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span className="text-[11px] font-medium">Classes Attended</span>
+              <span className="flex size-5 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <IconCheck size={13} />
+              </span>
+            </div>
+            <div className="mt-1 text-xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
+              {presentSessions}
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Out of {totalSessions} total sessions
+            </p>
           </Card>
-          <Card>
-            <CardContent className="py-3 px-3.5">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-muted-foreground">Absent</p>
-                <span className="flex size-6 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
-                  <IconCircleX size={16} aria-hidden="true" />
-                </span>
-              </div>
-              <p className="mt-1.5 text-xl font-bold text-destructive">{absentSessions}</p>
-              <small className="block text-xs leading-tight text-muted-foreground">Missed classes</small>
-            </CardContent>
+
+          {/* Stat 4: Total Missed */}
+          <Card className="rounded-xl border border-border/70 p-3 shadow-xs bg-card">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span className="text-[11px] font-medium">Classes Missed</span>
+              <span className="flex size-5 items-center justify-center rounded-md bg-destructive/10 text-destructive">
+                <IconX size={13} />
+              </span>
+            </div>
+            <div className="mt-1 text-xl font-bold tracking-tight text-destructive">
+              {absentSessions}
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Absences recorded
+            </p>
           </Card>
         </div>
 
-        {/* Subject Breakdown */}
-        {subjectStats.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Subject-wise Attendance Breakdown</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Every subject in your current semester — bars fill in as attendance is recorded.
-              </p>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2.5">
-              {subjectStats.map((sub) => {
-                const pct = sub.total > 0 ? (sub.present / sub.total) * 100 : 0;
-                const band = attendanceBand(pct);
-                const color = subjectColorByCode.get(sub.code);
-                const noData = sub.total === 0;
-                return (
-                  /* One compact line per subject: name absorbs the slack so the
-                     present/total + bar + percentage cluster stays a fixed
-                     right-aligned block and every bar is the same width. */
-                  <div
-                    key={sub.code}
-                    className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border/40 pb-2.5 last:border-0 last:pb-0"
+        {/* ── Main Content: Segmented Tabs View ── */}
+        <Tabs
+          value={activeTab}
+          onValueChange={(val) => setActiveTab(val as "subjects" | "timeline")}
+          className="space-y-3.5"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-border/60 pb-2.5">
+            <TabsList className="bg-muted/60 p-1 rounded-xl">
+              <TabsTrigger
+                value="subjects"
+                className="gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-xs"
+              >
+                <IconBook2 size={14} />
+                Subject Breakdown ({enrolledSubjects.length})
+              </TabsTrigger>
+              <TabsTrigger
+                value="timeline"
+                className="gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-xs"
+              >
+                <IconListCheck size={14} />
+                Daily Logs ({groupedByDate.length} Days)
+              </TabsTrigger>
+            </TabsList>
+
+            <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <IconInfoCircle size={13} className="text-primary shrink-0" />
+              Teacher recorded attendance updates in real time
+            </span>
+          </div>
+
+          {/* ════ TAB 1: SUBJECT BREAKDOWN (Compact Table Layout) ════ */}
+          <TabsContent value="subjects" className="space-y-3 m-0 outline-hidden">
+            {subjectStats.length === 0 ? (
+              <Card className="rounded-2xl border-dashed p-10 text-center">
+                <IconCalendarCheck className="size-8 text-muted-foreground/40 mx-auto" />
+                <h3 className="mt-2 text-sm font-semibold text-foreground">No subjects found</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Subjects for your current semester will appear once assigned.
+                </p>
+              </Card>
+            ) : (
+              <Card className="rounded-xl border border-border/70 shadow-xs overflow-hidden bg-card">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-muted/40">
+                      <TableRow>
+                        <TableHead className="text-xs font-bold uppercase tracking-wider py-2.5">Subject</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-wider text-center py-2.5 w-32">Classes</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-wider py-2.5 w-48">Attendance Rate</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-wider py-2.5 w-40">Exam Status</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-wider py-2.5 min-w-44">Target / Buffer</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-wider text-right pr-4 py-2.5 w-24">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {subjectStats.map((sub) => {
+                        const pct = sub.total > 0 ? (sub.present / sub.total) * 100 : 0;
+                        const isGood = sub.total > 0 && pct >= 75;
+                        const forecast = calculateForecast(sub.present, sub.total);
+
+                        return (
+                          <TableRow key={sub.code} className="hover:bg-muted/30 transition-colors">
+                            {/* Subject Code & Name */}
+                            <TableCell className="py-2.5">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="font-mono text-xs font-bold bg-muted/60 shrink-0">
+                                  {sub.code}
+                                </Badge>
+                                <span className="text-xs font-semibold text-foreground line-clamp-1" title={sub.name}>
+                                  {sub.name}
+                                </span>
+                              </div>
+                            </TableCell>
+
+                            {/* Attended / Total */}
+                            <TableCell className="text-center py-2.5">
+                              <span className="text-xs font-medium tabular-nums">
+                                <strong className="text-foreground">{sub.present}</strong>
+                                <span className="text-muted-foreground"> / {sub.total}</span>
+                              </span>
+                            </TableCell>
+
+                            {/* Attendance Rate + Mini Progress Bar */}
+                            <TableCell className="py-2.5">
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span
+                                    className={`font-bold tabular-nums ${
+                                      sub.total === 0
+                                        ? "text-muted-foreground"
+                                        : isGood
+                                        ? "text-emerald-600 dark:text-emerald-400"
+                                        : "text-amber-600 dark:text-amber-400"
+                                    }`}
+                                  >
+                                    {sub.total > 0 ? `${pct.toFixed(1)}%` : "—"}
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground">req 75%</span>
+                                </div>
+                                <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full transition-all ${
+                                      sub.total === 0
+                                        ? "bg-muted"
+                                        : isGood
+                                        ? "bg-emerald-500"
+                                        : pct >= 60
+                                        ? "bg-amber-500"
+                                        : "bg-destructive"
+                                    }`}
+                                    style={{ width: `${Math.min(100, pct)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </TableCell>
+
+                            {/* Exam Eligibility Badge */}
+                            <TableCell className="py-2.5">
+                              {sub.total === 0 ? (
+                                <Badge variant="outline" className="text-[11px] text-muted-foreground font-medium">
+                                  No classes yet
+                                </Badge>
+                              ) : isGood ? (
+                                <Badge
+                                  variant="outline"
+                                  className="border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-[11px] font-semibold gap-1 py-0.5"
+                                >
+                                  <IconCircleCheck size={12} className="text-emerald-500" />
+                                  Qualified (≥75%)
+                                </Badge>
+                              ) : (
+                                <Badge
+                                  variant="outline"
+                                  className="border-amber-500/40 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 text-[11px] font-semibold gap-1 py-0.5"
+                                >
+                                  <IconAlertTriangle size={12} className="text-amber-500" />
+                                  Not Qualified (&lt;75%)
+                                </Badge>
+                              )}
+                            </TableCell>
+
+                            {/* Target / Buffer Forecast */}
+                            <TableCell className="py-2.5">
+                              <span
+                                className={`text-[11px] font-medium ${
+                                  forecast.status === "safe"
+                                    ? "text-emerald-700 dark:text-emerald-400"
+                                    : forecast.status === "needed"
+                                    ? "text-amber-700 dark:text-amber-400"
+                                    : "text-muted-foreground"
+                                }`}
+                              >
+                                {forecast.text}
+                              </span>
+                            </TableCell>
+
+                            {/* View Logs Button */}
+                            <TableCell className="text-right pr-4 py-2.5">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs font-semibold px-2 hover:bg-muted"
+                                onClick={() => {
+                                  setSelectedSubject(sub.code);
+                                  setActiveTab("timeline");
+                                }}
+                              >
+                                View Logs →
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* ════ TAB 2: DAILY LOGS (Grouped by Date) ════ */}
+          <TabsContent value="timeline" className="space-y-3 m-0 outline-hidden">
+            {/* Filter Toolbar */}
+            <Card className="p-3 sm:p-3.5 rounded-xl border border-border/70 shadow-xs bg-card">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                {/* Search */}
+                <div className="relative flex-1 min-w-44">
+                  <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by subject code, name, or date..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="pl-8 text-xs h-8.5"
+                  />
+                </div>
+
+                {/* Subject Dropdown & Status Filter */}
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={selectedSubject}
+                    onValueChange={(val) => {
+                      setSelectedSubject(val);
+                      setCurrentPage(1);
+                    }}
                   >
-                    <span className="flex min-w-0 flex-1 items-center gap-2 text-sm">
-                      <span
-                        className="size-3 shrink-0 rounded-[5px]"
-                        style={{ background: color }}
-                        aria-hidden="true"
-                      />
-                      <strong className="shrink-0">{sub.code}</strong>
-                      <span className="truncate text-muted-foreground">— {sub.name}</span>
-                    </span>
-                    <span
-                      className={`shrink-0 text-xs tabular-nums ${
-                        noData ? "text-muted-foreground/60" : "text-muted-foreground"
+                    <SelectTrigger className="w-full sm:w-48 h-8.5 text-xs">
+                      <IconFilter size={13} className="text-muted-foreground mr-1 shrink-0" />
+                      <SelectValue placeholder="All Subjects" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">All Subjects</SelectItem>
+                      {enrolledSubjects.map((sub) => (
+                        <SelectItem key={sub.code} value={sub.code}>
+                          {sub.code} — {sub.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Status Filter Buttons */}
+                  <div className="inline-flex rounded-lg border border-border/70 p-0.5 bg-muted/40 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStatusFilter("ALL");
+                        setCurrentPage(1);
+                      }}
+                      className={`px-2 py-1 text-xs font-semibold rounded-md transition-colors ${
+                        statusFilter === "ALL"
+                          ? "bg-background text-foreground shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      {sub.present}/{sub.total}
-                    </span>
-                    <div className="h-2 w-36 shrink-0 overflow-hidden rounded-full bg-muted sm:w-44">
-                      <div
-                        className="h-full rounded-full transition-all"
-                        style={{ width: `${pct}%`, background: BAND_COLOR[band] }}
-                      />
-                    </div>
-                    <span
-                      className="w-14 shrink-0 text-right text-sm font-bold tabular-nums"
-                      style={{ color: noData ? "var(--muted-foreground)" : BAND_COLOR[band] }}
+                      All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStatusFilter("PRESENT");
+                        setCurrentPage(1);
+                      }}
+                      className={`px-2 py-1 text-xs font-semibold rounded-md transition-colors ${
+                        statusFilter === "PRESENT"
+                          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-bold shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
                     >
-                      {pct.toFixed(1)}%
-                    </span>
+                      Present
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStatusFilter("ABSENT");
+                        setCurrentPage(1);
+                      }}
+                      className={`px-2 py-1 text-xs font-semibold rounded-md transition-colors ${
+                        statusFilter === "ABSENT"
+                          ? "bg-destructive/15 text-destructive font-bold shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Absent
+                    </button>
                   </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Filter Bar */}
-        {subjectStats.length > 1 && (
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-sm text-muted-foreground">Filter Logs by Subject:</span>
-            <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-              <SelectTrigger className="min-w-56">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Subjects</SelectItem>
-                {subjectStats.map((sub) => (
-                  <SelectItem key={sub.code} value={sub.code}>
-                    {sub.code} - {sub.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        {/* Colour legend: maps each subject's square colour to the subject.
-            Title on the top row, then subject entries in a wrapping grid —
-            more than 8 subjects simply flow onto an extra row. */}
-        {legendSubjects.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Subjects</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Colour key for the squares in the daily log below.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2.5">
-                {legendSubjects.map((subject) => (
-                  <span
-                    key={subject.code}
-                    className="inline-flex min-w-40 items-center gap-2 rounded-lg border bg-card px-2.5 py-2 text-xs"
-                  >
-                    <span
-                      className="size-3 shrink-0 rounded-[5px]"
-                      style={{ background: subjectColorByCode.get(subject.code) }}
-                      aria-hidden="true"
-                    />
-                    <span className="font-mono font-semibold">{subject.code}</span>
-                    <span className="truncate text-muted-foreground">{subject.name}</span>
-                  </span>
-                ))}
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            </Card>
 
-        {/* Daily Attendance Log — one row per date, subject chips inside.
-            A chip's square carries the subject colour (see the legend) while
-            the chip's border + background carry PRESENT (green) / ABSENT
-            (neutral). */}
-        {filteredRecords.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 rounded-xl border bg-muted/30 px-4 py-12 text-center">
-            <IconCalendarCheck className="size-8 text-muted-foreground/60" aria-hidden="true" />
-            <p className="text-sm text-muted-foreground">No attendance sessions recorded yet.</p>
-          </div>
-        ) : (
-          <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-56">Date</TableHead>
-                    <TableHead>Subjects</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {datedLogs.map(([date, dayRecords]) => (
-                    <TableRow key={date}>
-                      <TableCell className="align-top font-medium whitespace-nowrap">
-                        {new Date(date).toLocaleDateString("en-US", {
-                          weekday: "short",
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-4.5">
-                          {dayRecords.map((item) => {
-                            const present = item.status === "PRESENT";
-                            const subject = item.session.class.subject;
-                            return (
-                              <span
-                                key={item.id}
-                                title={`${subject.name} — ${present ? "Present" : "Absent"}`}
-                                className={cn(
-                                  "inline-flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-semibold",
-                                  present
-                                    ? "border-[color-mix(in_oklab,var(--ctp-green)_45%,transparent)] bg-[color-mix(in_oklab,var(--ctp-green)_15%,transparent)] text-(--ctp-green)"
-                                    : "border-border bg-muted/40 text-muted-foreground",
-                                )}
-                              >
-                                <span
-                                  className="size-3 shrink-0 rounded-[5px]"
-                                  style={{
-                                    background: subjectColorByCode.get(subject.code),
-                                  }}
-                                  aria-hidden="true"
-                                />
-                                {subject.code}
-                              </span>
-                            );
-                          })}
+            {/* Date-Grouped View */}
+            {groupedByDate.length === 0 ? (
+              <Card className="rounded-xl border-dashed p-10 text-center bg-card/60">
+                <IconCalendarCheck className="size-8 text-muted-foreground/40 mx-auto" />
+                <h3 className="mt-2 text-sm font-semibold text-foreground">No attendance records match your filter</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Try clearing the search query or selecting a different subject filter.
+                </p>
+                {(selectedSubject !== "ALL" || statusFilter !== "ALL" || searchQuery) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 text-xs font-medium"
+                    onClick={() => {
+                      setSelectedSubject("ALL");
+                      setStatusFilter("ALL");
+                      setSearchQuery("");
+                      setCurrentPage(1);
+                    }}
+                  >
+                    Reset Filters
+                  </Button>
+                )}
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {paginatedDateGroups.map((group) => {
+                  const allPresent = group.absentCount === 0;
+                  const allAbsent = group.presentCount === 0;
+
+                  return (
+                    <Card
+                      key={group.dateKey}
+                      className="rounded-xl border border-border/70 shadow-xs overflow-hidden bg-card"
+                    >
+                      {/* Date Group Header */}
+                      <div className="flex items-center justify-between px-4 py-2.5 bg-muted/30 border-b border-border/60">
+                        <div className="flex items-center gap-2">
+                          <IconCalendar size={14} className="text-primary shrink-0" />
+                          <span className="text-xs font-bold text-foreground">
+                            {group.displayDate}
+                          </span>
+                          <Badge variant="outline" className="text-[10px] font-semibold uppercase px-1.5 py-0 bg-background/80">
+                            {group.weekday}
+                          </Badge>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </Card>
-        )}
+
+                        {/* Daily Summary Pill */}
+                        <div>
+                          {allPresent ? (
+                            <Badge
+                              variant="outline"
+                              className="border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-[10px] font-bold gap-1 py-0.5"
+                            >
+                              <IconCircleCheck size={11} className="text-emerald-500" />
+                              All Present ({group.presentCount}/{group.records.length})
+                            </Badge>
+                          ) : allAbsent ? (
+                            <Badge
+                              variant="outline"
+                              className="border-destructive/40 bg-destructive/10 text-destructive text-[10px] font-bold gap-1 py-0.5"
+                            >
+                              <IconCircleX size={11} className="text-destructive" />
+                              All Absent ({group.absentCount})
+                            </Badge>
+                          ) : (
+                            <div className="flex items-center gap-1.5 text-[11px] font-semibold">
+                              <span className="text-emerald-600 dark:text-emerald-400">
+                                {group.presentCount} Present
+                              </span>
+                              <span className="text-muted-foreground">·</span>
+                              <span className="text-destructive">
+                                {group.absentCount} Absent
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Subjects Taught on this Date */}
+                      <div className="divide-y divide-border/40">
+                        {group.records.map((record) => {
+                          const isPresent = record.status === "PRESENT";
+
+                          return (
+                            <div
+                              key={record.id}
+                              className="flex items-center justify-between px-4 py-2.5 hover:bg-muted/20 transition-colors"
+                            >
+                              {/* Subject Info */}
+                              <div className="flex items-center gap-2.5 min-w-0 pr-3">
+                                <Badge
+                                  variant="outline"
+                                  className="font-mono text-[11px] font-bold bg-muted/50 shrink-0"
+                                >
+                                  {record.session.class.subject.code}
+                                </Badge>
+                                <span className="text-xs font-semibold text-foreground truncate">
+                                  {record.session.class.subject.name}
+                                </span>
+                                {record.note && (
+                                  <span className="text-[11px] text-muted-foreground italic truncate">
+                                    — {record.note}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Present / Absent Badge */}
+                              <div className="shrink-0">
+                                {isPresent ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 font-bold text-[11px] gap-1 py-0.5 px-2"
+                                  >
+                                    <IconCheck size={12} className="text-emerald-500" />
+                                    PRESENT
+                                  </Badge>
+                                ) : (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-destructive/40 bg-destructive/10 text-destructive font-bold text-[11px] gap-1 py-0.5 px-2"
+                                  >
+                                    <IconX size={12} className="text-destructive" />
+                                    ABSENT
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </Card>
+                  );
+                })}
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <Card className="p-3 border border-border/70 shadow-xs bg-card flex items-center justify-between text-xs text-muted-foreground">
+                    <span>
+                      Showing days {(currentPage - 1) * datesPerPage + 1} to{" "}
+                      {Math.min(currentPage * datesPerPage, groupedByDate.length)} of {groupedByDate.length} days
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={currentPage <= 1}
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        className="h-7 w-7 p-0"
+                        aria-label="Previous page"
+                      >
+                        <IconChevronLeft size={14} />
+                      </Button>
+                      <span className="font-semibold px-2">
+                        {currentPage} / {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={currentPage >= totalPages}
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        className="h-7 w-7 p-0"
+                        aria-label="Next page"
+                      >
+                        <IconChevronRight size={14} />
+                      </Button>
+                    </div>
+                  </Card>
+                )}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </StudentShell>
   );

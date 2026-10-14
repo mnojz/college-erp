@@ -1,10 +1,22 @@
-import { IconCalendar, IconPencil, IconSchool } from "@tabler/icons-react";
+"use client";
+
+import { useState } from "react";
+import {
+  IconCalendar,
+  IconCheck,
+  IconCopy,
+  IconId,
+  IconPencil,
+  IconSchool,
+  IconSparkles,
+} from "@tabler/icons-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { toast } from "sonner";
 
-type ProfileHeroProps = {
+export type ProfileHeroProps = {
   name: string;
   email: string;
   status: string;
@@ -12,7 +24,11 @@ type ProfileHeroProps = {
   department: string;
   admissionNo: string;
   rollNumber: number | null;
+  enrollmentNumber?: string;
+  batch?: string;
+  semester?: number | null;
   profileImageUrl: string | null;
+  reviewStatus?: "APPROVED" | "PENDING_REVIEW" | "REJECTED";
   onEdit?: () => void;
 };
 
@@ -24,10 +40,25 @@ export function ProfileHero({
   department,
   admissionNo,
   rollNumber,
+  enrollmentNumber,
+  batch,
+  semester,
   profileImageUrl,
+  reviewStatus,
   onEdit,
 }: ProfileHeroProps) {
-  const studentId = rollNumber || admissionNo;
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, label: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedKey(label);
+    toast.success(`${label} copied to clipboard`);
+    setTimeout(() => {
+      setCopiedKey(null);
+    }, 2000);
+  };
+
   const initials =
     name
       .trim()
@@ -36,54 +67,183 @@ export function ProfileHero({
       .join("")
       .slice(0, 2)
       .toUpperCase() || "ST";
+
   const active = status.toUpperCase() === "ACTIVE";
 
   return (
-    <Card className="p-5 sm:p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
-        {/* Rounded square (not a circle) so it matches the teacher overview hero. */}
-        <Avatar className="size-20 rounded-xl after:rounded-xl sm:size-24">
-          {profileImageUrl ? (
-            <AvatarImage src={profileImageUrl} alt={name} className="rounded-xl" />
-          ) : null}
-          <AvatarFallback className="rounded-xl bg-linear-to-br from-primary/85 to-primary text-xl font-semibold text-primary-foreground sm:text-2xl">
-            {initials}
-          </AvatarFallback>
-        </Avatar>
+    <Card className="overflow-hidden border border-border/70 shadow-sm rounded-2xl bg-card p-0 py-0 pt-0 gap-0 [--card-spacing:0px]">
+      {/* ── Banner Backdrop ── */}
+      <div className="relative h-28 sm:h-36 w-full bg-linear-to-r from-primary/25 via-primary/10 to-primary/5 dark:from-primary/20 dark:via-primary/10 dark:to-background border-b border-border/50">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/15 via-transparent to-transparent opacity-80" />
+        <div className="absolute right-4 top-4 sm:right-6 sm:top-6 flex items-center gap-2">
+          <Badge
+            variant="outline"
+            className="bg-background/80 backdrop-blur-md px-2.5 py-1 text-xs font-semibold shadow-xs"
+          >
+            <IconSparkles size={13} className="text-primary mr-1" />
+            {batch || "Undergraduate"}
+          </Badge>
+        </div>
+      </div>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{name}</h1>
-            <Badge variant={active ? "default" : "secondary"} className="gap-1.5">
-              <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
-              {status}
-            </Badge>
+      {/* ── Profile Header Info ── */}
+      <div className="px-5 pb-5 sm:px-7 sm:pb-6">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-14 sm:-mt-16">
+          {/* Avatar with status ring */}
+          <div className="relative inline-block self-start">
+            <Avatar className="size-24 sm:size-28 rounded-2xl ring-4 ring-background shadow-md">
+              {profileImageUrl ? (
+                <AvatarImage src={profileImageUrl} alt={name} className="object-cover rounded-2xl" />
+              ) : null}
+              <AvatarFallback className="rounded-2xl bg-linear-to-br from-primary to-primary/80 text-2xl font-bold text-primary-foreground">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <span
+              className={`absolute bottom-1 right-1 size-4 rounded-full ring-2 ring-background ${
+                active ? "bg-emerald-500" : "bg-muted-foreground"
+              }`}
+              title={active ? "Active account" : "Inactive account"}
+            />
           </div>
 
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5">
-              <IconSchool size={14} aria-hidden="true" />
-              {department || "Department not assigned"}
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <IconCalendar size={14} aria-hidden="true" />
-              {program || "Program not assigned"}
-            </span>
+          {/* Action buttons on the right */}
+          <div className="flex items-center gap-2 self-start sm:self-end">
+            {onEdit && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5 rounded-lg h-9 font-medium shadow-xs hover:bg-muted/60 transition-colors"
+                onClick={onEdit}
+              >
+                <IconPencil size={15} />
+                Edit Profile
+              </Button>
+            )}
           </div>
-
-          <p className="mt-2 text-sm break-words">
-            Registration Number: <strong>{admissionNo}</strong>{" "}
-            <span className="text-muted-foreground">{email}</span>
-          </p>
-          <p className="text-sm text-muted-foreground">Student ID: {studentId}</p>
         </div>
 
-        {onEdit && (
-          <Button type="button" variant="outline" size="sm" className="gap-1.5 sm:mt-0" onClick={onEdit}>
-            <IconPencil size={15} aria-hidden="true" />
-            Edit Profile
-          </Button>
-        )}
+        {/* ── Details Block ── */}
+        <div className="mt-4">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">{name}</h1>
+            <Badge
+              variant={active ? "default" : "secondary"}
+              className={`gap-1.5 px-2.5 py-0.5 text-xs font-medium rounded-full ${
+                active
+                  ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30"
+                  : ""
+              }`}
+            >
+              <span
+                className={`size-1.5 rounded-full ${active ? "bg-emerald-500" : "bg-muted-foreground"}`}
+              />
+              {active ? "Active Student" : status}
+            </Badge>
+
+            {reviewStatus === "PENDING_REVIEW" && (
+              <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-xs">
+                Photo Pending Approval
+              </Badge>
+            )}
+            {reviewStatus === "REJECTED" && (
+              <Badge variant="destructive" className="text-xs">
+                Photo Update Required
+              </Badge>
+            )}
+          </div>
+
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs sm:text-sm text-muted-foreground font-medium">
+            <span className="inline-flex items-center gap-1.5">
+              <IconSchool size={15} className="text-primary/70 shrink-0" />
+              {program || "Program not assigned"}
+            </span>
+            {semester && (
+              <>
+                <span className="text-muted-foreground/40 hidden sm:inline">•</span>
+                <span className="inline-flex items-center gap-1.5">
+                  <IconCalendar size={15} className="text-primary/70 shrink-0" />
+                  Semester {semester}
+                </span>
+              </>
+            )}
+            {department && (
+              <>
+                <span className="text-muted-foreground/40 hidden sm:inline">•</span>
+                <span className="text-muted-foreground">{department}</span>
+              </>
+            )}
+          </div>
+
+          {/* ── Key Identity Tags with Quick-Copy ── */}
+          <div className="mt-4 flex flex-wrap items-center gap-2 pt-3 border-t border-border/50">
+            {rollNumber != null && (
+              <div className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-muted/40 px-2.5 py-1 text-xs">
+                <span className="text-muted-foreground font-medium">Roll No:</span>
+                <span className="font-mono font-bold text-foreground">#{rollNumber}</span>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(String(rollNumber), "Roll Number")}
+                  className="text-muted-foreground hover:text-foreground transition-colors ml-0.5"
+                  title="Copy Roll Number"
+                  aria-label="Copy Roll Number"
+                >
+                  {copiedKey === "Roll Number" ? (
+                    <IconCheck size={13} className="text-emerald-500" />
+                  ) : (
+                    <IconCopy size={13} />
+                  )}
+                </button>
+              </div>
+            )}
+
+            {admissionNo && (
+              <div className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-muted/40 px-2.5 py-1 text-xs">
+                <IconId size={14} className="text-muted-foreground/80" />
+                <span className="text-muted-foreground font-medium">Reg No:</span>
+                <span className="font-mono font-semibold text-foreground">{admissionNo}</span>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(admissionNo, "Registration ID")}
+                  className="text-muted-foreground hover:text-foreground transition-colors ml-0.5"
+                  title="Copy Registration ID"
+                  aria-label="Copy Registration ID"
+                >
+                  {copiedKey === "Registration ID" ? (
+                    <IconCheck size={13} className="text-emerald-500" />
+                  ) : (
+                    <IconCopy size={13} />
+                  )}
+                </button>
+              </div>
+            )}
+
+            {enrollmentNumber && enrollmentNumber !== admissionNo && (
+              <div className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-muted/40 px-2.5 py-1 text-xs">
+                <span className="text-muted-foreground font-medium">Enrollment:</span>
+                <span className="font-mono font-semibold text-foreground">{enrollmentNumber}</span>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(enrollmentNumber, "Enrollment Number")}
+                  className="text-muted-foreground hover:text-foreground transition-colors ml-0.5"
+                  title="Copy Enrollment Number"
+                  aria-label="Copy Enrollment Number"
+                >
+                  {copiedKey === "Enrollment Number" ? (
+                    <IconCheck size={13} className="text-emerald-500" />
+                  ) : (
+                    <IconCopy size={13} />
+                  )}
+                </button>
+              </div>
+            )}
+
+            <div className="inline-flex items-center gap-1.5 text-xs text-muted-foreground ml-auto hidden md:inline-flex">
+              <span>{email}</span>
+            </div>
+          </div>
+        </div>
       </div>
     </Card>
   );

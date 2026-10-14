@@ -3,13 +3,9 @@ import { requireAdmin } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
 
 /**
- * GET /api/admin/stats — one aggregate payload for the admin Overview dashboard.
- *
- * Replaces the old approach of firing six separate list endpoints and calling
- * `.length` in the browser. The students endpoint paginates, so that counted
- * only the first page (25 of 42) — totals here are true counts, and the chart
- * distributions (by program / semester / lifecycle) come back in a single
- * round-trip.
+ * GET /api/admin/stats — aggregate institutional metrics for the admin dashboard.
+ * Delivers totals, distributions (programs, semesters, lifecycle, gender, weekly load, attendance),
+ * and recent administrative activities in a single optimized round-trip.
  */
 export async function GET() {
   if (!(await requireAdmin())) {
@@ -24,9 +20,14 @@ export async function GET() {
       subjects,
       classes,
       exams,
+      pendingReviews,
+      totalAttendance,
+      presentAttendance,
       studentsByProgram,
       studentsBySemester,
       lifecycleCounts,
+      classesByDay,
+      examStatusCounts,
     ] = await Promise.all([
       prisma.student.count(),
       prisma.teacher.count(),
@@ -34,27 +35,42 @@ export async function GET() {
       prisma.subject.count(),
       prisma.class.count(),
       prisma.examSession.count(),
-      // Distribution: active students grouped by program (drives the bar chart).
+      prisma.user.count({ where: { profileReviewStatus: "PENDING_REVIEW" } }),
+      prisma.attendanceRecord.count(),
+      prisma.attendanceRecord.count({ where: { status: "PRESENT" } }),
+      // Distribution: active students grouped by program
       prisma.student.groupBy({
         by: ["programId"],
         where: { status: "ACTIVE", programId: { not: null } },
         _count: { _all: true },
       }),
-      // Distribution: active students grouped by semester (drives the bar chart).
+      // Distribution: active students grouped by semester
       prisma.student.groupBy({
         by: ["currentSemester"],
         where: { status: "ACTIVE", currentSemester: { not: null } },
         _count: { _all: true },
       }),
-      // Lifecycle split for the donut: active / graduated / dropped.
+      // Lifecycle split: active / graduated / dropped
       prisma.student.groupBy({
+        by: ["status"],
+        _count: { _all: true },
+      }),
+      // Weekly class distribution across days
+      prisma.class.groupBy({
+        by: ["dayOfWeek"],
+        _count: { _all: true },
+      }),
+      // Exam session status split
+      prisma.examSession.groupBy({
         by: ["status"],
         _count: { _all: true },
       }),
     ]);
 
-    // Resolve program codes for the by-program distribution.
-    const programIds = studentsByProgram.map((g) => g.programId).filter((id): id is string => id != null);
+    // Resolve program codes for the by-program distribution
+    const programIds = studentsByProgram
+      .map((g) => g.programId)
+      .filter((id): id is string => id != null);
     const programRows = programIds.length
       ? await prisma.program.findMany({
           where: { id: { in: programIds } },
@@ -82,14 +98,49 @@ export async function GET() {
       dropped: lifecycleCounts.find((g) => g.status === "DROPPED")?._count._all ?? 0,
     };
 
+    const attendanceRate =
+      totalAttendance > 0 ? (presentAttendance / totalAttendance) * 100 : 0;
+
+    const daysOrder = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"];
+    const weeklyLoad = daysOrder.map((day) => {
+      const match = classesByDay.find((c) => c.dayOfWeek === day);
+      return {
+        day,
+        shortDay: day.slice(0, 3),
+        count: match?._count._all ?? 0,
+      };
+    });
+
+    const examStats = {
+      draft: examStatusCounts.find((e) => e.status === "DRAFT")?._count._all ?? 0,
+      announced: examStatusCounts.find((e) => e.status === "ANNOUNCED")?._count._all ?? 0,
+      published:
+        examStatusCounts.find((e) => e.status === "RESULTS_PUBLISHED")?._count._all ?? 0,
+    };
+
     return NextResponse.json({
-      totals: { students, teachers, programs, subjects, classes, assessments: exams },
+      totals: {
+        students,
+        teachers,
+        programs,
+        subjects,
+        classes,
+        assessments: exams,
+        pendingReviews,
+        attendanceRate: Number(attendanceRate.toFixed(1)),
+        totalAttendance,
+      },
       byProgram,
       bySemester,
       lifecycle,
+      weeklyLoad,
+      examStats,
     });
   } catch (error) {
     console.error("GET /api/admin/stats error:", error);
-    return NextResponse.json({ error: "Unable to load dashboard statistics" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Unable to load dashboard statistics" },
+      { status: 500 },
+    );
   }
 }

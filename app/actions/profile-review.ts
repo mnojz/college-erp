@@ -83,22 +83,41 @@ export async function submitAvatarForReview(
  */
 export async function approveProfileChanges(
   userId: string,
+  note?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const admin = await requireAdmin();
   if (!admin) return { ok: false, error: "Forbidden" };
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      pendingAvatarUrl: true,
-      pendingProfileData: true,
-      student: { select: { id: true } },
-      teacher: { select: { id: true } },
-    },
-  });
+  const [adminUser, user] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: admin.userId },
+      select: { firstName: true, lastName: true },
+    }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        pendingAvatarUrl: true,
+        pendingProfileData: true,
+        student: { select: { id: true } },
+        teacher: { select: { id: true } },
+      },
+    }),
+  ]);
+
   if (!user || (!user.pendingAvatarUrl && !user.pendingProfileData)) {
     return { ok: false, error: "Nothing pending for this user." };
   }
+
+  const adminName = adminUser
+    ? `${adminUser.firstName} ${adminUser.lastName}`.trim()
+    : "Administrator";
+  const hadAvatar = !!user.pendingAvatarUrl;
+  const hadData = !!user.pendingProfileData;
+  const scope = hadAvatar && hadData ? "photo & details" : hadAvatar ? "photo" : "details";
+  const actionTitle = `Profile ${scope} approved`;
+  const bodyText = note?.trim()
+    ? `Approved by ${adminName}. Note: ${note.trim()}`
+    : `Your submitted profile ${scope} have been verified and approved by ${adminName}. They are now live on your profile.`;
 
   const updates: Prisma.PrismaPromise<unknown>[] = [
     prisma.user.update({
@@ -148,8 +167,8 @@ export async function approveProfileChanges(
       data: {
         userId,
         type: "PROFILE_APPROVED",
-        title: "Profile changes approved",
-        body: "Your submitted profile changes have been approved and are now live on your profile.",
+        title: actionTitle,
+        body: bodyText,
         link: user.student ? "/student" : "/teacher",
       },
     }),
@@ -171,21 +190,41 @@ export async function approveProfileChanges(
  */
 export async function rejectProfileChanges(
   userId: string,
+  reason?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   const admin = await requireAdmin();
   if (!admin) return { ok: false, error: "Forbidden" };
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      pendingAvatarUrl: true,
-      pendingProfileData: true,
-      student: { select: { id: true } },
-    },
-  });
+  const [adminUser, user] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: admin.userId },
+      select: { firstName: true, lastName: true },
+    }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        pendingAvatarUrl: true,
+        pendingProfileData: true,
+        student: { select: { id: true } },
+      },
+    }),
+  ]);
+
   if (!user || (!user.pendingAvatarUrl && !user.pendingProfileData)) {
     return { ok: false, error: "Nothing pending for this user." };
   }
+
+  const adminName = adminUser
+    ? `${adminUser.firstName} ${adminUser.lastName}`.trim()
+    : "Administrator";
+  const hadAvatar = !!user.pendingAvatarUrl;
+  const hadData = !!user.pendingProfileData;
+  const scope = hadAvatar && hadData ? "photo & details" : hadAvatar ? "photo" : "details";
+  const actionTitle = `Profile ${scope} rejected`;
+  const reasonText = reason?.trim()
+    ? `Reason: ${reason.trim()}`
+    : "The submitted update or photo did not meet college guidelines.";
+  const bodyText = `Reviewed by ${adminName}. ${reasonText} Your previous profile details remain unchanged.`;
 
   await prisma.$transaction([
     prisma.user.update({
@@ -203,8 +242,8 @@ export async function rejectProfileChanges(
       data: {
         userId,
         type: "PROFILE_REJECTED",
-        title: "Profile changes not approved",
-        body: "Your submitted profile changes were not approved, so your previous details remain unchanged. You can submit a correction from your profile.",
+        title: actionTitle,
+        body: bodyText,
         link: user.student ? "/student" : "/teacher",
       },
     }),
@@ -221,14 +260,16 @@ export async function rejectProfileChanges(
  */
 export async function approveProfileForm(formData: FormData): Promise<void> {
   const id = formData.get("userId");
+  const note = formData.get("note");
   if (typeof id !== "string" || !id) return;
-  const res = await approveProfileChanges(id);
+  const res = await approveProfileChanges(id, typeof note === "string" ? note : undefined);
   if (!res.ok) console.error("approveProfileChanges:", res.error);
 }
 
 export async function rejectProfileForm(formData: FormData): Promise<void> {
   const id = formData.get("userId");
+  const reason = formData.get("reason");
   if (typeof id !== "string" || !id) return;
-  const res = await rejectProfileChanges(id);
+  const res = await rejectProfileChanges(id, typeof reason === "string" ? reason : undefined);
   if (!res.ok) console.error("rejectProfileChanges:", res.error);
 }
