@@ -6,8 +6,6 @@ import type { ReactNode } from "react";
 import {
   ChevronDown,
   LogOut,
-  User,
-  Users,
 } from "lucide-react";
 import { ThemeToggle } from "@/app/components/common/ThemeToggle";
 import { NotificationDropdown } from "@/app/components/common/NotificationDropdown";
@@ -33,8 +31,6 @@ export type DashboardNavProps = {
   userName?: string;
   userSubtitle?: string;
   avatarUrl?: string | null;
-  /** Where the "View profile" menu item links to. */
-  profileHref?: string;
   onLogout?: () => void;
   /** Slot used by DashboardShell to render the mobile sidebar toggle. */
   menuButton?: ReactNode;
@@ -51,7 +47,6 @@ export function DashboardNav({
   userName,
   userSubtitle,
   avatarUrl,
-  profileHref = "/profile",
   onLogout,
   menuButton,
   centerSlot,
@@ -188,28 +183,6 @@ export function DashboardNav({
                   </div>
                 </div>
               </DropdownMenuLabel>
-
-              <DropdownMenuSeparator className="my-1 bg-border/60" />
-
-              <DropdownMenuItem asChild>
-                <Link
-                  href={profileHref}
-                  className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium cursor-pointer"
-                >
-                  <User className="size-4 text-muted-foreground" aria-hidden="true" />
-                  <span>My Profile</span>
-                </Link>
-              </DropdownMenuItem>
-
-              <DropdownMenuItem asChild>
-                <Link
-                  href="/directory"
-                  className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium cursor-pointer"
-                >
-                  <Users className="size-4 text-muted-foreground" aria-hidden="true" />
-                  <span>Campus Directory</span>
-                </Link>
-              </DropdownMenuItem>
 
               <DropdownMenuSeparator className="my-1 bg-border/60" />
 

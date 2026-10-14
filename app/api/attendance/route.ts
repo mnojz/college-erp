@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@/app/generated/prisma/client";
 import { getSession } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
+import { campusTodayISO } from "@/app/lib/campus-time";
 
 type AttendanceBody = {
   classId?: unknown;
@@ -128,7 +129,10 @@ export async function GET(request: Request) {
     // them. Two aggregates cover every class at once, so the meters ride along
     // inside the roster payload — no extra round-trip, free on class switch.
     const classIds = classes.map((c) => c.id);
-    const [sessionCounts, presentRecords] = await Promise.all([
+    const todayStr = campusTodayISO();
+    const todayDate = parseSessionDate(todayStr);
+
+    const [sessionCounts, presentRecords, todaySessions] = await Promise.all([
       prisma.attendanceSession.groupBy({
         by: ["classId"],
         where: { classId: { in: classIds } },
@@ -140,8 +144,15 @@ export async function GET(request: Request) {
         where: { status: "PRESENT", session: { classId: { in: classIds } } },
         select: { studentId: true, session: { select: { classId: true } } },
       }),
+      todayDate
+        ? prisma.attendanceSession.findMany({
+            where: { classId: { in: classIds }, sessionDate: todayDate },
+            select: { classId: true },
+          })
+        : Promise.resolve([]),
     ]);
     const totalByClass = new Map(sessionCounts.map((sc) => [sc.classId, sc._count._all]));
+    const todaySessionClassIds = new Set(todaySessions.map((s) => s.classId));
     const presentByClassStudent = new Map<string, number>();
     for (const record of presentRecords) {
       const key = `${record.session.classId}:${record.studentId}`;
@@ -150,6 +161,7 @@ export async function GET(request: Request) {
 
     const classesWithAttendance = classes.map((c) => ({
       ...c,
+      hasTodaySession: todaySessionClassIds.has(c.id),
       program: {
         ...c.program,
         students: c.program.students.map((s) => ({

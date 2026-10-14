@@ -70,14 +70,11 @@ export function PublicNavbar({
         </nav>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center bg-muted/30 p-0.5 rounded-lg border border-border/50">
-            <ThemeToggle className="size-8 rounded-md hover:bg-background hover:text-foreground text-muted-foreground transition-colors" />
-          </div>
+          <ThemeToggle className="size-9 rounded-xl border border-border/70 bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shadow-2xs" />
 
           <Button
             type="button"
-            size="sm"
-            className="hidden sm:inline-flex gap-1.5 font-semibold shadow-2xs"
+            className="hidden sm:inline-flex h-9 px-3.5 rounded-xl gap-1.5 text-xs font-semibold shadow-2xs cursor-pointer"
             onClick={onSignInClick}
           >
             <IconLogin size={15} aria-hidden="true" />
@@ -86,7 +83,7 @@ export function PublicNavbar({
 
           <Button
             type="button"
-            className="sm:hidden size-9"
+            className="sm:hidden size-9 rounded-xl"
             size="icon"
             variant="outline"
             aria-label={mobileOpen ? "Close menu" : "Open menu"}

@@ -9,12 +9,14 @@ import {
   IconPencil,
   IconSchool,
   IconSparkles,
+  IconZoomIn,
 } from "@tabler/icons-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
+import { ProfileImagePreviewModal } from "@/app/components/profile/ProfileImagePreviewModal";
 
 export type ProfileHeroProps = {
   name: string;
@@ -48,6 +50,7 @@ export function ProfileHero({
   onEdit,
 }: ProfileHeroProps) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [showImagePreview, setShowImagePreview] = useState(false);
 
   const copyToClipboard = (text: string, label: string) => {
     if (!text) return;
@@ -71,7 +74,8 @@ export function ProfileHero({
   const active = status.toUpperCase() === "ACTIVE";
 
   return (
-    <Card className="overflow-hidden border border-border/70 shadow-sm rounded-2xl bg-card p-0 py-0 pt-0 gap-0 [--card-spacing:0px]">
+    <>
+      <Card className="overflow-hidden border border-border/70 shadow-sm rounded-2xl bg-card p-0 py-0 pt-0 gap-0 [--card-spacing:0px]">
       {/* ── Banner Backdrop ── */}
       <div className="relative h-28 sm:h-36 w-full bg-linear-to-r from-primary/25 via-primary/10 to-primary/5 dark:from-primary/20 dark:via-primary/10 dark:to-background border-b border-border/50">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/15 via-transparent to-transparent opacity-80" />
@@ -89,18 +93,36 @@ export function ProfileHero({
       {/* ── Profile Header Info ── */}
       <div className="px-5 pb-5 sm:px-7 sm:pb-6">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-14 sm:-mt-16">
-          {/* Avatar with status ring */}
+          {/* Avatar with status ring & click preview */}
           <div className="relative inline-block self-start">
-            <Avatar className="size-24 sm:size-28 rounded-2xl ring-4 ring-background shadow-md">
-              {profileImageUrl ? (
-                <AvatarImage src={profileImageUrl} alt={name} className="object-cover rounded-2xl" />
-              ) : null}
-              <AvatarFallback className="rounded-2xl bg-linear-to-br from-primary to-primary/80 text-2xl font-bold text-primary-foreground">
-                {initials}
-              </AvatarFallback>
-            </Avatar>
+            <button
+              type="button"
+              onClick={() => setShowImagePreview(true)}
+              className="group relative block rounded-2xl cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-transform duration-200 hover:scale-[1.02]"
+              title="Click to view full photo"
+              aria-label="View enlarged profile photo"
+            >
+              <Avatar className="size-24 sm:size-28 rounded-2xl ring-4 ring-background shadow-md overflow-hidden">
+                {profileImageUrl ? (
+                  <AvatarImage
+                    src={profileImageUrl}
+                    alt={name}
+                    className="object-cover rounded-2xl transition-transform duration-300 group-hover:scale-105"
+                  />
+                ) : null}
+                <AvatarFallback className="rounded-2xl bg-linear-to-br from-primary to-primary/80 text-2xl font-bold text-primary-foreground">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+
+              {/* Hover overlay indicator with pointer */}
+              <div className="absolute inset-0 rounded-2xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center text-white backdrop-blur-[1px]">
+                <IconZoomIn className="size-6 drop-shadow-md" aria-hidden="true" />
+              </div>
+            </button>
+
             <span
-              className={`absolute bottom-1 right-1 size-4 rounded-full ring-2 ring-background ${
+              className={`absolute bottom-1 right-1 size-4 rounded-full ring-2 ring-background pointer-events-none ${
                 active ? "bg-emerald-500" : "bg-muted-foreground"
               }`}
               title={active ? "Active account" : "Inactive account"}
@@ -144,12 +166,12 @@ export function ProfileHero({
 
             {reviewStatus === "PENDING_REVIEW" && (
               <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-xs">
-                Photo Pending Approval
+                Changes Pending Approval
               </Badge>
             )}
             {reviewStatus === "REJECTED" && (
               <Badge variant="destructive" className="text-xs">
-                Photo Update Required
+                Changes Update Required
               </Badge>
             )}
           </div>
@@ -246,5 +268,15 @@ export function ProfileHero({
         </div>
       </div>
     </Card>
+
+    <ProfileImagePreviewModal
+      open={showImagePreview}
+      onOpenChange={setShowImagePreview}
+      imageUrl={profileImageUrl}
+      name={name}
+      subtitle={program || "Student"}
+      badge={enrollmentNumber}
+    />
+  </>
   );
 }

@@ -262,6 +262,11 @@
     scroll-behavior: smooth;
   }
 
+  html.has-custom-cursor,
+  html.has-custom-cursor * {
+    cursor: none !important;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system,
@@ -349,5 +354,3 @@ the compact, professional shape language of the shared components. */
 :where([data-slot="card"], [data-slot="dialog-content"], [data-slot="sheet-content"]) {
   border-radius: min(0.5rem, 8px);
 }
-
-/* respect the tech stack and utilize tailwind and sadcn ui before writing css here */

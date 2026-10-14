@@ -1,7 +1,8 @@
 "use client";
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,10 +19,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   IconAlertTriangle,
+  IconArrowsShuffle,
+  IconCalendarCheck,
   IconCalendarEvent,
   IconCircleCheck,
   IconCircleX,
   IconClipboardList,
+  IconClock,
   IconFilterOff,
   IconLock,
   IconPencil,
@@ -34,6 +38,7 @@ import { AttendanceMeter } from "@/app/components/teacher/AttendanceMeter";
 import { TeacherAttendanceRecords } from "@/app/components/teacher/TeacherAttendanceRecords";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
 import { CAMPUS_TIME_ZONE, campusNow, campusTodayISO } from "@/app/lib/campus-time";
+import { formatTime } from "@/app/lib/timetable-layout";
 
 type Student = {
   id: string;
@@ -54,6 +59,7 @@ type ClassItem = {
   semester: number;
   type: string;
   group: string | null;
+  hasTodaySession?: boolean;
   subject: { code: string; name: string };
   program: {
     id: string;
@@ -100,9 +106,6 @@ function filterClassesFor(
 function findCurrentClassId(classes: ClassItem[]): string {
   if (classes.length === 0) return "";
 
-  // Campus wall-clock, never the browser's timezone: class times are stored as
-  // wall-clock, so a machine set to another zone would otherwise resolve the
-  // wrong day and the wrong "current" class.
   const { day: todayKey, minutes: currentTimeMinutes } = campusNow();
 
   // Look for a class that matches today and whose time window contains now.
@@ -134,6 +137,7 @@ export default function TeacherAttendancePage() {
   const [selectedClassId, setSelectedClassId] = useState("");
   const [presentStudentIds, setPresentStudentIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "PRESENT" | "ABSENT">("ALL");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
@@ -186,9 +190,10 @@ export default function TeacherAttendancePage() {
   }
 
   /** Attendance is always for the current day — shown as read-only info. */
-  // Campus date, not UTC: between 00:00 and the UTC offset, toISOString()
-  // hands back YESTERDAY and attendance gets filed under it.
   const todayISO = campusTodayISO();
+  const { day: todayKey } = campusNow();
+  const displayDayName = todayKey.charAt(0) + todayKey.slice(1).toLowerCase();
+
   const todayLabel = new Date().toLocaleDateString("en-GB", {
     timeZone: CAMPUS_TIME_ZONE,
     weekday: "short",
@@ -196,6 +201,7 @@ export default function TeacherAttendancePage() {
     month: "short",
     year: "numeric",
   });
+
   /** Minutes after the FIRST submission during which edits remain possible. */
   const EDIT_WINDOW_MINUTES = 5;
   const editWindowEndsAt = submittedAt
@@ -219,6 +225,11 @@ export default function TeacherAttendancePage() {
     () => classes.find((c) => c.id === selectedClassId),
     [classes, selectedClassId],
   );
+
+  /** Today's scheduled classes */
+  const todaysScheduledClasses = useMemo(() => {
+    return classes.filter((c) => c.dayOfWeek === todayKey);
+  }, [classes, todayKey]);
 
   /** Dropdown value: the distinct-subject key the selected class belongs to. */
   const selectedSubjectKey = selectedClass
@@ -253,11 +264,7 @@ export default function TeacherAttendancePage() {
     [classes, selectedProgram, selectedSemester],
   );
 
-  /** One dropdown entry per SUBJECT -- weekday/time never appear here. Those only
-   *  power the smart suggestion; the concrete slot is resolved automatically
-   *  (today's schedule, else first weekly slot) when recording. A subject is a
-   *  single entry whether it runs as a Lecture, a Practical, or both.
-   */
+  /** One dropdown entry per SUBJECT */
   const subjectOptions = useMemo(() => {
     const subjects = new Map<string, { key: string; label: string; hasPractical: boolean }>();
     for (const c of filteredClasses) {
@@ -277,10 +284,6 @@ export default function TeacherAttendancePage() {
     return Array.from(subjects.values());
   }, [filteredClasses]);
 
-  /** If the currently selected class is filtered out, fall back to the routine-suggested
-   *  class. Implemented as a helper called from the filter event handlers (not an effect,
-   *  to avoid synchronous setState-in-effect lint rules.).
-   */
   function syncSelectedClassWith(nextFiltered: ClassItem[]) {
     if (nextFiltered.length === 0) {
       if (selectedClassId) {
@@ -322,13 +325,18 @@ export default function TeacherAttendancePage() {
 
         const loadedClasses: ClassItem[] = attResult.classes ?? [];
         setClasses(loadedClasses);
-        // Smart-default: find the class currently in session (by day + time),
-        // falling back to the first class in sorted order.
-        const initialClassId = findCurrentClassId(loadedClasses) || "";
+
+        // Smart-default: if classId is provided in URL, preselect it; otherwise find the class currently in session.
+        const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+        const urlClassId = urlParams?.get("classId");
+        const matchedClass = urlClassId ? loadedClasses.find((c) => c.id === urlClassId) : null;
+        const initialClassId = matchedClass?.id ?? findCurrentClassId(loadedClasses) ?? "";
+
+        if (matchedClass) {
+          setSelectedProgram(matchedClass.program.id);
+          setSelectedSemester(String(matchedClass.semester));
+        }
         setSelectedClassId(initialClassId);
-        // Hydrate attendance already saved for that class TODAY, so returning to
-        // this page (or refreshing it) restores the marks, the 5-minute
-        // countdown and the "Edit Attendance" button instead of a blank form.
         await loadExistingSession(initialClassId);
 
         if (profRes.ok && profResult.teacher) {
@@ -348,15 +356,9 @@ export default function TeacherAttendancePage() {
     }
 
     loadData();
-    // loadExistingSession is re-created on every render, so it cannot be a
-    // dependency: this effect must hydrate exactly once per mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
-  // Keep the client clock fresh while a session is submitted (and not yet
-  // locked) so the edit-window countdown and the "Locked" flip happen live.
-  // The first sync runs in a timeout (not the effect body) to satisfy the
-  // set-state-in-effect rule; it still fires within milliseconds.
   useEffect(() => {
     if (!submittedAt || isLocked) return;
     const sync = setTimeout(() => setNow(Date.now()), 0);
@@ -367,18 +369,8 @@ export default function TeacherAttendancePage() {
     };
   }, [submittedAt, isLocked]);
 
-  /**
-   * Baseline of the last SAVED marks for the current class. An edit (PUT)
-   * only needs the PRESENT delta against this set — today's session is
-   * already counted in the roster meters — so no refetch is required.
-   */
   const savedMarksRef = useRef<Set<string>>(new Set());
 
-  /**
-   * Adjusts one class's per-student meters in place so the bars refresh the
-   * moment attendance saves. `deltaFor` supplies the present/total increments
-   * (or decrements) for each student.
-   */
   function applyAttendanceDelta(
     classId: string,
     deltaFor: (student: Student) => { present: number; total: number },
@@ -389,6 +381,7 @@ export default function TeacherAttendancePage() {
           ? c
           : {
               ...c,
+              hasTodaySession: true,
               program: {
                 ...c.program,
                 students: c.program.students.map((s) => {
@@ -408,7 +401,6 @@ export default function TeacherAttendancePage() {
   }
 
   function toggleStudent(studentId: string) {
-    // Deactivated accounts are read-only on the roll (the server rejects them too).
     const target = selectedClass?.program.students.find((s) => s.id === studentId);
     if (target && isAccountInactive(target)) return;
     setPresentStudentIds((current) => {
@@ -419,20 +411,36 @@ export default function TeacherAttendancePage() {
     });
   }
 
+  function markStudentPresent(studentId: string) {
+    const target = selectedClass?.program.students.find((s) => s.id === studentId);
+    if (target && isAccountInactive(target)) return;
+    setPresentStudentIds((current) => {
+      const next = new Set(current);
+      next.add(studentId);
+      return next;
+    });
+  }
+
+  function markStudentAbsent(studentId: string) {
+    setPresentStudentIds((current) => {
+      const next = new Set(current);
+      next.delete(studentId);
+      return next;
+    });
+  }
+
   function selectClass(classId: string) {
     setSelectedClassId(classId);
+    const target = classes.find((c) => c.id === classId);
+    if (target) {
+      setSelectedProgram(target.program.id);
+      setSelectedSemester(String(target.semester));
+    }
     setMessage("");
     setError("");
-    // Restores any attendance already saved today for this class (including
-    // its locked/editable state) so switching classes never loses state.
     void loadExistingSession(classId);
   }
 
-  /**
-   * Picks a SUBJECT from the dropdown and resolves the concrete class slot to
-   * record against: the slot scheduled right now for that subject, else its
-   * first weekly slot. Day/time never appear in the dropdown itself.
-   */
   function selectSubject(subjectKey: string) {
     const [progId, semStr, base] = subjectKey.split("|");
     if (!progId || !semStr || !base) return;
@@ -474,8 +482,18 @@ export default function TeacherAttendancePage() {
     setPresentStudentIds(new Set());
   }
 
-  /** Loads any attendance already saved today for this class so the UI can
-   *  restore its submitted/locked state (server decides editability). */
+  function invertSelection() {
+    if (!selectedClass) return;
+    const activeStudents = selectedClass.program.students.filter((s) => !isAccountInactive(s));
+    setPresentStudentIds((current) => {
+      const next = new Set<string>();
+      for (const s of activeStudents) {
+        if (!current.has(s.id)) next.add(s.id);
+      }
+      return next;
+    });
+  }
+
   async function loadExistingSession(classId: string) {
     const resetToIdle = () => {
       setSessionStatus("idle");
@@ -497,8 +515,6 @@ export default function TeacherAttendancePage() {
       if (data.session) {
         setSubmittedAt(data.session.createdAt ?? null);
         setSessionStatus("submitted");
-        // Drop any PRESENT record belonging to a since-deactivated account so it
-        // can never come back pre-checked.
         const inactiveIds = new Set(
           (classes.find((c) => c.id === classId)?.program.students ?? [])
             .filter(isAccountInactive)
@@ -511,19 +527,15 @@ export default function TeacherAttendancePage() {
             .filter((studentId: string) => !inactiveIds.has(studentId)),
         );
         setPresentStudentIds(marks);
-        // Remember the server's marks as the baseline for the next edit's
-        // meter delta (a PUT shifts PRESENT counts, never session totals).
         savedMarksRef.current = marks;
       } else {
         resetToIdle();
       }
     } catch {
-      /* A failed pre-fetch is non-fatal - the roster still renders empty. */
       resetToIdle();
     }
   }
 
-  /** Submit (first save) or update (edit) today's session for the selected class. */
   async function submitAttendance() {
     if (!selectedClass) return;
     setError("");
@@ -537,7 +549,6 @@ export default function TeacherAttendancePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           classId: selectedClass.id,
-          // Always today — attendance cannot be recorded in advance or retroactively.
           sessionDate: todayISO,
           presentStudentIds: [...presentStudentIds],
         }),
@@ -545,9 +556,6 @@ export default function TeacherAttendancePage() {
       const result = await response.json();
       if (!response.ok) {
         setError(result.error ?? "Unable to submit attendance");
-        // Someone already saved this session (or the window closed): rebuild the
-        // whole UI from the server so the saved marks AND the countdown come
-        // back, instead of just flipping the button label.
         if (result.session || result.locked) {
           await loadExistingSession(selectedClass.id);
         }
@@ -555,10 +563,7 @@ export default function TeacherAttendancePage() {
       }
       setSubmittedAt(result.session?.createdAt ?? new Date().toISOString());
       setSessionStatus("submitted");
-      // Refresh this class's meters locally so the bars move with the save:
-      // a first save adds one session for the whole roster (+1 present for
-      // each mark); an edit only shifts the PRESENT delta, because today's
-      // session was already counted when the sheet was first saved.
+
       if (wasEditing) {
         const previousMarks = savedMarksRef.current;
         applyAttendanceDelta(selectedClass.id, (s) => ({
@@ -592,10 +597,7 @@ export default function TeacherAttendancePage() {
   const absentCount = totalStudents - presentCount;
   const attendanceRate = totalStudents > 0 ? ((presentCount / totalStudents) * 100).toFixed(0) : "0";
 
-  // Sort by roll number, then filter. The API orders students the same way,
-  // but re-sorting here guarantees roll call stays in roll order regardless
-  // of what any endpoint returns: null rolls sort last (matching the API's
-  // `nulls: "last"`), enrollment number breaks ties.
+  // Filter & sort roster
   const filteredStudents = useMemo(() => {
     if (!selectedClass) return [];
     const byRoll = (a: Student, b: Student) => {
@@ -606,19 +608,28 @@ export default function TeacherAttendancePage() {
       }
       return a.enrollmentNumber.localeCompare(b.enrollmentNumber);
     };
-    const roster = selectedClass.program.students;
-    if (!searchQuery.trim()) return [...roster].sort(byRoll);
-    const q = searchQuery.toLowerCase();
-    return roster
-      .filter(
+
+    let roster = selectedClass.program.students;
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      roster = roster.filter(
         (s) =>
           s.user.firstName.toLowerCase().includes(q) ||
           s.user.lastName.toLowerCase().includes(q) ||
           s.enrollmentNumber.toLowerCase().includes(q) ||
           (s.rollNumber != null && String(s.rollNumber).includes(q)),
-      )
-      .sort(byRoll);
-  }, [selectedClass, searchQuery]);
+      );
+    }
+
+    if (statusFilter === "PRESENT") {
+      roster = roster.filter((s) => presentStudentIds.has(s.id));
+    } else if (statusFilter === "ABSENT") {
+      roster = roster.filter((s) => !presentStudentIds.has(s.id));
+    }
+
+    return [...roster].sort(byRoll);
+  }, [selectedClass, searchQuery, statusFilter, presentStudentIds]);
 
   return (
     <TeacherShell
@@ -654,453 +665,629 @@ export default function TeacherAttendancePage() {
         </div>
 
         <TabsContent value="mark" className="space-y-6">
-          {/* Attendance Control Card */}
-          <section className="rounded-xl border bg-card shadow-xs">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 p-5">
+          {/* ── 1. Today's Scheduled Classes (Quick Switcher) ── */}
+          {todaysScheduledClasses.length > 0 && (
+            <section className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <IconCalendarCheck size={16} className="text-primary" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Today&apos;s Routine ({displayDayName}) — Quick Class Switcher
+                  </h3>
+                </div>
+                <span className="text-xs font-semibold text-muted-foreground">
+                  {todaysScheduledClasses.length} lecture{todaysScheduledClasses.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                {todaysScheduledClasses.map((cls) => {
+                  const isSelected = cls.id === selectedClassId;
+                  const isDone = cls.hasTodaySession;
+
+                  return (
+                    <button
+                      key={cls.id}
+                      type="button"
+                      onClick={() => selectClass(cls.id)}
+                      className={`group relative flex flex-col justify-between p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        isSelected
+                          ? "border-primary bg-primary/5 ring-2 ring-primary/20 shadow-xs"
+                          : "border-border/70 bg-card hover:border-primary/40 hover:bg-muted/10"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-foreground">
+                          <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                            {formatTime(cls.startTime)}
+                          </span>
+                          <span className="text-muted-foreground text-[10px]">to {formatTime(cls.endTime)}</span>
+                        </div>
+
+                        {isDone ? (
+                          <Badge
+                            variant="outline"
+                            className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 text-[10px] font-semibold gap-1"
+                          >
+                            <IconCircleCheck size={11} /> Recorded
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30 text-[10px] font-semibold gap-1"
+                          >
+                            <IconClock size={11} /> Pending
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="mt-2 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-[10px] font-bold text-muted-foreground">
+                            {cls.subject.code}
+                          </span>
+                          <h4 className="text-xs font-bold text-foreground truncate group-hover:text-primary transition-colors">
+                            {cls.subject.name}
+                          </h4>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          {cls.program.code} • Sem {cls.semester} ({cls.program.students.length} students)
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* ── 2. Manual Class Selector & Filter Bar ── */}
+          <section className="rounded-xl border border-border/80 bg-card shadow-xs">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 p-4 sm:p-5">
               <div className="flex items-center gap-3">
                 <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <IconCalendarEvent size={18} aria-hidden="true" />
                 </span>
                 <div>
-                  <h2 className="text-sm font-bold text-foreground">Select a Class</h2>
+                  <h2 className="text-sm font-bold text-foreground">Class Selection</h2>
                   <p className="text-xs text-muted-foreground">
-                    Filter by program and semester, then choose the class for today&apos;s roll call.
+                    Filter by program and semester to open any teaching roster.
                   </p>
                 </div>
               </div>
               <span
-                className="inline-flex items-center gap-2 rounded-lg border border-border bg-secondary px-3 py-1.5 text-xs font-semibold text-primary"
-                title="Attendance is recorded for today only — there is no date picker by design"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-1 text-xs font-semibold text-primary"
+                title="Attendance is recorded for today only"
               >
-                <IconCalendarEvent size={15} aria-hidden="true" />
-                Today · {todayLabel}
+                <IconCalendarEvent size={14} aria-hidden="true" />
+                {todayLabel}
               </span>
             </div>
 
-            <div className="grid grid-cols-1 items-end gap-4 p-5 sm:grid-cols-2 lg:grid-cols-[0.9fr_0.9fr_1.7fr_auto]">
-          <div className="grid gap-1.5">
-            <Label htmlFor="att-filter-program">Program</Label>
-            <Select
-              value={selectedProgram}
-              onValueChange={handleProgramChange}
-              disabled={isLoading || availablePrograms.length === 0}
-            >
-              <SelectTrigger id="att-filter-program" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Programs</SelectItem>
-                {availablePrograms.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.code} — {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+            <div className="grid grid-cols-1 items-end gap-3.5 p-4 sm:p-5 sm:grid-cols-2 lg:grid-cols-[0.9fr_0.9fr_1.7fr_auto]">
+              <div className="grid gap-1.5">
+                <Label htmlFor="att-filter-program" className="text-xs font-semibold">Program</Label>
+                <Select
+                  value={selectedProgram}
+                  onValueChange={handleProgramChange}
+                  disabled={isLoading || availablePrograms.length === 0}
+                >
+                  <SelectTrigger id="att-filter-program" className="w-full text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Programs</SelectItem>
+                    {availablePrograms.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.code} — {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="att-filter-semester">Semester</Label>
-            <Select
-              value={selectedSemester}
-              onValueChange={handleSemesterChange}
-              disabled={isLoading || availableSemesters.length === 0}
-            >
-              <SelectTrigger id="att-filter-semester" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Semesters</SelectItem>
-                {availableSemesters.map((s) => (
-                  <SelectItem key={s} value={String(s)}>
-                    Semester {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="att-filter-semester" className="text-xs font-semibold">Semester</Label>
+                <Select
+                  value={selectedSemester}
+                  onValueChange={handleSemesterChange}
+                  disabled={isLoading || availableSemesters.length === 0}
+                >
+                  <SelectTrigger id="att-filter-semester" className="w-full text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Semesters</SelectItem>
+                    {availableSemesters.map((s) => (
+                      <SelectItem key={s} value={String(s)}>
+                        Semester {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="att-filter-subject">Class / Subject</Label>
-            <Select
-              value={selectedSubjectKey || undefined}
-              onValueChange={selectSubject}
-              disabled={isLoading || filteredClasses.length === 0}
-            >
-              <SelectTrigger id="att-filter-subject" className="w-full">
-                <SelectValue placeholder="No matching classes found" />
-              </SelectTrigger>
-              <SelectContent>
-                {subjectOptions.map((opt) => (
-                  <SelectItem key={opt.key} value={opt.key}>
-                    {opt.label}
-                    {opt.hasPractical ? " \u00b7 incl. practical" : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="att-filter-subject" className="text-xs font-semibold">Subject / Roster</Label>
+                <Select
+                  value={selectedSubjectKey || undefined}
+                  onValueChange={selectSubject}
+                  disabled={isLoading || filteredClasses.length === 0}
+                >
+                  <SelectTrigger id="att-filter-subject" className="w-full text-xs">
+                    <SelectValue placeholder="No matching classes found" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subjectOptions.map((opt) => (
+                      <SelectItem key={opt.key} value={opt.key}>
+                        {opt.label}
+                        {opt.hasPractical ? " · practical" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            onClick={resetFilters}
-            disabled={selectedProgram === "ALL" && selectedSemester === "ALL"}
-            title="Reset the program and semester filters"
-          >
-            <IconFilterOff size={15} aria-hidden="true" />
-            </Button>
-            </div>
-          </section>
-
-      {/* Metrics Row */}
-      <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <article className="flex min-w-0 flex-col justify-between rounded-xl border bg-card p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Enrolled
-            </span>
-            <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <IconUsers size={16} aria-hidden="true" />
-            </span>
-          </div>
-          <strong className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            {totalStudents}
-          </strong>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Total in {selectedClass?.program.code ?? "class"}
-          </p>
-        </article>
-
-        <article className="flex min-w-0 flex-col justify-between rounded-xl border bg-card p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Present
-            </span>
-            <span className="flex size-7 items-center justify-center rounded-lg bg-[color-mix(in_oklab,var(--ctp-green)_15%,transparent)] text-(--ctp-green)">
-              <IconCircleCheck size={16} aria-hidden="true" />
-            </span>
-          </div>
-          <strong className="mt-3 text-2xl font-bold tracking-tight text-(--ctp-green) sm:text-3xl">
-            {presentCount}
-          </strong>
-          <p className="mt-0.5 text-xs text-muted-foreground">Marked present</p>
-        </article>
-
-        <article className="flex min-w-0 flex-col justify-between rounded-xl border bg-card p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Absent
-            </span>
-            <span className="flex size-7 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
-              <IconCircleX size={16} aria-hidden="true" />
-            </span>
-          </div>
-          <strong className="mt-3 text-2xl font-bold tracking-tight text-destructive sm:text-3xl">
-            {absentCount}
-          </strong>
-          <p className="mt-0.5 text-xs text-muted-foreground">Absentee students</p>
-        </article>
-
-        <article className="flex min-w-0 flex-col justify-between rounded-xl border bg-card p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Rate
-            </span>
-            <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <IconTrendingUp size={16} aria-hidden="true" />
-            </span>
-          </div>
-          <strong className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            {attendanceRate}%
-          </strong>
-          <p className="mt-0.5 text-xs text-muted-foreground">Current session</p>
-        </article>
-      </section>
-
-      {/* Error & Success Messages */}
-      {error && (
-        <div
-          role="alert"
-          className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive"
-        >
-          <IconAlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
-          <span>{error}</span>
-        </div>
-      )}
-      {message && (
-        <div
-          role="status"
-          className="flex items-start gap-2.5 rounded-xl border border-[color-mix(in_oklab,var(--ctp-green)_30%,transparent)] bg-[color-mix(in_oklab,var(--ctp-green)_12%,transparent)] px-4 py-3 text-sm font-medium text-(--ctp-green)"
-        >
-          <IconCircleCheck size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
-          <span>{message}</span>
-        </div>
-      )}
-
-      {/* Roster & Roll Call Card */}
-      <section className="rounded-xl border bg-card shadow-xs">
-        <div className="flex flex-col gap-3 border-b border-border/70 p-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="text-base font-bold text-foreground">Student Roll Call</h2>
-            <p className="text-xs text-muted-foreground">
-              {selectedClass ? `${selectedClass.subject.code}: ${selectedClass.subject.name}` : "Select a class"}
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
-            <div className="relative w-full sm:w-64">
-              <IconSearch className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" aria-hidden="true" />
-              <Input
-                type="search"
-                placeholder="Search student or roll..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-9 pl-8 text-xs"
-              />
-            </div>
-            <div className="flex items-center gap-2">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={selectAll}
-                disabled={!selectedClass || totalStudents === 0 || isLocked || sessionStatus === "submitted"}
-                className="h-9 gap-1.5 text-xs font-semibold"
+                onClick={resetFilters}
+                disabled={selectedProgram === "ALL" && selectedSemester === "ALL"}
+                title="Reset filters"
+                className="h-9 px-3"
               >
-                <IconCircleCheck size={15} aria-hidden="true" />
-                Mark All Present
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={clearAll}
-                disabled={!selectedClass || totalStudents === 0 || isLocked || sessionStatus === "submitted"}
-                className="h-9 gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
-              >
-                <IconCircleX size={15} aria-hidden="true" />
-                Clear All
+                <IconFilterOff size={15} aria-hidden="true" />
               </Button>
             </div>
-          </div>
-        </div>
+          </section>
 
-        {isLoading ? (
-          <div className="grid gap-2.5 p-5">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between rounded-xl border border-border/60 bg-card p-3 sm:p-4"
-              >
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <Skeleton className="size-10 rounded-full shrink-0" />
-                  <div className="space-y-1.5 min-w-0">
-                    <Skeleton className="h-4 w-36" />
-                    <Skeleton className="h-3 w-24" />
-                  </div>
+          {/* ── 3. Turnout Metrics Summary ── */}
+          <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <article className="flex min-w-0 flex-col justify-between rounded-xl border border-border/70 bg-card p-4 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Enrolled
+                </span>
+                <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <IconUsers size={16} aria-hidden="true" />
+                </span>
+              </div>
+              <strong className="mt-2 text-2xl font-extrabold text-foreground sm:text-3xl">
+                {totalStudents}
+              </strong>
+              <p className="text-[11px] text-muted-foreground">
+                In {selectedClass?.program.code ?? "class"}
+              </p>
+            </article>
+
+            <article className="flex min-w-0 flex-col justify-between rounded-xl border border-border/70 bg-card p-4 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Present
+                </span>
+                <span className="flex size-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  <IconCircleCheck size={16} aria-hidden="true" />
+                </span>
+              </div>
+              <strong className="mt-2 text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 sm:text-3xl">
+                {presentCount}
+              </strong>
+              <p className="text-[11px] text-muted-foreground">Marked present</p>
+            </article>
+
+            <article className="flex min-w-0 flex-col justify-between rounded-xl border border-border/70 bg-card p-4 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Absent
+                </span>
+                <span className="flex size-7 items-center justify-center rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                  <IconCircleX size={16} aria-hidden="true" />
+                </span>
+              </div>
+              <strong className="mt-2 text-2xl font-extrabold text-rose-600 dark:text-rose-400 sm:text-3xl">
+                {absentCount}
+              </strong>
+              <p className="text-[11px] text-muted-foreground">Absentees</p>
+            </article>
+
+            <article className="flex min-w-0 flex-col justify-between rounded-xl border border-border/70 bg-card p-4 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Turnout Rate
+                </span>
+                <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <IconTrendingUp size={16} aria-hidden="true" />
+                </span>
+              </div>
+              <strong className="mt-2 text-2xl font-extrabold text-foreground sm:text-3xl">
+                {attendanceRate}%
+              </strong>
+              <p className="text-[11px] text-muted-foreground">Session turnout</p>
+            </article>
+          </section>
+
+          {/* Error & Success Messages */}
+          {error && (
+            <div
+              role="alert"
+              className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive"
+            >
+              <IconAlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+              <span>{error}</span>
+            </div>
+          )}
+          {message && (
+            <div
+              role="status"
+              className="flex items-start gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm font-medium text-emerald-700 dark:text-emerald-300"
+            >
+              <IconCircleCheck size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+              <span>{message}</span>
+            </div>
+          )}
+
+          {/* ── 4. Student Roll Call & Roster Card ── */}
+          <section className="rounded-xl border border-border/80 bg-card shadow-xs">
+            {/* Header with Title, Search, Status Tabs & Batch Actions */}
+            <div className="flex flex-col gap-3.5 border-b border-border/70 p-4 sm:p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-base font-bold text-foreground">Student Roll Call</h2>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedClass ? `${selectedClass.subject.code}: ${selectedClass.subject.name}` : "Select a class"}
+                  </p>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Skeleton className="h-8 w-20 rounded-lg" />
-                  <Skeleton className="h-8 w-8 rounded-lg" />
+
+                {/* Status Filter Tabs (All / Present / Absent) */}
+                <div className="flex items-center gap-1 p-1 rounded-xl bg-muted/60 border border-border/60 self-start sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("ALL")}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      statusFilter === "ALL"
+                        ? "bg-background text-foreground shadow-2xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    All ({totalStudents})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("PRESENT")}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      statusFilter === "PRESENT"
+                        ? "bg-emerald-600 text-white shadow-2xs"
+                        : "text-emerald-600 dark:text-emerald-400 hover:text-emerald-700"
+                    }`}
+                  >
+                    Present ({presentCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("ABSENT")}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      statusFilter === "ABSENT"
+                        ? "bg-rose-600 text-white shadow-2xs"
+                        : "text-rose-600 dark:text-rose-400 hover:text-rose-700"
+                    }`}
+                  >
+                    Absent ({absentCount})
+                  </button>
                 </div>
               </div>
-            ))}
-          </div>
-        ) : !selectedClass || totalStudents === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 p-16 text-center">
-            <IconUsers className="size-8 text-muted-foreground/60" aria-hidden="true" />
-            <p className="text-sm text-muted-foreground">
-              No enrolled students in this class program yet.
-            </p>
-          </div>
-        ) : filteredStudents.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 p-16 text-center">
-            <IconSearch className="size-8 text-muted-foreground/60" aria-hidden="true" />
-            <p className="text-sm text-muted-foreground">No students matching &quot;{searchQuery}&quot;</p>
-          </div>
-        ) : (
-          <div className="grid gap-2 p-5">
-            {filteredStudents.map((student) => {
-              const isPresent = presentStudentIds.has(student.id);
-              // Deactivated account: still listed on the roll, never markable.
-              const inactive = isAccountInactive(student);
-              // Marks lock as soon as the sheet is submitted. They only unlock
-              // again after "Edit Attendance" flips the session back to "editing",
-              // so a saved sheet can never be silently changed by a stray click.
-              const readOnly = inactive || isLocked || sessionStatus === "submitted";
-              return (
-                <div
-                  key={student.id}
-                  role="button"
-                  tabIndex={readOnly ? -1 : 0}
-                  aria-pressed={isPresent}
-                  onClick={() => {
-                    // Locked sessions and deactivated accounts are both read-only;
-                    // the server rejects edits to either.
-                    if (readOnly) return;
-                    toggleStudent(student.id);
-                  }}
-                  onKeyDown={(e) => {
-                    if (readOnly) return;
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      toggleStudent(student.id);
-                    }
-                  }}
-                  className={`flex min-h-16 items-stretch justify-between gap-4 overflow-hidden rounded-xl border transition-colors ${
-                    isPresent
-                      ? "border-[color-mix(in_oklab,var(--ctp-green)_35%,transparent)] bg-[color-mix(in_oklab,var(--ctp-green)_8%,transparent)]"
-                      : "border-border bg-card"
-                  } ${inactive ? "opacity-50" : ""} ${readOnly ? "" : "cursor-pointer hover:bg-muted/40"}`}
-                >
-                  {/* Left group stretches to the row's full height so the roll
-                      tile reads as a flush-left gutter: no padding around it,
-                      square right edge, left corners inherited from the row's
-                      rounded-xl + overflow-hidden clipping. */}
-                  <div className="flex min-w-0 items-stretch gap-3.5">
-                    {/* Roll number leads the row — teachers mark attendance by
-                        roll, so it's the primary scan target. Zero-padded so
-                        digits stay aligned down the list; the present state is
-                        carried by the green tint + checkbox, not a badge. */}
-                    <span
-                      className={`flex w-16 shrink-0 items-center justify-center border-r text-2xl font-extrabold tabular-nums ${
-                        isPresent
-                          ? "border-[color-mix(in_oklab,var(--ctp-green)_30%,transparent)] bg-[color-mix(in_oklab,var(--ctp-green)_16%,transparent)] text-(--ctp-green)"
-                          : "border-border bg-muted text-foreground"
-                      }`}
-                    >
-                      {student.rollNumber != null
-                        ? String(student.rollNumber).padStart(2, "0")
-                        : "—"}
-                    </span>
-                    <div className="flex min-w-0 items-center">
-                      {/* Profile photo when one is set, tinted initials as the
-                          fallback — same rounded-lg avatar as the records
-                          table. The after: override squares the component's
-                          hairline ring to the box. */}
-                      <Avatar className="size-10 rounded-lg after:rounded-lg">
-                        {student.profileImageUrl ? (
-                          // Decorative: the student's name sits right next to
-                          // the avatar, so a duplicate alt would only add
-                          // screen-reader noise.
-                          <AvatarImage
-                            src={student.profileImageUrl}
-                            alt=""
-                            className="rounded-lg object-cover"
-                          />
-                        ) : null}
-                        <AvatarFallback
-                          className={`rounded-lg text-sm font-bold ${
-                            isPresent
-                              ? "bg-[color-mix(in_oklab,var(--ctp-green)_16%,transparent)] text-(--ctp-green)"
-                              : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          {student.user.firstName[0]}
-                          {student.user.lastName[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                      <p className="ml-3.5 min-w-0 truncate text-sm font-semibold text-foreground">
-                        {student.user.firstName} {student.user.lastName}
-                      </p>
+
+              {/* Search & Batch Tools */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                <div className="relative w-full sm:w-72">
+                  <IconSearch className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" aria-hidden="true" />
+                  <Input
+                    type="search"
+                    placeholder="Search student by name or roll..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="h-9 pl-8 text-xs"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={selectAll}
+                    disabled={!selectedClass || totalStudents === 0 || isLocked || sessionStatus === "submitted"}
+                    className="h-8 gap-1.5 text-xs font-semibold"
+                  >
+                    <IconCircleCheck size={14} className="text-emerald-600" aria-hidden="true" />
+                    Mark All Present
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={invertSelection}
+                    disabled={!selectedClass || totalStudents === 0 || isLocked || sessionStatus === "submitted"}
+                    className="h-8 gap-1.5 text-xs font-semibold"
+                    title="Invert present/absent selections"
+                  >
+                    <IconArrowsShuffle size={14} aria-hidden="true" />
+                    Invert
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearAll}
+                    disabled={!selectedClass || totalStudents === 0 || isLocked || sessionStatus === "submitted"}
+                    className="h-8 gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
+                  >
+                    <IconCircleX size={14} aria-hidden="true" />
+                    Clear All
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Student Roll Rows */}
+            {isLoading ? (
+              <div className="grid gap-2.5 p-4 sm:p-5">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div
+                    key={i}
+                    className="flex flex-row items-stretch overflow-hidden rounded-xl border border-border/60 bg-card min-h-[4.5rem]"
+                  >
+                    <Skeleton className="w-16 sm:w-20 shrink-0 rounded-none border-r border-border/60" />
+                    <div className="flex flex-1 flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:px-4 sm:py-3 gap-3">
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <Skeleton className="size-11 rounded-xl shrink-0" />
+                        <div className="space-y-1.5 min-w-0">
+                          <Skeleton className="h-4 w-36" />
+                          <Skeleton className="h-3 w-24" />
+                        </div>
+                      </div>
+                      <Skeleton className="h-9 w-32 rounded-xl" />
                     </div>
                   </div>
-
-                  {/* Right cluster: the fixed-width meter sits close to the
-                      checkbox (shared gap) so every row's bar has the same
-                      length — the name absorbs the remaining slack. */}
-                  <div className="flex shrink-0 items-center gap-30 pr-6">
-                    <AttendanceMeter
-                      present={student.attendance.present}
-                      total={student.attendance.total}
-                    />
-                    {inactive && (
-                      <span
-                        className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-bold tracking-wide text-muted-foreground"
-                        title="This student's account was deactivated by an admin — they cannot be marked present"
-                      >
-                        INACTIVE
-                      </span>
-                    )}
-                    <Checkbox
-                      checked={isPresent}
-                      disabled={readOnly}
-                      onCheckedChange={() => toggleStudent(student.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      aria-label={`Mark ${student.user.firstName} ${student.user.lastName} ${isPresent ? "absent" : "present"}`}
-                      // Bigger box (28px) with the app's rounded-lg radius.
-                      // The `!` flags outrank data-checked:bg-primary AND
-                      // dark:data-checked:bg-primary — the class merger keeps
-                      // that one because its modifiers differ — so a checked
-                      // box is always catppuccin green, never the default blue.
-                      // The indicator's built-in icon size ([&>svg]:size-3.5)
-                      // has equal specificity to a plain [&_svg] override, so
-                      // the winner would depend on stylesheet order. Target the
-                      // indicator explicitly to keep the 20px checkmark.
-                      className="size-7! cursor-pointer rounded-lg! data-checked:border-(--ctp-green)! data-checked:bg-(--ctp-green)! [&_[data-slot=checkbox-indicator]>svg]:size-5"
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Submit Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 p-5">
-          <span className="text-xs text-muted-foreground">
-            Unchecked students are marked Absent automatically.
-            {!isLocked && sessionStatus !== "idle" && editWindowEndsAt && remainingLabel && (
-              <>
-                {" "}· Editable for <strong className="font-semibold text-foreground">{remainingLabel}</strong> remaining (until{" "}
-                <strong className="font-semibold text-foreground">
-                  {editWindowEndsAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </strong>
-                )
-              </>
-            )}
-          </span>
-          <Button
-            type="button"
-            variant={isLocked ? "secondary" : "default"}
-            size="lg"
-            className="gap-2 px-6 font-semibold shadow-sm"
-            onClick={() => {
-              // First press after a submission switches into edit mode; the
-              // next press actually updates the session on the server.
-              if (sessionStatus === "submitted" && !isLocked) {
-                setSessionStatus("editing");
-                setMessage("");
-                return;
-              }
-              void submitAttendance();
-            }}
-            disabled={!selectedClass || isSubmitting || totalStudents === 0 || isLocked}
-          >
-            {isLocked ? (
-              <>
-                <IconLock size={16} aria-hidden="true" />
-                Locked
-                {submittedAt
-                  ? ` · Saved ${new Date(submittedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                  : ""}
-              </>
-            ) : sessionStatus === "editing" ? (
-              isSubmitting ? "Updating Session…" : "Update Attendance"
-            ) : sessionStatus === "submitted" ? (
-              <>
-                <IconPencil size={16} aria-hidden="true" />
-                Edit Attendance
-              </>
-            ) : isSubmitting ? (
-              "Submitting Session…"
+                ))}
+              </div>
+            ) : !selectedClass || totalStudents === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-2 p-14 text-center">
+                <IconUsers className="size-8 text-muted-foreground/60" aria-hidden="true" />
+                <p className="text-sm font-semibold text-foreground">No students in this class program</p>
+                <p className="text-xs text-muted-foreground">Select another program or semester above.</p>
+              </div>
+            ) : filteredStudents.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-2 p-14 text-center">
+                <IconSearch className="size-8 text-muted-foreground/60" aria-hidden="true" />
+                <p className="text-sm font-semibold text-foreground">No matching students</p>
+                <p className="text-xs text-muted-foreground">Try clearing your search query or status filter.</p>
+              </div>
             ) : (
-              `Save Attendance (${presentCount} Present)`
+              <div className="grid gap-2.5 p-4 sm:p-5">
+                {filteredStudents.map((student) => {
+                  const isPresent = presentStudentIds.has(student.id);
+                  const inactive = isAccountInactive(student);
+                  const readOnly = inactive || isLocked || sessionStatus === "submitted";
+                  const studentAttendanceRate =
+                    student.attendance.total > 0
+                      ? Math.round((student.attendance.present / student.attendance.total) * 100)
+                      : 100;
+
+                  return (
+                    <div
+                      key={student.id}
+                      role="button"
+                      tabIndex={readOnly ? -1 : 0}
+                      aria-pressed={isPresent}
+                      onClick={() => {
+                        if (readOnly) return;
+                        toggleStudent(student.id);
+                      }}
+                      onKeyDown={(e) => {
+                        if (readOnly) return;
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          toggleStudent(student.id);
+                        }
+                      }}
+                      className={`group flex flex-row items-stretch overflow-hidden rounded-xl border transition-all min-h-[4.5rem] sm:min-h-[4.75rem] ${
+                        isPresent
+                          ? "border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-500/10"
+                          : "border-border/70 bg-card hover:border-border hover:bg-muted/15"
+                      } ${inactive ? "opacity-60" : ""} ${readOnly ? "" : "cursor-pointer hover:shadow-2xs"}`}
+                    >
+                      {/* Left: Flush Tiling Roll Number Gutter */}
+                      <div
+                        className={`flex w-16 sm:w-20 shrink-0 self-stretch items-center justify-center border-r font-mono text-2xl sm:text-3xl font-black tabular-nums transition-colors select-none ${
+                          isPresent
+                            ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                            : "border-border/70 bg-muted/60 text-foreground"
+                        }`}
+                      >
+                        {student.rollNumber != null ? String(student.rollNumber).padStart(2, "0") : "—"}
+                      </div>
+
+                      {/* Main Body: Avatar, Info, Progress & Action Controls */}
+                      <div className="flex flex-1 flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:px-4 sm:py-3 min-w-0">
+                        {/* Student Avatar & Identity */}
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <Avatar className="size-11 rounded-xl shrink-0">
+                            {student.profileImageUrl ? (
+                              <AvatarImage src={student.profileImageUrl} alt="" className="object-cover" />
+                            ) : null}
+                            <AvatarFallback className="rounded-xl text-xs sm:text-sm font-bold">
+                              {student.user.firstName[0]}
+                              {student.user.lastName[0]}
+                            </AvatarFallback>
+                          </Avatar>
+
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-sm sm:text-base text-foreground truncate">
+                                {student.user.firstName} {student.user.lastName}
+                              </span>
+                              {inactive && (
+                                <Badge variant="outline" className="text-[10px] bg-muted text-muted-foreground">
+                                  Inactive
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                              <span className="font-mono">{student.enrollmentNumber}</span>
+                              <span className="lg:hidden font-medium">
+                                · {student.attendance.present}/{student.attendance.total} ({studentAttendanceRate}%)
+                              </span>
+                              {studentAttendanceRate < 75 && (
+                                <span className="text-amber-600 dark:text-amber-400 font-semibold text-[11px]">
+                                  · At-Risk (&lt;75%)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right: Cumulative Attendance Meter + Dual [P] / [A] Action Buttons */}
+                        <div className="flex items-center justify-between sm:justify-end gap-5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50">
+                          {/* Subject Attendance Meter */}
+                          <div className="hidden lg:flex items-center shrink-0">
+                            <AttendanceMeter
+                              present={student.attendance.present}
+                              total={student.attendance.total}
+                            />
+                          </div>
+
+                          {/* Dual Toggle Pill Buttons */}
+                          <div
+                            className="flex items-center gap-1 p-1 rounded-xl bg-muted/60 border border-border/60"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              disabled={readOnly}
+                              onClick={() => markStudentPresent(student.id)}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                isPresent
+                                  ? "bg-emerald-600 text-white shadow-xs"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-background/80"
+                              } ${readOnly ? "cursor-not-allowed opacity-70" : ""}`}
+                            >
+                              <IconCircleCheck size={15} />
+                              <span>Present</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={readOnly}
+                              onClick={() => markStudentAbsent(student.id)}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                !isPresent && !inactive
+                                  ? "bg-rose-600 text-white shadow-xs"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-background/80"
+                              } ${readOnly ? "cursor-not-allowed opacity-70" : ""}`}
+                            >
+                              <IconCircleX size={15} />
+                              <span>Absent</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
-          </Button>
-        </div>
-      </section>
+          </section>
+
+          {/* ── 5. Sticky Floating Action & Submit Bar ── */}
+          <div className="sticky bottom-4 z-20 mx-auto w-full rounded-2xl border border-border/80 bg-background/95 backdrop-blur-md p-4 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {/* Left: Live Summary & Edit Window Countdown */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-sm text-foreground">
+                    {presentCount} <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-xs">Present</span>
+                  </span>
+                  <span className="text-muted-foreground">•</span>
+                  <span className="font-bold text-sm text-foreground">
+                    {absentCount} <span className="text-rose-600 dark:text-rose-400 font-semibold text-xs">Absent</span>
+                  </span>
+                  <span className="text-muted-foreground">•</span>
+                  <span className="font-semibold text-muted-foreground">
+                    {attendanceRate}% Turnout
+                  </span>
+                </div>
+
+                {!isLocked && sessionStatus !== "idle" && editWindowEndsAt && remainingLabel && (
+                  <Badge
+                    variant="outline"
+                    className="border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200 gap-1 text-[11px] font-semibold py-0.5"
+                  >
+                    <IconClock size={12} />
+                    Editable for {remainingLabel}
+                  </Badge>
+                )}
+              </div>
+
+              {/* Right: Actions */}
+              <div className="flex items-center gap-2.5 self-end sm:self-center">
+                {sessionStatus === "idle" && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={selectAll}
+                    disabled={!selectedClass || totalStudents === 0}
+                    className="text-xs h-9 font-semibold hidden sm:inline-flex"
+                  >
+                    Mark All Present
+                  </Button>
+                )}
+
+                <Button
+                  type="button"
+                  variant={isLocked ? "secondary" : "default"}
+                  size="sm"
+                  className="h-9 px-5 text-xs font-bold gap-1.5 shadow-sm"
+                  onClick={() => {
+                    if (sessionStatus === "submitted" && !isLocked) {
+                      setSessionStatus("editing");
+                      setMessage("");
+                      return;
+                    }
+                    void submitAttendance();
+                  }}
+                  disabled={!selectedClass || isSubmitting || totalStudents === 0 || isLocked}
+                >
+                  {isLocked ? (
+                    <>
+                      <IconLock size={15} />
+                      Locked
+                      {submittedAt
+                        ? ` · Saved ${new Date(submittedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                        : ""}
+                    </>
+                  ) : sessionStatus === "editing" ? (
+                    isSubmitting ? "Updating Session…" : "Update Attendance"
+                  ) : sessionStatus === "submitted" ? (
+                    <>
+                      <IconPencil size={15} />
+                      Edit Attendance
+                    </>
+                  ) : isSubmitting ? (
+                    "Submitting Session…"
+                  ) : (
+                    <>
+                      <IconCircleCheck size={16} />
+                      Save Attendance ({presentCount} Present)
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="records" className="space-y-6">

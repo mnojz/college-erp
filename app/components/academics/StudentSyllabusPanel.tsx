@@ -2,29 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  IconDownload,
-  IconEye,
-  IconFileDescription,
-  IconFileText,
-  IconFilter,
-  IconSearch,
-  IconSparkles,
-} from "@tabler/icons-react";
-import { formatBytes, resolveTitle, type ProgramsMeta, type SyllabusDto } from "@/app/lib/syllabi-shared";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useSyllabusProgramGroups } from "@/app/components/syllabi/SyllabusGroupedList";
+import { SyllabusProgramSections } from "@/app/components/syllabi/SyllabusProgramSections";
 import { SyllabusPreviewModal } from "@/app/components/syllabi/SyllabusPreviewModal";
+import { type ProgramsMeta, type SyllabusDto } from "@/app/lib/syllabi-shared";
+import { Skeleton } from "@/components/ui/skeleton";
+import { IconFileDescription } from "@tabler/icons-react";
 
 type Profile = {
   enrollmentNumber: string;
@@ -58,13 +41,6 @@ export function StudentSyllabusPanel({ initialProfile }: Props) {
   const [error, setError] = useState("");
   const [previewSyllabus, setPreviewSyllabus] = useState<SyllabusDto | null>(null);
 
-  // Filters
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedProgramId, setSelectedProgramId] = useState<string>(
-    initialProfile?.program?.id ?? "ALL"
-  );
-  const [semesterFilter, setSemesterFilter] = useState<"ALL" | number>("ALL");
-
   useEffect(() => {
     async function load() {
       try {
@@ -83,9 +59,6 @@ export function StudentSyllabusPanel({ initialProfile }: Props) {
           if (profileRes.ok) {
             const profileData = await profileRes.json();
             setProfile(profileData.student);
-            if (profileData.student?.program?.id) {
-              setSelectedProgramId(profileData.student.program.id);
-            }
           }
         }
 
@@ -110,337 +83,77 @@ export function StudentSyllabusPanel({ initialProfile }: Props) {
     load();
   }, [router, initialProfile]);
 
-  // Filtered syllabus records
-  const filteredSyllabi = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
-    return syllabi.filter((s) => {
-      // Program filter
-      if (selectedProgramId !== "ALL" && s.programId !== selectedProgramId) {
-        return false;
-      }
-      // Semester filter
-      if (semesterFilter !== "ALL" && s.semester !== semesterFilter) {
-        return false;
-      }
-      // Search query
-      if (q) {
-        const haystack = `${s.title ?? ""} ${s.fileName} ${s.departmentName} ${s.programCode ?? ""} ${s.programName ?? ""}`.toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
-      return true;
+  const rawGroups = useSyllabusProgramGroups(syllabi, meta.programs);
+
+  const myProgramId = profile?.program?.id;
+
+  // If student is enrolled in a program, prioritize that program at the top
+  const groups = useMemo(() => {
+    if (!myProgramId) return rawGroups;
+    return [...rawGroups].sort((a, b) => {
+      const aIsMine = a.program?.id === myProgramId;
+      const bIsMine = b.program?.id === myProgramId;
+      if (aIsMine && !bIsMine) return -1;
+      if (!aIsMine && bIsMine) return 1;
+      return 0;
     });
-  }, [syllabi, selectedProgramId, semesterFilter, searchQuery]);
-
-  // Current semester syllabus documents spotlight
-  const currentSemesterSyllabi = useMemo(() => {
-    if (!profile?.currentSemester) return [];
-    const myProgId = profile.program?.id;
-    return syllabi.filter(
-      (s) =>
-        (myProgId ? s.programId === myProgId : true) &&
-        s.semester === profile.currentSemester
-    );
-  }, [syllabi, profile]);
-
-  // Group filtered syllabi by semester (1 to 8)
-  const groupedBySemester = useMemo(() => {
-    const map = new Map<number, SyllabusDto[]>();
-    for (const item of filteredSyllabi) {
-      const sem = item.semester;
-      const list = map.get(sem) ?? [];
-      list.push(item);
-      map.set(sem, list);
-    }
-    return Array.from(map.entries()).sort(([a], [b]) => a - b);
-  }, [filteredSyllabi]);
+  }, [rawGroups, myProgramId]);
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-28 w-full rounded-2xl" />
-        <Skeleton className="h-10 w-full rounded-xl" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Skeleton className="h-40 w-full rounded-xl" />
-          <Skeleton className="h-40 w-full rounded-xl" />
+      <div className="space-y-6">
+        <div className="rounded-xl border border-border/70 bg-card overflow-hidden">
+          <div className="border-b bg-muted/20 p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Skeleton className="size-10 rounded-xl" />
+              <div className="space-y-1.5">
+                <Skeleton className="h-5 w-44" />
+                <Skeleton className="h-3.5 w-28" />
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 p-5">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+              <div key={s} className="rounded-xl border border-dashed border-border/70 p-3 space-y-3">
+                <div className="flex justify-between">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-12" />
+                </div>
+                <Skeleton className="h-16 w-full rounded-lg" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
   }
 
-  const isFilteredToMyProgram =
-    profile?.program?.id && selectedProgramId === profile.program.id;
-
   return (
-    <div className="space-y-4">
-      {/* ── Featured Spotlight: Current Semester Syllabus ── */}
-      {currentSemesterSyllabi.length > 0 && (
-        <Card className="rounded-2xl border border-primary/40 shadow-xs bg-linear-to-r from-primary/10 via-primary/5 to-background p-4 sm:p-5 overflow-hidden">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="flex size-6 items-center justify-center rounded-md bg-primary/20 text-primary">
-                  <IconSparkles size={14} />
-                </span>
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Current Academic Focus
-                </span>
-              </div>
-              <h2 className="mt-1 text-base sm:text-lg font-bold tracking-tight text-foreground">
-                Semester {profile?.currentSemester} Official Syllabus
-              </h2>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Official curriculum guideline and evaluation scheme for your current semester.
-              </p>
-            </div>
-
-            {/* Quick Action Buttons for Spotlight Documents */}
-            <div className="flex flex-wrap items-center gap-2">
-              {currentSemesterSyllabi.map((s) => (
-                <div key={s.id} className="flex items-center gap-1.5">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => setPreviewSyllabus(s)}
-                    className="h-8 text-xs font-semibold px-3 gap-1.5 shadow-xs"
-                  >
-                    <IconEye size={14} />
-                    Preview PDF
-                  </Button>
-                  <Button
-                    asChild
-                    variant="outline"
-                    size="sm"
-                    className="h-8 text-xs font-semibold px-2.5 gap-1.5"
-                  >
-                    <a href={`/api/syllabus/${s.id}/file`} download>
-                      <IconDownload size={14} />
-                      Download
-                    </a>
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* ── Filter Toolbar ── */}
-      <Card className="p-3 sm:p-3.5 rounded-xl border border-border/70 shadow-xs bg-card">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-          {/* Search Box */}
-          <div className="relative flex-1 min-w-48">
-            <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-            <Input
-              placeholder="Search syllabus by title, course, or department..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 text-xs h-8.5"
-            />
-          </div>
-
-          {/* Program Select Filter */}
-          <div className="flex items-center gap-2">
-            <Select value={selectedProgramId} onValueChange={setSelectedProgramId}>
-              <SelectTrigger className="w-full sm:w-64 h-8.5 text-xs font-medium">
-                <IconFilter size={13} className="text-muted-foreground mr-1 shrink-0" />
-                <SelectValue placeholder="All Programs" />
-              </SelectTrigger>
-              <SelectContent>
-                {profile?.program && (
-                  <SelectItem value={profile.program.id} className="text-xs font-bold text-primary">
-                    My Program ({profile.program.code})
-                  </SelectItem>
-                )}
-                <SelectItem value="ALL" className="text-xs">
-                  All College Programs
-                </SelectItem>
-                {meta.programs.map((p) => (
-                  <SelectItem key={p.id} value={p.id} className="text-xs">
-                    {p.name} ({p.code})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Quick My Program Reset Pill if switched */}
-            {profile?.program && !isFilteredToMyProgram && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8.5 text-xs font-semibold px-2 shrink-0"
-                onClick={() => setSelectedProgramId(profile.program!.id)}
-              >
-                Reset to My Program
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Semester Filter Pills */}
-        <div className="mt-3 pt-2.5 border-t border-border/50 flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] font-semibold text-muted-foreground mr-1">Semester:</span>
-          <button
-            type="button"
-            onClick={() => setSemesterFilter("ALL")}
-            className={`px-2.5 py-0.5 text-xs font-semibold rounded-md transition-colors ${
-              semesterFilter === "ALL"
-                ? "bg-primary text-primary-foreground shadow-xs"
-                : "bg-muted/50 text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            All
-          </button>
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => {
-            const isCurrent = profile?.currentSemester === sem;
-            return (
-              <button
-                key={sem}
-                type="button"
-                onClick={() => setSemesterFilter(sem)}
-                className={`px-2.5 py-0.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1 ${
-                  semesterFilter === sem
-                    ? "bg-primary text-primary-foreground shadow-xs"
-                    : isCurrent
-                    ? "bg-primary/10 text-primary border border-primary/30"
-                    : "bg-muted/50 text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Sem {sem}
-                {isCurrent && <span className="text-[10px]">★</span>}
-              </button>
-            );
-          })}
-        </div>
-      </Card>
-
-      {/* Error Message */}
+    <div className="space-y-6">
       {error && (
-        <p className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive font-medium">
+        <p className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
           {error}
         </p>
       )}
 
-      {/* ── Grouped Syllabus Cards ── */}
-      {groupedBySemester.length === 0 ? (
-        <Card className="rounded-xl border-dashed p-10 text-center bg-card/60">
-          <IconFileDescription className="size-8 text-muted-foreground/40 mx-auto" />
-          <h3 className="mt-2 text-sm font-semibold text-foreground">No syllabus documents found</h3>
-          <p className="text-xs text-muted-foreground mt-1">
-            No files match your selected filters. Try clearing your search query or selecting a different program.
-          </p>
-          {(searchQuery || semesterFilter !== "ALL" || selectedProgramId !== (profile?.program?.id ?? "ALL")) && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-3 text-xs font-medium"
-              onClick={() => {
-                setSearchQuery("");
-                setSemesterFilter("ALL");
-                setSelectedProgramId(profile?.program?.id ?? "ALL");
-              }}
-            >
-              Reset Filters
-            </Button>
-          )}
-        </Card>
+      {syllabi.length > 0 ? (
+        <SyllabusProgramSections
+          variant="public"
+          groups={groups}
+          onPreview={(s) => setPreviewSyllabus(s)}
+        />
       ) : (
-        <div className="space-y-4">
-          {groupedBySemester.map(([semesterNo, docs]) => {
-            const isCurrentSem = profile?.currentSemester === semesterNo;
-
-            return (
-              <div key={semesterNo} className="space-y-2.5">
-                {/* Semester Header */}
-                <div className="flex items-center gap-2">
-                  <span className="flex size-5 items-center justify-center rounded-md bg-primary/10 text-primary text-xs font-bold">
-                    {semesterNo}
-                  </span>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                    Semester {semesterNo} Curriculum
-                  </h3>
-                  {isCurrentSem && (
-                    <Badge
-                      variant="outline"
-                      className="text-[10px] font-bold px-1.5 py-0 bg-primary/10 text-primary border-primary/30"
-                    >
-                      Your Current Semester
-                    </Badge>
-                  )}
-                  <span className="text-xs text-muted-foreground">({docs.length} file{docs.length > 1 ? "s" : ""})</span>
-                  <div className="h-px flex-1 bg-border/60 ml-2" />
-                </div>
-
-                {/* Cards for Documents in this Semester */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {docs.map((doc) => (
-                    <Card
-                      key={doc.id}
-                      className="rounded-xl border border-border/70 p-3.5 shadow-xs bg-card hover:border-primary/40 transition-colors flex flex-col justify-between"
-                    >
-                      <div>
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="flex size-7 items-center justify-center rounded-lg bg-red-500/10 text-red-600 dark:text-red-400">
-                              <IconFileText size={16} />
-                            </span>
-                            <div className="min-w-0">
-                              <Badge variant="outline" className="text-[10px] font-bold px-1.5 py-0 bg-muted/50">
-                                {doc.programCode ?? "ALL"}
-                              </Badge>
-                            </div>
-                          </div>
-                          <span className="font-mono text-[11px] text-muted-foreground font-semibold">
-                            {formatBytes(doc.fileSize)}
-                          </span>
-                        </div>
-
-                        <h4
-                          className="mt-2 text-xs sm:text-sm font-bold text-foreground line-clamp-1"
-                          title={resolveTitle(doc)}
-                        >
-                          {resolveTitle(doc)}
-                        </h4>
-                        <p className="mt-0.5 text-[11px] text-muted-foreground truncate" title={doc.fileName}>
-                          {doc.fileName}
-                        </p>
-                      </div>
-
-                      {/* Action Bar */}
-                      <div className="mt-3 pt-2.5 border-t border-border/50 flex items-center justify-between gap-2">
-                        <span className="text-[10px] text-muted-foreground">
-                          {doc.departmentName || "Academic Syllabus"}
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setPreviewSyllabus(doc)}
-                            className="h-7 text-xs font-semibold px-2 hover:bg-muted"
-                          >
-                            <IconEye size={13} className="mr-1" />
-                            Preview
-                          </Button>
-                          <Button
-                            asChild
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs font-semibold px-2"
-                          >
-                            <a href={`/api/syllabus/${doc.id}/file`} download>
-                              <IconDownload size={13} className="mr-1 text-primary" />
-                              Download
-                            </a>
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        !error && (
+          <div className="rounded-2xl border border-dashed bg-card/60 p-12 text-center space-y-3">
+            <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+              <IconFileDescription size={24} />
+            </div>
+            <h3 className="text-base font-semibold text-foreground">No syllabus found</h3>
+            <p className="mx-auto max-w-sm text-xs sm:text-sm text-muted-foreground">
+              No syllabus files are currently available for your academic program.
+            </p>
+          </div>
+        )
       )}
 
       {/* On-Page PDF Preview Modal */}

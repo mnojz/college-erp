@@ -11,7 +11,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { IconCamera, IconLoader2 } from "@tabler/icons-react";
+import { IconCamera, IconLoader2, IconZoomIn } from "@tabler/icons-react";
+import { ProfileImagePreviewModal } from "@/app/components/profile/ProfileImagePreviewModal";
 import {
   BLUR_MIN_VARIANCE,
   checkPassportFace,
@@ -44,6 +45,7 @@ export function ProfilePictureUpload({ currentAvatarUrl, avatarPending, avatarRe
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState<string | null>(null);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   /** Read a chosen file into a data-URL and open the crop dialog. */
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -122,12 +124,23 @@ export function ProfilePictureUpload({ currentAvatarUrl, avatarPending, avatarRe
       </CardHeader>
       <CardContent className="flex flex-wrap items-center gap-4">
         {currentAvatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={currentAvatarUrl}
-            alt="Current profile photo"
-            className="size-20 rounded-xl border object-cover"
-          />
+          <button
+            type="button"
+            onClick={() => setShowPreview(true)}
+            className="group relative size-20 rounded-xl border border-border/80 overflow-hidden cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-transform duration-200 hover:scale-[1.03] shadow-xs"
+            title="Click to view full photo"
+            aria-label="View enlarged profile photo"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={currentAvatarUrl}
+              alt="Current profile photo"
+              className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center text-white backdrop-blur-[1px]">
+              <IconZoomIn className="size-5 drop-shadow-md" aria-hidden="true" />
+            </div>
+          </button>
         ) : (
           <span
             className="flex size-20 items-center justify-center rounded-xl border bg-primary/10 text-sm font-semibold text-primary"
@@ -175,6 +188,13 @@ export function ProfilePictureUpload({ currentAvatarUrl, avatarPending, avatarRe
         src={cropSrc}
         onCancel={() => setCropSrc(null)}
         onConfirm={(url) => void handleCropConfirm(url)}
+      />
+      <ProfileImagePreviewModal
+        open={showPreview}
+        onOpenChange={setShowPreview}
+        imageUrl={currentAvatarUrl}
+        name="Profile Photo"
+        subtitle="Current active profile photo"
       />
     </Card>
   );

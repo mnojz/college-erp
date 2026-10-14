@@ -1,30 +1,66 @@
 "use client";
-import { Button } from "@/components/ui/button";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
+import { Avatar } from "@/app/components/profile/Avatar";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MetricGridSkeleton, SectionSkeleton } from "@/app/components/layout/PageSkeletons";
 import { formatTime } from "@/app/lib/timetable-layout";
-import { campusDayOfWeek } from "@/app/lib/campus-time";
-import { Badge } from "@/components/ui/badge";
+import { campusDayOfWeek, campusMinutesOfDay } from "@/app/lib/campus-time";
 import {
+  NoticeDetailData,
+  NoticeDetailModal,
+} from "@/app/components/common/NoticeDetailModal";
+import {
+  IconAlertCircle,
   IconArrowRight,
-  IconBook,
+  IconBell,
+  IconBook2,
+  IconCalendar,
   IconCalendarCheck,
+  IconCalendarClock,
+  IconCalendarEvent,
+  IconChevronRight,
+  IconClipboardCheck,
   IconFileDescription,
   IconHierarchy2,
-  IconReceipt,
-  IconReportAnalytics,
-  IconUser,
+  IconId,
+  IconMail,
+  IconPaperclip,
+  IconSchool,
+  IconUpload,
+  IconUsersGroup,
+  IconZoomIn,
 } from "@tabler/icons-react";
+import { ProfileImagePreviewModal } from "@/app/components/profile/ProfileImagePreviewModal";
+
+type TeacherClass = {
+  id: string;
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  subject: { id: string; name: string; code: string };
+  program: {
+    id: string;
+    name: string;
+    code: string;
+    departmentName: string;
+    students: Array<{ id: string }>;
+  };
+  semester: number;
+  _count: { sessions: number };
+};
 
 type TeacherData = {
   id: string;
   employeeNo: string;
   profileImageUrl: string | null;
+  office: string | null;
   user: {
     id: string;
     email: string;
@@ -32,94 +68,176 @@ type TeacherData = {
     lastName: string;
     status: string;
   };
-  classes: Array<{
-    id: string;
-    dayOfWeek: string;
-    startTime: string;
-    endTime: string;
-    subject: { id: string; name: string; code: string };
-    program: {
-      id: string;
-      name: string;
-      code: string;
-      departmentName: string;
-      students: Array<{ id: string }>;
-    };
-    semester: number;
-    _count: { sessions: number };
-  }>;
+  classes: TeacherClass[];
 };
 
+type AnnouncementItem = {
+  id: string;
+  title: string;
+  body: string;
+  publishedAt: string | null;
+  createdAt: string;
+  author: { firstName: string; lastName: string } | null;
+  subject: { id: string; name: string; code: string } | null;
+  program: { id: string; name: string; code: string } | null;
+  semester: number | null;
+  attachmentFileName: string | null;
+  attachmentMimeType: string | null;
+  attachmentSize: number | null;
+};
 
+type ExamSubjectItem = {
+  examSubjectId: string;
+  sessionId: string;
+  part: string;
+  maxMarks: number;
+  subject: { id: string; code: string; name: string };
+  session: {
+    id: string;
+    title: string;
+    type: string;
+    status: string;
+    semester: number;
+    program: { name: string; code: string };
+  };
+  markCount: number;
+  registeredCount: number;
+};
+
+const DAYS_OF_WEEK = [
+  { key: "MONDAY", label: "Mon" },
+  { key: "TUESDAY", label: "Tue" },
+  { key: "WEDNESDAY", label: "Wed" },
+  { key: "THURSDAY", label: "Thu" },
+  { key: "FRIDAY", label: "Fri" },
+  { key: "SATURDAY", label: "Sat" },
+] as const;
+
+function getGreeting(hour: number) {
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+function formatNoticeDate(iso: string | null) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  } catch {
+    return "";
+  }
+}
 
 export default function TeacherOverviewPage() {
   const router = useRouter();
   const [data, setData] = useState<TeacherData | null>(null);
-  const [totalAssessments, setTotalAssessments] = useState(0);
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
+  const [pendingExams, setPendingExams] = useState<ExamSubjectItem[]>([]);
+  const [selectedNotice, setSelectedNotice] = useState<AnnouncementItem | null>(null);
+  const [selectedDay, setSelectedDay] = useState<string>(() => campusDayOfWeek());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showImagePreview, setShowImagePreview] = useState(false);
+
+  const todayDayName = campusDayOfWeek();
+  const displayDayName = todayDayName.charAt(0) + todayDayName.slice(1).toLowerCase();
+  const mins = campusMinutesOfDay();
+  const greeting = getGreeting(Math.floor(mins / 60));
 
   useEffect(() => {
-    async function loadProfile() {
+    let cancelled = false;
+
+    async function loadDashboard() {
       try {
-        const response = await fetch("/api/teacher/profile");
-        if (response.status === 401 || response.status === 403) {
-          router.replace("/dashboard");
-          return;
+        const [profRes, noticeRes, examRes] = await Promise.allSettled([
+          fetch("/api/teacher/profile"),
+          fetch("/api/announcements"),
+          fetch("/api/teacher/exams"),
+        ]);
+
+        if (profRes.status === "fulfilled") {
+          const res = profRes.value;
+          if (res.status === 401 || res.status === 403) {
+            router.replace("/dashboard");
+            return;
+          }
+          const resJson = await res.json();
+          if (!res.ok) {
+            if (!cancelled) setError(resJson.error ?? "Failed to load teacher profile");
+            return;
+          }
+          if (!cancelled) {
+            setData(resJson.teacher);
+          }
+        } else {
+          if (!cancelled) setError("Unable to load profile data");
         }
-        const resJson = await response.json();
-        if (!response.ok) {
-          setError(resJson.error ?? "Failed to load teacher profile");
-          return;
+
+        // Optional notices feed
+        if (noticeRes.status === "fulfilled" && noticeRes.value.ok) {
+          try {
+            const noticeJson = await noticeRes.value.json();
+            if (!cancelled && Array.isArray(noticeJson.announcements)) {
+              setAnnouncements(noticeJson.announcements.slice(0, 4));
+            }
+          } catch {
+            // Silently ignore secondary widget error
+          }
         }
-        setData(resJson.teacher);
-        setTotalAssessments(resJson.stats?.totalAssessments ?? 0);
+
+        // Optional pending exams feed
+        if (examRes.status === "fulfilled" && examRes.value.ok) {
+          try {
+            const examJson = await examRes.value.json();
+            if (!cancelled && Array.isArray(examJson.items)) {
+              const pending = examJson.items.filter(
+                (item: ExamSubjectItem) => item.markCount < item.registeredCount
+              );
+              setPendingExams(pending);
+            }
+          } catch {
+            // Silently ignore secondary widget error
+          }
+        }
+
+        if (!cancelled) setLoading(false);
       } catch {
-        setError("Unable to reach the server");
-      } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setError("Unable to reach the server");
+          setLoading(false);
+        }
       }
     }
 
-    loadProfile();
+    loadDashboard();
+
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
-  if (error) {
-    return (
-      <main className="grid min-h-[40vh] place-items-center px-6 text-sm font-semibold text-destructive">
-        <p>{error}</p>
-        <Button
-          className="primary-button"
-          type="button"
-          onClick={() => router.replace("/dashboard")}
-          style={{ marginTop: "16px" }}
-        >
-          Back to Login
-        </Button>
-      </main>
-    );
+  // Derived collections
+  const classes = data?.classes ?? [];
+  const activeDayKey = selectedDay || todayDayName;
+  const activeDayClasses = classes.filter((c) => c.dayOfWeek === activeDayKey);
+  const todaysClasses = classes.filter((c) => c.dayOfWeek === todayDayName);
+
+  // Class counts by day
+  const classCountByDay: Record<string, number> = {};
+  for (const c of classes) {
+    classCountByDay[c.dayOfWeek] = (classCountByDay[c.dayOfWeek] || 0) + 1;
   }
 
-  if (loading || !data) {
-    return (
-      <TeacherShell active="/dashboard" title="Faculty Overview & Workspace" subtitle="Teacher Portal">
-        <div className="space-y-6">
-          <Skeleton className="h-32 w-full rounded-xl" />
-          <MetricGridSkeleton count={4} />
-          <SectionSkeleton rows={4} />
-          <SectionSkeleton rows={3} />
-        </div>
-      </TeacherShell>
-    );
-  }
-
-  const fullName = `${data.user.firstName} ${data.user.lastName}`;
-
-  // Deduplicate classes into unique subjects (subjects ≠ class slots — no time periods)
-  const subjectMap = new Map<string, { code: string; name: string; program: string; semester: number; studentCount: number }>();
-  for (const c of data.classes) {
-    if (!subjectMap.has(c.subject.id)) {
-      subjectMap.set(c.subject.id, {
+  // Unique subjects
+  const uniqueSubjectsMap = new Map<
+    string,
+    { code: string; name: string; program: string; semester: number; studentCount: number; id: string }
+  >();
+  for (const c of classes) {
+    if (!uniqueSubjectsMap.has(c.subject.id)) {
+      uniqueSubjectsMap.set(c.subject.id, {
+        id: c.subject.id,
         code: c.subject.code,
         name: c.subject.name,
         program: c.program.code,
@@ -128,251 +246,613 @@ export default function TeacherOverviewPage() {
       });
     }
   }
-  const uniqueSubjects = Array.from(subjectMap.values());
-  const totalSubjects = uniqueSubjects.length;
+  const uniqueSubjects = Array.from(uniqueSubjectsMap.values());
 
-  // Calculate unique students across all programs
-  const studentIdSet = new Set<string>();
+  // Metrics
+  let totalStudents = 0;
   let totalSessionsLogged = 0;
-  for (const c of data.classes) {
-    totalSessionsLogged += c._count.sessions;
-    for (const s of c.program.students) {
-      studentIdSet.add(s.id);
+  let departmentName = "Department Faculty";
+
+  if (classes.length > 0) {
+    const studentIdSet = new Set<string>();
+    for (const c of classes) {
+      totalSessionsLogged += c._count.sessions;
+      for (const s of c.program.students) {
+        studentIdSet.add(s.id);
+      }
     }
+    totalStudents = studentIdSet.size;
+    departmentName = classes[0]?.program.departmentName || "Engineering Faculty";
   }
-  const totalStudents = studentIdSet.size;
 
-  // Primary department name
-  const departmentName = data.classes[0]?.program.departmentName || "Engineering Faculty";
+  if (error) {
+    return (
+      <main className="grid min-h-[50vh] place-items-center px-6 text-sm font-semibold text-destructive">
+        <div className="text-center space-y-3">
+          <p>{error}</p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.replace("/dashboard")}
+          >
+            Back to Dashboard
+          </Button>
+        </div>
+      </main>
+    );
+  }
 
-  // Today's schedule
-  const todayDayName = campusDayOfWeek();
-  const todaysClasses = data.classes.filter((c) => c.dayOfWeek === todayDayName);
+  if (loading || !data) {
+    return (
+      <TeacherShell active="/dashboard" title="Faculty Overview" subtitle="Teacher Portal">
+        <div className="space-y-6">
+          <Skeleton className="h-32 w-full rounded-2xl" />
+          <MetricGridSkeleton count={4} />
+          <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-6">
+            <SectionSkeleton rows={4} />
+            <SectionSkeleton rows={4} />
+          </div>
+        </div>
+      </TeacherShell>
+    );
+  }
+
+  const fullName = `${data.user.firstName} ${data.user.lastName}`.trim();
+
+  const noticeDetailData: NoticeDetailData | null = selectedNotice
+    ? {
+        id: selectedNotice.id,
+        title: selectedNotice.title,
+        body: selectedNotice.body,
+        publishedAt: selectedNotice.publishedAt,
+        createdAt: selectedNotice.createdAt,
+        author: selectedNotice.author,
+        attachment: selectedNotice.attachmentFileName
+          ? {
+              fileName: selectedNotice.attachmentFileName,
+              mimeType: selectedNotice.attachmentMimeType || "application/octet-stream",
+              size: selectedNotice.attachmentSize || 0,
+            }
+          : null,
+        scope:
+          selectedNotice.subject && selectedNotice.program && selectedNotice.semester
+            ? {
+                subjectName: selectedNotice.subject.name,
+                subjectCode: selectedNotice.subject.code,
+                programName: selectedNotice.program.name,
+                programCode: selectedNotice.program.code,
+                semester: selectedNotice.semester,
+              }
+            : null,
+      }
+    : null;
 
   return (
     <TeacherShell
       active="/dashboard"
-      title="Faculty Overview & Workspace"
+      title="Faculty Overview"
       subtitle="Teacher Portal"
       teacherName={fullName}
       employeeNo={data.employeeNo}
       avatarUrl={data.profileImageUrl}
     >
-      {/* Faculty Profile Hero Card */}
-      <section className="mb-6 flex flex-wrap items-center gap-5 rounded-xl border bg-card p-6 shadow-xs">
-        {data.profileImageUrl ? (
-          <img
-            src={data.profileImageUrl}
-            alt={fullName}
-            className="size-27.5 shrink-0 rounded-xl border-2 object-cover"
-          />
-        ) : (
-          <div className="grid size-27.5 shrink-0 place-items-center rounded-xl bg-linear-to-br from-primary/85 to-primary text-4xl font-bold text-primary-foreground">
-            {data.user.firstName[0]}
-            {data.user.lastName[0]}
+      <div className="space-y-6">
+        {/* ── 1. Faculty Header Banner (Clean, Focused, No Fluff) ── */}
+        <section className="relative overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-br from-card via-card to-primary/5 p-5 sm:p-6 shadow-xs">
+          <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-5">
+            {/* Identity & Metadata */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 min-w-0">
+              <button
+                type="button"
+                onClick={() => setShowImagePreview(true)}
+                className="group relative shrink-0 rounded-2xl shadow-xs ring-1 ring-border overflow-hidden cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-transform duration-200 hover:scale-[1.03]"
+                title="Click to view full photo"
+                aria-label="View enlarged profile photo"
+              >
+                <Avatar name={fullName} photoUrl={data.profileImageUrl} size={68} />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center text-white backdrop-blur-[1px]">
+                  <IconZoomIn className="size-5 drop-shadow-md" aria-hidden="true" />
+                </div>
+              </button>
+
+              <div className="min-w-0 space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground">
+                  {greeting}, {data.user.firstName}
+                </p>
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground truncate">
+                  {fullName}
+                </h1>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground pt-0.5">
+                  <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                    <IconSchool size={15} className="text-primary" />
+                    {departmentName}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <IconId size={15} />
+                    ID: <strong className="text-foreground">{data.employeeNo}</strong>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <IconMail size={15} />
+                    {data.user.email}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Direct Primary Action Buttons */}
+            <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/60">
+              <Button asChild size="sm" className="h-9 gap-1.5 text-xs font-semibold shadow-xs">
+                <Link href="/teacher/attendance">
+                  <IconCalendarCheck size={16} />
+                  Take Attendance
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="sm" className="h-9 gap-1.5 text-xs font-semibold">
+                <Link href="/teacher/exams">
+                  <IconClipboardCheck size={16} />
+                  Exam Marks
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="sm" className="h-9 gap-1.5 text-xs font-semibold">
+                <Link href="/teacher/materials">
+                  <IconUpload size={16} />
+                  Upload Notes
+                </Link>
+              </Button>
+            </div>
           </div>
-        )}
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="m-0 text-2xl font-bold tracking-tight">{fullName}</h1>
-            <Badge variant="secondary">Active</Badge>
-          </div>
-          <div className="flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-muted-foreground [&_span]:inline-flex [&_span]:items-center [&_span]:gap-1.5 [&_strong]:font-semibold [&_strong]:text-foreground">
-            <span>
-              <IconBook size={16} />
-              {departmentName}
+        </section>
+
+        {/* ── 2. Key Metrics Grid ── */}
+        <section className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Card 1: Today's Classes */}
+          <Card className="p-4 sm:p-5 rounded-xl border border-border/70 shadow-xs bg-card hover:border-primary/40 transition-colors">
+            <div className="flex items-center justify-between text-muted-foreground mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider">Today&apos;s Classes</span>
+              <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <IconCalendarEvent size={18} />
+              </div>
+            </div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-foreground">{todaysClasses.length}</div>
+            <span className="text-xs text-muted-foreground">
+              {todaysClasses.length > 0 ? `${todaysClasses.length} lecture${todaysClasses.length !== 1 ? "s" : ""} scheduled` : `Lecture-free (${displayDayName})`}
             </span>
-            <span>
-              <IconUser size={16} />
-              Employee ID: <strong>{data.employeeNo}</strong>
-            </span>
-          </div>
-          <p className="m-0 text-[13px] text-muted-foreground [&_strong]:font-semibold [&_strong]:text-foreground">
-            Institutional Email: <strong>{data.user.email}</strong>
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2.5">
-          <Button asChild>
-            <Link href="/teacher/attendance">
-              <IconCalendarCheck size={16} />
-              Take Attendance
-            </Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/teacher/exams">
-              <IconReportAnalytics size={16} />
-              Enter Exam Marks
-            </Link>
-          </Button>
-        </div>
-      </section>
+          </Card>
 
-      {/* Metrics Row */}
-      <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Teaching Subjects</span>
-          <strong className="my-1 text-[34px] font-bold leading-none tracking-tight">{totalSubjects}</strong>
-          <small className="text-xs text-muted-foreground">Unique subjects</small>
-        </article>
-        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Enrolled Students</span>
-          <strong className="my-1 text-[34px] font-bold leading-none tracking-tight text-primary">{totalStudents}</strong>
-          <small className="text-xs text-muted-foreground">Across assigned programs</small>
-        </article>
-        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Exam Subjects</span>
-          <strong className="my-1 text-[34px] font-bold leading-none tracking-tight">{totalAssessments}</strong>
-          <small className="text-xs text-muted-foreground">Mid-term &amp; practical entries</small>
-        </article>
-        <Link
-          href="/teacher/attendance?tab=records"
-          className="group flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs transition-colors hover:border-primary/50 hover:bg-accent/30"
-        >
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground group-hover:text-primary">
-            Attendance Sessions
-          </span>
-          <strong className="my-1 text-[34px] font-bold leading-none tracking-tight text-primary">
-            {totalSessionsLogged}
-          </strong>
-          <small className="text-xs text-muted-foreground">View subject logs &amp; records →</small>
-        </Link>
-      </section>
+          {/* Card 2: Teaching Subjects */}
+          <Card className="p-4 sm:p-5 rounded-xl border border-border/70 shadow-xs bg-card hover:border-primary/40 transition-colors">
+            <div className="flex items-center justify-between text-muted-foreground mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider">Assigned Subjects</span>
+              <div className="flex size-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <IconBook2 size={18} />
+              </div>
+            </div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-foreground">{uniqueSubjects.length}</div>
+            <span className="text-xs text-muted-foreground">Active course modules</span>
+          </Card>
 
-      {/* Read-only academic resources — the same pages the public site serves,
-          so there is no separate teacher copy to keep in sync. */}
-      <section className="mb-6">
-        <h2 className="m-0 mb-3 text-lg font-bold">Academic Resources</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {[
-            {
-              href: "/teacher/resources?tab=syllabus",
-              icon: IconFileDescription,
-              title: "Syllabus Library",
-              hint: "Official outlines by department & semester",
-            },
-            {
-              href: "/teacher/resources?tab=structure",
-              icon: IconHierarchy2,
-              title: "Course Structure",
-              hint: "Course map, credits & semesters",
-            },
-            {
-              href: "/teacher/resources?tab=fees",
-              icon: IconReceipt,
-              title: "Fee Structure",
-              hint: "Published programme & semester fees",
-            },
-          ].map((card) => (
-            <Link
-              key={card.href}
-              href={card.href}
-              className="group flex items-start gap-3 rounded-xl border bg-card p-5 shadow-xs transition-colors hover:border-ring hover:bg-accent/40"
-            >
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors group-hover:text-primary">
-                <card.icon size={18} aria-hidden="true" />
-              </span>
-              <span className="min-w-0">
-                <strong className="block text-sm font-semibold">{card.title}</strong>
-                <small className="text-xs text-muted-foreground">{card.hint}</small>
-              </span>
-              <IconArrowRight
-                size={16}
-                aria-hidden="true"
-                className="ml-auto shrink-0 self-center text-muted-foreground transition-transform group-hover:translate-x-0.5"
-              />
-            </Link>
-          ))}
-        </div>
-      </section>
+          {/* Card 3: Enrolled Students */}
+          <Card className="p-4 sm:p-5 rounded-xl border border-border/70 shadow-xs bg-card hover:border-primary/40 transition-colors">
+            <div className="flex items-center justify-between text-muted-foreground mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider">Students Reach</span>
+              <div className="flex size-8 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                <IconUsersGroup size={18} />
+              </div>
+            </div>
+            <div className="text-2xl sm:text-3xl font-extrabold text-foreground">{totalStudents}</div>
+            <span className="text-xs text-muted-foreground">Enrolled in your cohorts</span>
+          </Card>
 
-      {/* Main Grid: Today's Schedule & Teaching Subjects */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.2fr_1fr]">
-        {/* Teaching Subjects (unique, no time slots) */}
-        <section className="rounded-xl border bg-card p-6 shadow-xs">
-          <div className="mb-4 flex items-center justify-between border-b pb-3.5">
-            <h2 className="m-0 text-lg font-bold">Teaching Subjects</h2>
-            <span className="text-xs text-muted-foreground">{totalSubjects} unique</span>
-          </div>
-
-          {uniqueSubjects.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">No teaching subjects assigned yet.</p>
-          ) : (
-            <div className="mt-4 grid gap-3.5">
-              {uniqueSubjects.map((sub) => (
-                <div key={sub.code} className="flex flex-col gap-2 rounded-xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <div className="mb-1 flex items-center gap-2">
-                      <Badge variant="outline">{sub.code}</Badge>
-                      <strong className="text-[0.95rem]">{sub.name}</strong>
-                    </div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[0.82rem] text-muted-foreground">
-                      <span>Program: {sub.program}</span>
-                      <span>•</span>
-                      <span>Semester: {sub.semester}</span>
-                      <span>•</span>
-                      <span>{sub.studentCount} Students</span>
-                    </div>
+          {/* Card 4: Actionable Status (Pending Marks or Sessions Logged) */}
+          {pendingExams.length > 0 ? (
+            <Link href="/teacher/exams" className="group block">
+              <Card className="p-4 sm:p-5 rounded-xl border border-amber-500/30 bg-amber-500/5 group-hover:border-amber-500/60 shadow-xs transition-colors">
+                <div className="flex items-center justify-between text-amber-700 dark:text-amber-300 mb-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider">Pending Marks</span>
+                  <div className="flex size-8 items-center justify-center rounded-lg bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                    <IconAlertCircle size={18} />
                   </div>
-                  <Button asChild variant="outline" size="sm" className="h-8 gap-1.5 text-xs shrink-0">
-                    <Link href="/teacher/attendance?tab=records">
-                      <IconCalendarCheck size={14} aria-hidden="true" />
-                      Attendance
+                </div>
+                <div className="text-2xl sm:text-3xl font-extrabold text-amber-800 dark:text-amber-200">
+                  {pendingExams.length}
+                </div>
+                <span className="text-xs text-amber-700/80 dark:text-amber-300/80 flex items-center gap-1 group-hover:underline">
+                  Evaluation needed <IconArrowRight size={12} />
+                </span>
+              </Card>
+            </Link>
+          ) : (
+            <Link href="/teacher/attendance?tab=records" className="group block">
+              <Card className="p-4 sm:p-5 rounded-xl border border-border/70 shadow-xs bg-card group-hover:border-primary/60 transition-colors">
+                <div className="flex items-center justify-between text-muted-foreground mb-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider group-hover:text-primary transition-colors">
+                    Sessions Logged
+                  </span>
+                  <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    <IconClipboardCheck size={18} />
+                  </div>
+                </div>
+                <div className="text-2xl sm:text-3xl font-extrabold text-foreground group-hover:text-primary transition-colors">
+                  {totalSessionsLogged}
+                </div>
+                <span className="text-xs text-muted-foreground flex items-center gap-1 group-hover:text-foreground transition-colors">
+                  View attendance logs <IconArrowRight size={12} />
+                </span>
+              </Card>
+            </Link>
+          )}
+        </section>
+
+        {/* ── 3. Primary Working Workspace (2 Columns) ── */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.2fr_1fr]">
+          {/* Left Column: Schedule with Interactive Day Picker + Subject Hub */}
+          <div className="space-y-6">
+            {/* 3A: Interactive Class Schedule with Day Selector */}
+            <Card className="rounded-xl border border-border/70 shadow-xs overflow-hidden flex flex-col">
+              <CardHeader className="border-b bg-muted/10 px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <IconCalendarClock size={18} className="text-primary" />
+                  <CardTitle className="text-sm font-bold text-foreground">
+                    Teaching Schedule
+                  </CardTitle>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Button asChild variant="link" size="sm" className="h-auto p-0 text-xs font-semibold">
+                    <Link href="/teacher/schedule">
+                      <span className="inline-flex items-center gap-1 text-primary">
+                        Weekly Timetable <IconChevronRight size={14} />
+                      </span>
                     </Link>
                   </Button>
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
+              </CardHeader>
 
-        {/* Today's Schedule Card */}
-        <section className="rounded-xl border bg-card p-5 shadow-xs" style={{ padding: "24px" }}>
-          <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2 border-b pb-3.5">
-            <h2 className="m-0 p-0 text-[1.1rem] font-bold">
-              Today&apos;s Schedule ({todayDayName})
-            </h2>
-            <Button asChild variant="link" size="sm" className="h-auto p-0 text-xs font-semibold">
-              <Link href="/teacher/schedule">
-                <span className="inline-flex items-center gap-1">
-                  Full Timetable <IconArrowRight size={14} strokeWidth={2.25} aria-hidden="true" />
-                </span>
-              </Link>
-            </Button>
+              {/* Day Pills Bar */}
+              <div className="flex items-center gap-1.5 px-5 py-2.5 bg-muted/5 border-b border-border/50 overflow-x-auto">
+                {DAYS_OF_WEEK.map((day) => {
+                  const isToday = day.key === todayDayName;
+                  const isSelected = day.key === activeDayKey;
+                  const count = classCountByDay[day.key] || 0;
+
+                  return (
+                    <button
+                      key={day.key}
+                      type="button"
+                      onClick={() => setSelectedDay(day.key)}
+                      className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 cursor-pointer ${
+                        isSelected
+                          ? "bg-primary text-primary-foreground shadow-xs"
+                          : "bg-background text-muted-foreground hover:bg-muted hover:text-foreground border border-border/60"
+                      }`}
+                    >
+                      <span>{day.label}</span>
+                      {count > 0 && (
+                        <span
+                          className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                            isSelected
+                              ? "bg-primary-foreground/20 text-primary-foreground"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      )}
+                      {isToday && (
+                        <span
+                          className={`size-1.5 rounded-full ${
+                            isSelected ? "bg-primary-foreground" : "bg-primary"
+                          }`}
+                          title="Today"
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Class List for Selected Day */}
+              <CardContent className="p-5 flex-1 flex flex-col justify-center">
+                {activeDayClasses.length === 0 ? (
+                  <div className="py-8 text-center text-muted-foreground space-y-2">
+                    <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                      <IconCalendar size={20} />
+                    </div>
+                    <p className="text-xs font-semibold text-foreground">
+                      No lectures scheduled on {selectedDay.charAt(0) + selectedDay.slice(1).toLowerCase()}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {activeDayClasses.map((cls) => (
+                      <div
+                        key={cls.id}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-border/60 bg-muted/5 hover:bg-muted/15 hover:border-primary/40 transition-all"
+                      >
+                        <div className="flex items-start gap-3 min-w-0">
+                          {/* Time Slot Badge */}
+                          <div className="flex flex-col items-center justify-center px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary border border-primary/20 shrink-0 min-w-[82px] text-center">
+                            <span className="text-xs font-bold leading-tight font-mono">
+                              {formatTime(cls.startTime)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              {formatTime(cls.endTime)}
+                            </span>
+                          </div>
+
+                          {/* Subject & Details */}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-[10px] font-mono font-semibold">
+                                {cls.subject.code}
+                              </Badge>
+                              <h4 className="text-xs sm:text-sm font-bold text-foreground truncate">
+                                {cls.subject.name}
+                              </h4>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {cls.program.name} ({cls.program.code}) • Semester {cls.semester}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Direct Action Buttons */}
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                          <Button asChild size="sm" className="h-8 text-xs font-semibold px-3 gap-1.5 shadow-2xs">
+                            <Link href={`/teacher/attendance?classId=${cls.id}`}>
+                              <IconCalendarCheck size={14} />
+                              Attendance
+                            </Link>
+                          </Button>
+                          <Button asChild variant="outline" size="sm" className="h-8 text-xs font-semibold px-2.5 gap-1">
+                            <Link href={`/teacher/materials?subjectId=${cls.subject.id}`} title="Share Notes">
+                              <IconUpload size={14} />
+                            </Link>
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 3B: Teaching Subjects Hub */}
+            <Card className="rounded-xl border border-border/70 shadow-xs overflow-hidden flex flex-col">
+              <CardHeader className="border-b bg-muted/10 px-5 py-3.5 flex flex-row items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <IconBook2 size={18} className="text-primary" />
+                  <CardTitle className="text-sm font-bold text-foreground">
+                    Assigned Courses &amp; Modules
+                  </CardTitle>
+                </div>
+                <Badge variant="outline" className="text-xs font-semibold">
+                  {uniqueSubjects.length} courses
+                </Badge>
+              </CardHeader>
+
+              <CardContent className="p-5">
+                {uniqueSubjects.length === 0 ? (
+                  <p className="py-6 text-center text-xs text-muted-foreground">
+                    No teaching subjects currently assigned.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {uniqueSubjects.map((sub) => (
+                      <div
+                        key={sub.id}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border border-border/60 bg-muted/5 hover:bg-muted/15 transition-colors"
+                      >
+                        <div className="min-w-0 pr-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-[10px] font-mono font-semibold">
+                              {sub.code}
+                            </Badge>
+                            <span className="text-xs sm:text-sm font-bold text-foreground truncate">
+                              {sub.name}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground mt-1">
+                            <span>{sub.program}</span>
+                            <span>•</span>
+                            <span>Semester {sub.semester}</span>
+                            <span>•</span>
+                            <span>{sub.studentCount} students</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                          <Button asChild variant="outline" size="sm" className="h-7 text-xs font-semibold px-2.5 gap-1">
+                            <Link href="/teacher/attendance?tab=records">
+                              <IconClipboardCheck size={13} className="text-primary" />
+                              Records
+                            </Link>
+                          </Button>
+                          <Button asChild variant="outline" size="sm" className="h-7 text-xs font-semibold px-2.5 gap-1">
+                            <Link href={`/teacher/materials?subjectId=${sub.id}`}>
+                              <IconUpload size={13} />
+                              Notes
+                            </Link>
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
-          {todaysClasses.length === 0 ? (
-            <div className="py-10 text-center text-muted-foreground">
-              <p className="m-0">No lectures scheduled for today ({todayDayName}).</p>
-              <small className="mt-2 block">Enjoy your lecture-free day or prepare assessments.</small>
-            </div>
-          ) : (
-            <div className="mt-4 grid gap-3">
-              {todaysClasses.map((cls) => (
-                <div key={cls.id} className="flex items-center justify-between rounded-[10px] border-l-4 border-l-primary bg-secondary p-3.5">
-                  <div>
-                    <strong className="block text-[0.92rem]">
-                      {cls.subject.code} — {cls.subject.name}
-                    </strong>
-                    <span className="text-[0.8rem] text-muted-foreground">
-                      {cls.program.code} · Semester {cls.semester}
-                    </span>
+          {/* Right Column: Priority Tasks, Announcements & Library */}
+          <div className="space-y-6">
+            {/* 3C: Pending Exam Evaluations (Actionable Alert Card) */}
+            {pendingExams.length > 0 && (
+              <Card className="rounded-xl border border-amber-500/40 bg-amber-500/5 shadow-xs overflow-hidden">
+                <CardHeader className="border-b border-amber-500/20 px-5 py-3 flex flex-row items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+                    <IconAlertCircle size={18} />
+                    <CardTitle className="text-xs font-bold uppercase tracking-wider">
+                      Pending Marks Entry
+                    </CardTitle>
                   </div>
-                  <div className="text-right">
-                    <span className="text-sm font-bold text-primary">
-                      {formatTime(cls.startTime)}
-                    </span>
-                    <small className="block text-[0.75rem] text-muted-foreground">
-                      to {formatTime(cls.endTime)}
-                    </small>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                  <Badge variant="outline" className="border-amber-600/40 text-amber-800 dark:text-amber-200 text-[10px] font-bold">
+                    {pendingExams.length} Pending
+                  </Badge>
+                </CardHeader>
 
-        </section>
+                <CardContent className="p-4 space-y-2.5">
+                  {pendingExams.map((exam) => (
+                    <div
+                      key={exam.examSubjectId}
+                      className="p-3 rounded-lg border border-amber-500/20 bg-background/80 flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-mono font-bold bg-amber-500/20 text-amber-800 dark:text-amber-200 px-1.5 py-0.5 rounded">
+                            {exam.subject.code}
+                          </span>
+                          <span className="text-xs font-bold text-foreground truncate">
+                            {exam.subject.name}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">
+                          {exam.session.title} • {exam.markCount}/{exam.registeredCount} graded
+                        </div>
+                      </div>
+
+                      <Button asChild size="sm" className="h-7 text-xs font-semibold px-2.5 bg-amber-600 hover:bg-amber-700 text-white shrink-0">
+                        <Link href="/teacher/exams">
+                          Grade
+                        </Link>
+                      </Button>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* 3D: Live Announcements & Campus Notices */}
+            <Card className="rounded-xl border border-border/70 shadow-xs overflow-hidden flex flex-col">
+              <CardHeader className="border-b bg-muted/10 px-5 py-3.5 flex flex-row items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <IconBell size={18} className="text-primary" />
+                  <CardTitle className="text-sm font-bold text-foreground">
+                    Campus Notices
+                  </CardTitle>
+                </div>
+
+                <Button asChild variant="link" size="sm" className="h-auto p-0 text-xs font-semibold">
+                  <Link href="/teacher/announcements">
+                    <span className="inline-flex items-center gap-1 text-primary">
+                      All Notices <IconChevronRight size={14} />
+                    </span>
+                  </Link>
+                </Button>
+              </CardHeader>
+
+              <CardContent className="p-4">
+                {announcements.length === 0 ? (
+                  <p className="py-6 text-center text-xs text-muted-foreground">
+                    No active notices published.
+                  </p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {announcements.map((notice) => (
+                      <button
+                        key={notice.id}
+                        type="button"
+                        onClick={() => setSelectedNotice(notice)}
+                        className="w-full text-left p-3 rounded-xl border border-border/60 bg-muted/5 hover:bg-muted/15 hover:border-primary/40 transition-all cursor-pointer group"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="text-xs font-bold text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                            {notice.title}
+                          </h4>
+                          <span className="text-[11px] text-muted-foreground shrink-0 font-medium">
+                            {formatNoticeDate(notice.publishedAt || notice.createdAt)}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
+                          {notice.body}
+                        </p>
+                        <div className="flex items-center gap-2 mt-2 text-[10px] text-muted-foreground">
+                          {notice.author && (
+                            <span>By {notice.author.firstName} {notice.author.lastName}</span>
+                          )}
+                          {notice.attachmentFileName && (
+                            <span className="inline-flex items-center gap-1 text-primary font-medium">
+                              <IconPaperclip size={11} />
+                              Attachment
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 3E: Quick Academic Library Shortcuts */}
+            <Card className="rounded-xl border border-border/70 shadow-xs overflow-hidden">
+              <CardHeader className="border-b bg-muted/10 px-5 py-3">
+                <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Institutional Library
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 grid grid-cols-2 gap-2">
+                <Link
+                  href="/teacher/resources?tab=syllabus"
+                  className="flex flex-col items-center justify-center p-3.5 rounded-lg border border-border/60 bg-muted/5 hover:bg-muted/20 hover:border-primary/40 transition-all text-center group"
+                >
+                  <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-2 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                    <IconFileDescription size={16} />
+                  </div>
+                  <span className="text-xs font-bold text-foreground group-hover:text-primary transition-colors">
+                    Syllabus Library
+                  </span>
+                  <span className="text-[10px] text-muted-foreground mt-0.5">
+                    Official outlines
+                  </span>
+                </Link>
+
+                <Link
+                  href="/teacher/resources?tab=structure"
+                  className="flex flex-col items-center justify-center p-3.5 rounded-lg border border-border/60 bg-muted/5 hover:bg-muted/20 hover:border-primary/40 transition-all text-center group"
+                >
+                  <div className="size-8 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-2 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                    <IconHierarchy2 size={16} />
+                  </div>
+                  <span className="text-xs font-bold text-foreground group-hover:text-primary transition-colors">
+                    Course Structure
+                  </span>
+                  <span className="text-[10px] text-muted-foreground mt-0.5">
+                    Degrees &amp; credits
+                  </span>
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
+
+      {/* ── 4. Notice Preview Modal ── */}
+      {selectedNotice && noticeDetailData && (
+        <NoticeDetailModal
+          notice={noticeDetailData}
+          onClose={() => setSelectedNotice(null)}
+        />
+      )}
+
+      {/* ── 5. Profile Picture Preview Modal ── */}
+      <ProfileImagePreviewModal
+        open={showImagePreview}
+        onOpenChange={setShowImagePreview}
+        imageUrl={data.profileImageUrl}
+        name={fullName}
+        subtitle={departmentName}
+        badge={data.employeeNo ? `ID: ${data.employeeNo}` : undefined}
+      />
     </TeacherShell>
   );
 }
-
