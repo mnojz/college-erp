@@ -101,9 +101,9 @@ type ViewMode = "grid" | "list";
 export function AnnouncementsBoard<T extends AnnouncementItem = AnnouncementItem>({
   variant = "public",
   showHeader = false,
-  eyebrow = "Campus Bulletin",
-  title = "Announcements & Notices",
-  subtitle = "Stay updated with official college notices, academic schedules, and departmental communications.",
+  eyebrow,
+  title = "Notices",
+  subtitle,
   items: externalItems,
   loading: externalLoading,
   error: externalError,
