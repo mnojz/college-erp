@@ -1,4 +1,5 @@
 "use client";
+
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -9,15 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "cn";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -32,9 +25,22 @@ import {
   timeToMinutes,
   WORK_DAYS,
 } from "@/app/lib/timetable-layout";
-import { IconPlus, IconAlertTriangle, IconCircleCheck } from "@tabler/icons-react";
+import { cn } from "@/lib/utils";
+import {
+  IconAlertTriangle,
+  IconCoffee,
+  IconLayersLinked,
+  IconPlus,
+} from "@tabler/icons-react";
 
-type ProgramOption = { id: string; name: string; code: string; durationYears: number };
+type ProgramOption = {
+  id: string;
+  name: string;
+  code: string;
+  durationYears: number;
+  departmentName?: string;
+};
+
 type SubjectItem = {
   id: string;
   name: string;
@@ -46,7 +52,13 @@ type SubjectItem = {
     teacher: { id: string; employeeNo: string; user: { firstName: string; lastName: string } };
   }>;
 };
-type TeacherOption = { id: string; name: string; employeeNo: string };
+
+type TeacherOption = {
+  id: string;
+  name: string;
+  employeeNo: string;
+};
+
 type ClassItem = {
   id: string;
   dayOfWeek: string;
@@ -62,21 +74,22 @@ type ClassItem = {
   program: { name: string; code: string };
   teacher: { employeeNo: string; user: { firstName: string; lastName: string } } | null;
 };
+
 type CurriculumCourseRow = {
   key: string;
   courseId: string;
   code: string;
   name: string;
-  semesterNo: number; // global semester number across the program
+  semesterNo: number;
   programId: string;
 };
-type Block = ClassItem & { startMin: number; endMin: number; conflict: boolean };
 
-// The break is its own entity (Break model) — NOT a class and NOT a subject:
-// one daily reserved time window per program+semester timetable. It is added
-// via the "Break period" mode in the slot editor, rendered as the hatched
-// Mon–Fri band on the weekly grid, and no class may overlap it on any weekday
-// (enforced server-side in /api/classes).
+type Block = ClassItem & {
+  startMin: number;
+  endMin: number;
+  conflict: boolean;
+};
+
 type BreakRow = {
   id: string;
   programId: string;
@@ -88,8 +101,6 @@ type BreakRow = {
 const emptyClassForm = {
   subjectId: "",
   teacherId: "",
-  // `as string` widens the literal from the `as const` WORK_DAYS tuple so the
-  // form fields stay plain strings.
   dayOfWeek: WORK_DAYS[0] as string,
   startTime: "09:00",
   endTime: "10:30",
@@ -103,6 +114,8 @@ function titleCaseDay(day: string) {
 
 export default function AdminTeachingPage() {
   const router = useRouter();
+
+  // Primary data state
   const [programs, setPrograms] = useState<ProgramOption[]>([]);
   const [subjects, setSubjects] = useState<SubjectItem[]>([]);
   const [classes, setClasses] = useState<ClassItem[]>([]);
@@ -110,7 +123,7 @@ export default function AdminTeachingPage() {
   const [teachers, setTeachers] = useState<TeacherOption[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Published curricula (source of truth for subjects)
+  // Published curricula (source of truth for courses)
   const [curricula, setCurricula] = useState<
     Array<{
       programId: string;
@@ -122,24 +135,23 @@ export default function AdminTeachingPage() {
     }>
   >([]);
 
-  // Scheduling context
+  // Selection
   const [selectedProgramId, setSelectedProgramId] = useState("");
-  const [selectedSemester, setSelectedSemester] = useState("");
+  const [selectedSemester, setSelectedSemester] = useState("1");
 
-  // Modals
+  // Modals state
   const [showClassModal, setShowClassModal] = useState(false);
-  // "Class slot" vs "Break period" mode inside the Add Slot dialog.
   const [slotMode, setSlotMode] = useState<"class" | "break">("class");
   const [classForm, setClassForm] = useState(emptyClassForm);
   const [editingClass, setEditingClass] = useState<{ id: string } & typeof emptyClassForm | null>(null);
   const [deletingClass, setDeletingClass] = useState<ClassItem | null>(null);
-  // The break being edited (opened by clicking the hatched band).
   const [editingBreak, setEditingBreak] = useState<BreakRow | null>(null);
   const [deletingBreak, setDeletingBreak] = useState<BreakRow | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // ─── Initial Load ────────────────────────────────────────────────
   useEffect(() => {
     async function load() {
       try {
@@ -179,7 +191,10 @@ export default function AdminTeachingPage() {
           ),
         );
         setCurricula(curd.curricula ?? []);
-        if (loadedPrograms.length > 0) setSelectedProgramId(loadedPrograms[0].id);
+        if (loadedPrograms.length > 0) {
+          setSelectedProgramId(loadedPrograms[0].id);
+          setSelectedSemester("1");
+        }
       } catch {
         setError("Unable to load scheduling records");
       } finally {
@@ -189,7 +204,7 @@ export default function AdminTeachingPage() {
     load();
   }, [router]);
 
-  // ─── Derived: curriculum subjects for the selected program+semester ──
+  // ─── Program & Semester Computations ─────────────────────────────
   const selectedProgram = useMemo(
     () => programs.find((p) => p.id === selectedProgramId) ?? null,
     [programs, selectedProgramId],
@@ -201,8 +216,7 @@ export default function AdminTeachingPage() {
     [curricula, selectedProgramId],
   );
 
-  // Flatten the published curriculum into per-course rows (with global
-  // semester numbers) for the selected program.
+  // Flatten published curriculum into semester courses
   const semesterCourses = useMemo<CurriculumCourseRow[]>(() => {
     if (!programCurriculum) return [];
     const rows: CurriculumCourseRow[] = [];
@@ -226,7 +240,7 @@ export default function AdminTeachingPage() {
     return rows;
   }, [programCurriculum, selectedProgramId, selectedSemester]);
 
-  // Resolve a curriculum course to its synced Subject row id.
+  // Resolve curriculum course code to operational Subject ID
   const resolveSubjectId = useCallback(
     (course: { code: string; semesterNo: number; programId: string }) =>
       subjects.find(
@@ -238,7 +252,7 @@ export default function AdminTeachingPage() {
     [subjects],
   );
 
-  // ─── Derived: timetable blocks for the grid ─────────────────────────
+  // Scheduled blocks for active program + semester
   const scheduledBlocks = useMemo<Block[]>(() => {
     return classes
       .filter((c) => c.programId === selectedProgramId && c.semester === Number(selectedSemester))
@@ -251,11 +265,7 @@ export default function AdminTeachingPage() {
       .sort((a, b) => a.startMin - b.startMin);
   }, [classes, selectedProgramId, selectedSemester]);
 
-  // Flag overlapping blocks. Rules:
-  //  - Same teacher at the same time always conflicts.
-  //  - Lecture + Lab (different slot types) may overlap.
-  //  - Lecture + Lecture always conflicts.
-  //  - Practical + Practical conflicts unless they are different parallel groups.
+  // Overlap / Conflict detection
   const conflictedBlocks = useMemo(() => {
     const flagged = new Set<string>();
     for (let i = 0; i < scheduledBlocks.length; i += 1) {
@@ -270,11 +280,9 @@ export default function AdminTeachingPage() {
           flagged.add(b.id);
           continue;
         }
-        // Different slot types (Lecture vs Practical/Lab) may overlap.
         const aType = a.type ?? "Lecture";
         const bType = b.type ?? "Lecture";
         if (aType !== bType) continue;
-        // Same type — reject, except parallel practical groups (Gr. A/Gr. B).
         const differentGroups = !!a.group && !!b.group && a.group !== b.group;
         if (aType === "Practical" && differentGroups) continue;
         flagged.add(a.id);
@@ -284,16 +292,41 @@ export default function AdminTeachingPage() {
     return flagged;
   }, [scheduledBlocks]);
 
-  // Curriculum subjects of this semester that have no scheduled slot yet.
-  const unscheduledSubjects = useMemo(() => {
-    const scheduledSubjectIds = new Set(scheduledBlocks.map((b) => b.subjectId));
-    return semesterCourses.filter((course) => {
-      const subjectId = resolveSubjectId(course);
-      return !subjectId || !scheduledSubjectIds.has(subjectId);
-    });
-  }, [semesterCourses, scheduledBlocks, resolveSubjectId]);
+  // Break window for active program + semester
+  const breakFor = useMemo(
+    () =>
+      breaks.find(
+        (b) => b.programId === selectedProgramId && b.semester === Number(selectedSemester),
+      ) ?? null,
+    [breaks, selectedProgramId, selectedSemester],
+  );
 
-  // Subject options for the class modal (curriculum courses → synced ids)
+  // Teachers mapped by subject
+  const teachersBySubject = useMemo(() => {
+    const map = new Map<string, TeacherOption[]>();
+    for (const subject of subjects) {
+      const options = (subject.subjectTeachers ?? []).map((st) => ({
+        id: st.teacher.id,
+        name: `${st.teacher.user.firstName} ${st.teacher.user.lastName}`,
+        employeeNo: st.teacher.employeeNo,
+      }));
+      map.set(subject.id, options);
+    }
+    return map;
+  }, [subjects]);
+
+  const assignedTeachersFor = useCallback(
+    (subjectId: string) => teachersBySubject.get(subjectId) ?? [],
+    [teachersBySubject],
+  );
+
+  const teacherName = useCallback(
+    (id: string | null) => (id && teachers.find((t) => t.id === id)?.name) || "Unassigned",
+    [teachers],
+  );
+
+
+  // Subject options for class modal
   const classSubjectOptions = useMemo(
     () =>
       semesterCourses
@@ -305,18 +338,6 @@ export default function AdminTeachingPage() {
     [semesterCourses, resolveSubjectId],
   );
 
-  // The break window for the selected table (at most one), if set.
-  const breakFor = useMemo(
-    () =>
-      breaks.find(
-        (b) => b.programId === selectedProgramId && b.semester === Number(selectedSemester),
-      ) ?? null,
-    [breaks, selectedProgramId, selectedSemester],
-  );
-  const createIsBreak = slotMode === "break";
-
-  // Same mapping, but for the slot being edited (may differ if the stored
-  // subject no longer maps cleanly — keep its current value selectable).
   const editClassSubjectOptions = useMemo(() => {
     const options = [...classSubjectOptions];
     if (editingClass && !options.some((o) => o.id === editingClass.subjectId)) {
@@ -331,23 +352,7 @@ export default function AdminTeachingPage() {
     return options;
   }, [classSubjectOptions, editingClass, classes]);
 
-  // Teachers assigned to each subject (SubjectTeacher). Scheduling only ever
-  // offers these teachers for a subject — the teacher is derived from the
-  // subject assignment, never picked from the full faculty list.
-  const teachersBySubject = useMemo(() => {
-    const map = new Map<string, TeacherOption[]>();
-    for (const subject of subjects) {
-      const options = (subject.subjectTeachers ?? []).map((st) => ({
-        id: st.teacher.id,
-        name: `${st.teacher.user.firstName} ${st.teacher.user.lastName}`,
-        employeeNo: st.teacher.employeeNo,
-      }));
-      map.set(subject.id, options);
-    }
-    return map;
-  }, [subjects]);
-
-  const assignedTeachersFor = (subjectId: string) => teachersBySubject.get(subjectId) ?? [];
+  const displayBlocks = scheduledBlocks;
 
   // ─── Handlers ────────────────────────────────────────────────────
   function openCreate(day?: string, startMin?: number) {
@@ -355,8 +360,10 @@ export default function AdminTeachingPage() {
     setError("");
     setSlotMode("class");
     setClassForm({
-      subjectId: "",
-      teacherId: "",
+      subjectId: classSubjectOptions[0]?.id ?? "",
+      teacherId: classSubjectOptions[0]?.id
+        ? (assignedTeachersFor(classSubjectOptions[0].id)[0]?.id ?? "")
+        : "",
       dayOfWeek: day ?? WORK_DAYS[0],
       startTime: minutesToHHMM(start),
       endTime: minutesToHHMM(start + 90),
@@ -372,8 +379,6 @@ export default function AdminTeachingPage() {
     setEditingClass({
       id: block.id,
       subjectId: block.subjectId,
-      // Keep the stored teacher when they're still assigned to this subject;
-      // otherwise fall back to the subject's first assigned teacher.
       teacherId:
         block.teacherId && subjectAssignments.some((t) => t.id === block.teacherId)
           ? block.teacherId
@@ -383,6 +388,26 @@ export default function AdminTeachingPage() {
       endTime: minutesToHHMM(timeToMinutes(block.endTime) ?? 0),
       type: block.type ?? "Lecture",
       group: block.group ?? "",
+    });
+  }
+
+  function openEditBreak() {
+    if (!breakFor) {
+      // Create new break
+      setSlotMode("break");
+      setClassForm({
+        ...emptyClassForm,
+        startTime: "12:00",
+        endTime: "13:00",
+      });
+      setShowClassModal(true);
+      return;
+    }
+    setError("");
+    setEditingBreak({
+      ...breakFor,
+      startTime: minutesToHHMM(timeToMinutes(breakFor.startTime) ?? 0),
+      endTime: minutesToHHMM(timeToMinutes(breakFor.endTime) ?? 0),
     });
   }
 
@@ -398,7 +423,6 @@ export default function AdminTeachingPage() {
     setBreaks(data.breaks ?? []);
   }
 
-  /** Friendly pre-check: the server enforces the break window too (409). */
   function breaksOverlap(startHHMM: string, endHHMM: string): boolean {
     if (!breakFor) return false;
     const s = timeToMinutes(startHHMM);
@@ -410,18 +434,16 @@ export default function AdminTeachingPage() {
 
   function breakOverlapError() {
     if (!breakFor) return "";
-    return `This time overlaps the break (${formatTime(breakFor.startTime)} – ${formatTime(
+    return `This time overlaps the campus break (${formatTime(breakFor.startTime)} – ${formatTime(
       breakFor.endTime,
-    )}). No class can be scheduled during the break on any day.`;
+    )}). No class can be scheduled during the break on any weekday.`;
   }
 
   async function handleCreateClass(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!selectedProgramId || !selectedSemester) return;
 
-    // Break mode: the break is NOT a class — no subject, teacher, day, or
-    // slot type. It reserves its time window on every weekday.
-    if (createIsBreak) {
+    if (slotMode === "break") {
       setError("");
       setSaving(true);
       try {
@@ -442,7 +464,7 @@ export default function AdminTeachingPage() {
         }
         await refreshBreaks();
         setShowClassModal(false);
-        toast.success("Break set successfully.");
+        toast.success("Break period set successfully.");
       } catch {
         setError("Unable to reach the server");
       } finally {
@@ -451,16 +473,21 @@ export default function AdminTeachingPage() {
       return;
     }
 
-    // Radix Select has no native constraint validation — enforce the
-    // "teacher required when the subject has assignments" rule here.
+    if (!classForm.subjectId) {
+      setError("Please select a subject.");
+      return;
+    }
+
     if (assignedTeachersFor(classForm.subjectId).length > 0 && !classForm.teacherId) {
       setError("Select a teacher for this slot.");
       return;
     }
+
     if (breaksOverlap(classForm.startTime, classForm.endTime)) {
       setError(breakOverlapError());
       return;
     }
+
     setError("");
     setSaving(true);
     try {
@@ -471,7 +498,7 @@ export default function AdminTeachingPage() {
           programId: selectedProgramId,
           semester: Number(selectedSemester),
           subjectId: classForm.subjectId,
-          teacherId: classForm.teacherId,
+          teacherId: classForm.teacherId || null,
           dayOfWeek: classForm.dayOfWeek,
           startTime: classForm.startTime,
           endTime: classForm.endTime,
@@ -497,6 +524,7 @@ export default function AdminTeachingPage() {
   async function handleUpdateClass(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!editingClass) return;
+
     if (assignedTeachersFor(editingClass.subjectId).length > 0 && !editingClass.teacherId) {
       setError("Select a teacher for this slot.");
       return;
@@ -516,7 +544,7 @@ export default function AdminTeachingPage() {
           programId: selectedProgramId,
           semester: Number(selectedSemester),
           subjectId: editingClass.subjectId,
-          teacherId: editingClass.teacherId,
+          teacherId: editingClass.teacherId || null,
           dayOfWeek: editingClass.dayOfWeek,
           startTime: editingClass.startTime,
           endTime: editingClass.endTime,
@@ -562,22 +590,6 @@ export default function AdminTeachingPage() {
     }
   }
 
-  // Click an empty spot on a day row → open the "schedule class" dialog at that time.
-  function handleTrackClick(day: string, minutes: number) {
-    openCreate(day, minutes);
-  }
-
-  // ─── Break editor (opened by clicking the hatched band) ──────────
-  function openEditBreak() {
-    if (!breakFor) return;
-    setError("");
-    setEditingBreak({
-      ...breakFor,
-      startTime: minutesToHHMM(timeToMinutes(breakFor.startTime) ?? 0),
-      endTime: minutesToHHMM(timeToMinutes(breakFor.endTime) ?? 0),
-    });
-  }
-
   async function handleUpdateBreak(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!editingBreak) return;
@@ -621,7 +633,7 @@ export default function AdminTeachingPage() {
         return;
       }
       setBreaks((prev) => prev.filter((b) => b.id !== deletingBreak.id));
-      toast.success("Break removed — the time is available for classes again.");
+      toast.success("Break removed — time is available for classes again.");
       setDeletingBreak(null);
     } catch {
       setError("Unable to reach the server");
@@ -631,239 +643,225 @@ export default function AdminTeachingPage() {
     }
   }
 
-  const teacherName = (id: string | null) =>
-    (id && teachers.find((t) => t.id === id)?.name) || "Unknown";
+  const createIsBreak = slotMode === "break";
 
   return (
-    <AdminShell title="Class Scheduling" subtitle="Timetable Management" active="/admin/teaching">
+    <AdminShell
+      title="Class Scheduling"
+      subtitle="Timetable & Lecture Slot Management"
+      active="/admin/teaching"
+    >
       <div className="flex flex-col gap-5">
-        {/* Toolbar */}
-        <Card size="sm">
-          <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="grid min-w-0 flex-1 gap-1.5 sm:max-w-sm">
-              <Label htmlFor="program-select">Program</Label>
-              <Select
-                value={selectedProgramId || undefined}
-                onValueChange={(value) => {
-                  setSelectedProgramId(value);
-                  setSelectedSemester("");
-                }}
-                disabled={loading || programs.length === 0}
-              >
-                <SelectTrigger id="program-select" className="w-full">
-                  <SelectValue
-                    placeholder={programs.length === 0 ? "No programs" : "Select program"}
-                  />
-                </SelectTrigger>
-                <SelectContent position="popper">
-                  {programs.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.code} — {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        {/* ── Top Header Toolbar: Program, Semester & Quick Actions ── */}
+        <Card className="rounded-xl border border-border/70 p-4 shadow-xs bg-card">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            {/* Left: Program & Semester Pickers (Equally Wide) */}
+            <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+              <div className="w-full sm:w-64">
+                <Label htmlFor="sched-program" className="text-xs font-semibold text-muted-foreground mb-1 block">
+                  Degree Program
+                </Label>
+                <Select
+                  value={selectedProgramId || undefined}
+                  onValueChange={(val) => {
+                    setSelectedProgramId(val);
+                    setSelectedSemester("1");
+                  }}
+                  disabled={loading || programs.length === 0}
+                >
+                  <SelectTrigger id="sched-program" className="h-9.5 text-xs font-semibold w-full">
+                    <IconLayersLinked size={15} className="text-primary mr-1.5 shrink-0" />
+                    <SelectValue placeholder="Select program..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {programs.map((p) => (
+                      <SelectItem key={p.id} value={p.id} className="text-xs">
+                        <span className="font-bold">{p.code}</span> — {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="w-full sm:w-64">
+                <Label htmlFor="sched-sem" className="text-xs font-semibold text-muted-foreground mb-1 block">
+                  Semester
+                </Label>
+                <Select
+                  value={selectedSemester || undefined}
+                  onValueChange={(val) => setSelectedSemester(val)}
+                  disabled={!selectedProgramId || semesterCount === 0}
+                >
+                  <SelectTrigger id="sched-sem" className="h-9.5 text-xs font-semibold w-full">
+                    <SelectValue placeholder="Semester" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: semesterCount }, (_, i) => i + 1).map((n) => (
+                      <SelectItem key={n} value={String(n)} className="text-xs">
+                        Semester {n}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            <div className="grid gap-1.5 sm:w-48">
-              <Label htmlFor="semester-select">Semester</Label>
-              <Select
-                value={selectedSemester || undefined}
-                onValueChange={(value) => setSelectedSemester(value)}
-                disabled={!selectedProgramId}
+            {/* Right: Quick Actions */}
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+              {/* Daily Break Status / Edit Button */}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={openEditBreak}
+                disabled={!selectedProgramId || !selectedSemester}
+                className={cn(
+                  "h-9 gap-1.5 text-xs font-semibold",
+                  breakFor ? "border-amber-500/40 text-amber-700 dark:text-amber-400 bg-amber-500/5 hover:bg-amber-500/10" : "",
+                )}
+                title={breakFor ? "Edit the campus daily break window" : "Configure daily campus break"}
               >
-                <SelectTrigger id="semester-select" className="w-full">
-                  <SelectValue placeholder="Select semester" />
-                </SelectTrigger>
-                <SelectContent position="popper">
-                  {Array.from({ length: semesterCount }, (_, i) => i + 1).map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      Semester {n}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                <IconCoffee size={15} className="text-amber-500" />
+                {breakFor ? (
+                  <>
+                    Break: {formatTime(breakFor.startTime)} – {formatTime(breakFor.endTime)}
+                  </>
+                ) : (
+                  "Set Break"
+                )}
+              </Button>
 
-            <Button
-              type="button"
-              onClick={() => openCreate()}
-              disabled={!selectedProgramId || !selectedSemester}
-              className="sm:ml-auto"
-            >
-              <IconPlus size={16} aria-hidden="true" />
-              Add Slot
-            </Button>
+              {/* Add Class Slot Button */}
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => openCreate()}
+                disabled={!selectedProgramId || !selectedSemester}
+                className="h-9 gap-1.5 text-xs font-semibold shadow-xs"
+              >
+                <IconPlus size={15} />
+                Add Class Slot
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        {/* Global Error Notice */}
+        {error && (
+          <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive font-medium">
+            <IconAlertTriangle size={16} className="shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* ── Weekly Matrix Timetable ── */}
+        <Card className="rounded-xl border border-border/70 shadow-xs overflow-hidden bg-card">
+          <CardHeader className="border-b border-border/60 bg-muted/20 px-4 py-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                  <span>Weekly Matrix Timetable</span>
+                  <Badge variant="outline" className="font-mono text-xs">
+                    {selectedProgram?.code} · Semester {selectedSemester}
+                  </Badge>
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Click any empty time slot on a weekday to schedule a class, or click a block to edit.
+                </p>
+              </div>
+
+              {/* Legend */}
+              <div className="flex flex-wrap items-center gap-2 text-[11px] font-medium text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-xs bg-primary/70" />
+                  Lecture
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-xs bg-violet-500/70" />
+                  Practical / Lab
+                </span>
+                {breakFor && (
+                  <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                    <span className="size-2.5 rounded-xs bg-amber-500/50" />
+                    Campus Break
+                  </span>
+                )}
+                {conflictedBlocks.size > 0 && (
+                  <span className="flex items-center gap-1.5 text-destructive font-bold">
+                    <span className="size-2.5 rounded-xs bg-destructive animate-ping" />
+                    Overlap Conflict
+                  </span>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-5">
+            <TimetableGrid
+              items={displayBlocks.map((b) => ({
+                ...b,
+                conflict: conflictedBlocks.has(b.id),
+                subjectTeacherName: teacherName(b.teacherId),
+              }))}
+              breakPeriod={breakFor ? { start: breakFor.startTime, end: breakFor.endTime } : null}
+              onTrackClick={(day, minutes) => openCreate(day, minutes)}
+              onBlockClick={(b) => openEdit(b as Block)}
+              onBreakClick={openEditBreak}
+              trackHint={(day) => `Click to schedule a class on ${titleCaseDay(day)}`}
+            />
           </CardContent>
         </Card>
 
-        {error && (
-          <p className="rounded-lg border border-destructive/20 bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive">
-            {error}
-          </p>
-        )}
-
-        {!loading && !selectedProgram && (
-          <div className="rounded-xl border border-dashed px-8 py-10 text-center text-sm text-muted-foreground">
-            Create a program first to build its timetable.
-          </div>
-        )}
-
-        {selectedProgram && !selectedSemester && (
-          <div className="rounded-xl border border-dashed px-8 py-10 text-center text-sm text-muted-foreground">
-            Pick a semester to view and edit its weekly timetable.
-          </div>
-        )}
-
-        {/* Weekly grid */}
-        {selectedProgram && selectedSemester && (
-          <Card>
-            <CardHeader className="border-b">
-              <CardTitle>Weekly timetable</CardTitle>
-              <CardDescription>
-                {selectedProgram.code} · Semester {selectedSemester} — click an empty slot to
-                schedule a class at that time, or click a block to edit it.
-              </CardDescription>
-              <CardAction>
-                {conflictedBlocks.size > 0 && (
-                  <Badge variant="destructive">
-                    {conflictedBlocks.size} overlapping {conflictedBlocks.size === 1 ? "slot" : "slots"}
-                  </Badge>
-                )}
-              </CardAction>
-            </CardHeader>
-            <CardContent>
-              <TimetableGrid
-                items={scheduledBlocks.map((b) => ({
-                  ...b,
-                  conflict: conflictedBlocks.has(b.id),
-                  subjectTeacherName: teacherName(b.teacherId),
-                }))}
-                breakPeriod={breakFor ? { start: breakFor.startTime, end: breakFor.endTime } : null}
-                onTrackClick={(day, minutes) => handleTrackClick(day, minutes)}
-                onBlockClick={(b) => openEdit(b as Block)}
-                onBreakClick={openEditBreak}
-                trackHint={(day) => `Click to schedule a ${day.toLowerCase()} class`}
-              />
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Unscheduled curriculum subjects for this semester */}
-        {selectedProgram && selectedSemester && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Curriculum coverage</CardTitle>
-              <CardDescription>
-                Semester {selectedSemester} subjects from the published curriculum and whether they
-                already have a scheduled slot.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {classSubjectOptions.length === 0 ? (
-                <p className="text-[13px] text-muted-foreground">
-                  No coded subjects found in the published curriculum for this semester.
-                </p>
-              ) : unscheduledSubjects.length === 0 ? (
-                <p className="flex items-center gap-1.5 text-[13px] font-medium text-emerald-600 dark:text-emerald-400">
-                  <IconCircleCheck size={16} aria-hidden="true" className="shrink-0" />
-                  Every curriculum subject has at least one scheduled slot.
-                </p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {unscheduledSubjects.map((course) => (
-                    <span
-                      key={course.key}
-                      className="inline-flex max-w-full items-center gap-2 rounded-full border bg-background py-1 pr-1 pl-3 text-xs"
-                    >
-                      <strong className="whitespace-nowrap font-semibold text-primary">
-                        {course.code}
-                      </strong>
-                      <span className="min-w-0 truncate">{course.name}</span>
-                      <Button
-                        type="button"
-                        size="xs"
-                        variant="secondary"
-                        title="Schedule this subject"
-                        onClick={() => {
-                          openCreate();
-                          const subjectId = resolveSubjectId(course);
-                          setClassForm((cf) => ({
-                            ...cf,
-                            subjectId,
-                            teacherId: subjectId
-                              ? (assignedTeachersFor(subjectId)[0]?.id ?? "")
-                              : cf.teacherId,
-                          }));
-                        }}
-                      >
-                        <IconPlus size={13} aria-hidden="true" />
-                        Schedule
-                      </Button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Modal: Add Class Slot */}
+        {/* ══════════════════════════════════════════════════════════ */}
+        {/* MODAL 1: ADD CLASS SLOT / BREAK                           */}
+        {/* ══════════════════════════════════════════════════════════ */}
         {showClassModal && selectedProgram && (
-          <AdminModal title="Schedule New Class Slot" onClose={() => setShowClassModal(false)}>
+          <AdminModal title="Schedule Class Slot" onClose={() => setShowClassModal(false)}>
             <form className="grid gap-4" onSubmit={handleCreateClass}>
               <div className="flex items-center gap-2">
-                <Badge variant="secondary">{selectedProgram.code}</Badge>
-                <span className="text-sm text-muted-foreground">Semester {selectedSemester}</span>
+                <Badge variant="secondary" className="font-bold">{selectedProgram.code}</Badge>
+                <span className="text-xs text-muted-foreground font-semibold">Semester {selectedSemester}</span>
               </div>
 
-              {/* Slot kind: a regular class, or a break that reserves its time
-                  on every weekday. Break mode hides subject/teacher/day/type. */}
+              {/* Slot Mode: Class slot vs Break period */}
               <div className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-muted/40 p-1">
                 <button
                   type="button"
                   onClick={() => setSlotMode("class")}
                   className={cn(
-                    "rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors",
+                    "rounded-md px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer",
                     !createIsBreak
                       ? "bg-background text-foreground shadow-xs"
                       : "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  Class slot
+                  Class Lecture / Lab
                 </button>
                 <button
                   type="button"
                   onClick={() => setSlotMode("break")}
                   disabled={!!breakFor}
-                  title={breakFor ? "A break is already set — click it on the table to edit it" : undefined}
+                  title={breakFor ? "Break already set — click it to edit" : undefined}
                   className={cn(
-                    "rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                    "rounded-md px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50",
                     createIsBreak
                       ? "bg-background text-foreground shadow-xs"
                       : "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  Break period
+                  Campus Break Window
                 </button>
               </div>
+
               {createIsBreak && (
-                <p className="rounded-lg border border-border/60 bg-muted/40 px-3.5 py-2.5 text-[13px] text-muted-foreground">
-                  The break reserves this time on <strong className="text-foreground">every weekday</strong> — no
-                  class can be scheduled during it, and it needs no subject, teacher, or day.
-                </p>
-              )}
-              {breakFor && !createIsBreak && (
-                <p className="text-xs text-muted-foreground">
-                  A break is already set for this timetable ({formatTime(breakFor.startTime)} –{" "}
-                  {formatTime(breakFor.endTime)}) — click it on the table to edit or remove it.
-                </p>
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-300">
+                  Reserves this time on <strong>every weekday (Mon–Fri)</strong>. No class can be scheduled during this interval.
+                </div>
               )}
 
               {!createIsBreak && (
                 <>
                   <div className="grid gap-1.5">
-                    <Label htmlFor="class-subject">Subject</Label>
+                    <Label htmlFor="class-subject" className="text-xs font-semibold">Course / Subject</Label>
                     <Select
                       value={classForm.subjectId || undefined}
                       onValueChange={(subjectId) => {
@@ -875,18 +873,18 @@ export default function AdminTeachingPage() {
                         });
                       }}
                     >
-                      <SelectTrigger id="class-subject" className="w-full">
+                      <SelectTrigger id="class-subject" className="w-full text-xs font-medium h-9">
                         <SelectValue
                           placeholder={
                             classSubjectOptions.length === 0
                               ? "No subjects in curriculum for this semester"
-                              : "Select subject"
+                              : "Select subject..."
                           }
                         />
                       </SelectTrigger>
                       <SelectContent position="popper">
                         {classSubjectOptions.map((option) => (
-                          <SelectItem key={option.id} value={option.id}>
+                          <SelectItem key={option.id} value={option.id} className="text-xs">
                             {option.label}
                           </SelectItem>
                         ))}
@@ -895,77 +893,76 @@ export default function AdminTeachingPage() {
                   </div>
 
                   <div className="grid gap-1.5">
-                    <Label htmlFor="class-teacher">Teacher (from subject assignment)</Label>
-                <Select
-                  value={classForm.teacherId || undefined}
-                  onValueChange={(teacherId) => setClassForm({ ...classForm, teacherId })}
-                  disabled={assignedTeachersFor(classForm.subjectId).length === 0}
-                >
-                  <SelectTrigger id="class-teacher" className="w-full">
-                    <SelectValue
-                      placeholder={
-                        assignedTeachersFor(classForm.subjectId).length === 0
-                          ? "No teacher assigned to this subject"
-                          : "Select teacher"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent position="popper">
-                    {assignedTeachersFor(classForm.subjectId).map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.name} ({t.employeeNo})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Auto-filled from subject assignments. Assign teachers to subjects on the People page.
-                </p>
-              </div>
-
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="class-day">Weekday</Label>
+                    <Label htmlFor="class-teacher" className="text-xs font-semibold">Instructor (From Subject Assignment)</Label>
                     <Select
-                      value={classForm.dayOfWeek}
-                      onValueChange={(dayOfWeek) => setClassForm({ ...classForm, dayOfWeek })}
+                      value={classForm.teacherId || undefined}
+                      onValueChange={(teacherId) => setClassForm({ ...classForm, teacherId })}
+                      disabled={assignedTeachersFor(classForm.subjectId).length === 0}
                     >
-                      <SelectTrigger id="class-day" className="w-full">
-                        <SelectValue />
+                      <SelectTrigger id="class-teacher" className="w-full text-xs font-medium h-9">
+                        <SelectValue
+                          placeholder={
+                            assignedTeachersFor(classForm.subjectId).length === 0
+                              ? "No teacher assigned to this subject"
+                              : "Select instructor..."
+                          }
+                        />
                       </SelectTrigger>
                       <SelectContent position="popper">
-                        {WORK_DAYS.map((day) => (
-                          <SelectItem key={day} value={day}>
-                            {titleCaseDay(day)}
+                        {assignedTeachersFor(classForm.subjectId).map((t) => (
+                          <SelectItem key={t.id} value={t.id} className="text-xs">
+                            {t.name} ({t.employeeNo})
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="grid gap-1.5">
-                      <Label htmlFor="class-type">Slot type</Label>
+                      <Label htmlFor="class-day" className="text-xs font-semibold">Weekday</Label>
+                      <Select
+                        value={classForm.dayOfWeek}
+                        onValueChange={(dayOfWeek) => setClassForm({ ...classForm, dayOfWeek })}
+                      >
+                        <SelectTrigger id="class-day" className="w-full text-xs font-medium h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent position="popper">
+                          {WORK_DAYS.map((day) => (
+                            <SelectItem key={day} value={day} className="text-xs">
+                              {titleCaseDay(day)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="class-type" className="text-xs font-semibold">Slot Type</Label>
                       <Select
                         value={classForm.type || undefined}
                         onValueChange={(type) => setClassForm({ ...classForm, type })}
                       >
-                        <SelectTrigger id="class-type" className="w-full">
+                        <SelectTrigger id="class-type" className="w-full text-xs font-medium h-9">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent position="popper">
-                          <SelectItem value="Lecture">Lecture</SelectItem>
-                          <SelectItem value="Practical">Practical</SelectItem>
+                          <SelectItem value="Lecture" className="text-xs">Lecture</SelectItem>
+                          <SelectItem value="Practical" className="text-xs">Practical / Lab</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
+
                     <div className="grid gap-1.5">
-                      <Label htmlFor="class-group">Group (optional)</Label>
+                      <Label htmlFor="class-group" className="text-xs font-semibold">Group (Optional)</Label>
                       <Input
                         id="class-group"
                         type="text"
                         placeholder="e.g. Gr. A"
                         value={classForm.group}
                         onChange={(e) => setClassForm({ ...classForm, group: e.target.value })}
+                        className="text-xs h-9"
                       />
                     </div>
                   </div>
@@ -974,57 +971,65 @@ export default function AdminTeachingPage() {
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="class-start">Start time</Label>
+                  <Label htmlFor="class-start" className="text-xs font-semibold">Start Time</Label>
                   <Input
                     id="class-start"
                     type="time"
                     value={classForm.startTime}
                     onChange={(e) => setClassForm({ ...classForm, startTime: e.target.value })}
+                    className="text-xs h-9 font-mono"
                   />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="class-end">End time</Label>
+                  <Label htmlFor="class-end" className="text-xs font-semibold">End Time</Label>
                   <Input
                     id="class-end"
                     type="time"
                     value={classForm.endTime}
                     onChange={(e) => setClassForm({ ...classForm, endTime: e.target.value })}
+                    className="text-xs h-9 font-mono"
                   />
                 </div>
               </div>
 
-              {error && <p className="text-[13px] text-destructive">{error}</p>}
+              {error && (
+                <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive font-medium">
+                  {error}
+                </p>
+              )}
 
-              <div className="flex flex-wrap justify-end gap-2.5">
-                <Button type="submit" disabled={saving}>
+              <div className="flex flex-wrap justify-end gap-2.5 pt-2">
+                <Button variant="outline" type="button" onClick={() => setShowClassModal(false)} className="text-xs">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={saving} className="text-xs font-semibold">
                   {saving ? (
                     "Scheduling…"
                   ) : (
                     <>
-                      <IconPlus size={15} aria-hidden="true" />
-                      Schedule Class
+                      <IconPlus size={15} />
+                      {createIsBreak ? "Set Campus Break" : "Schedule Class"}
                     </>
                   )}
-                </Button>
-                <Button variant="outline" type="button" onClick={() => setShowClassModal(false)}>
-                  Cancel
                 </Button>
               </div>
             </form>
           </AdminModal>
         )}
 
-        {/* Modal: Edit Class Slot */}
+        {/* ══════════════════════════════════════════════════════════ */}
+        {/* MODAL 2: EDIT CLASS SLOT                                   */}
+        {/* ══════════════════════════════════════════════════════════ */}
         {editingClass && selectedProgram && (
           <AdminModal title="Edit Class Slot" onClose={() => setEditingClass(null)}>
             <form className="grid gap-4" onSubmit={handleUpdateClass}>
               <div className="flex items-center gap-2">
-                <Badge variant="secondary">{selectedProgram.code}</Badge>
-                <span className="text-sm text-muted-foreground">Semester {selectedSemester}</span>
+                <Badge variant="secondary" className="font-bold">{selectedProgram.code}</Badge>
+                <span className="text-xs text-muted-foreground font-semibold">Semester {selectedSemester}</span>
               </div>
 
               <div className="grid gap-1.5">
-                <Label htmlFor="edit-subject">Subject</Label>
+                <Label htmlFor="edit-subject" className="text-xs font-semibold">Subject</Label>
                 <Select
                   value={editingClass.subjectId || undefined}
                   onValueChange={(subjectId) => {
@@ -1036,7 +1041,7 @@ export default function AdminTeachingPage() {
                     });
                   }}
                 >
-                  <SelectTrigger id="edit-subject" className="w-full">
+                  <SelectTrigger id="edit-subject" className="w-full text-xs font-medium h-9">
                     <SelectValue
                       placeholder={
                         editClassSubjectOptions.length === 0
@@ -1047,7 +1052,7 @@ export default function AdminTeachingPage() {
                   </SelectTrigger>
                   <SelectContent position="popper">
                     {editClassSubjectOptions.map((option) => (
-                      <SelectItem key={option.id} value={option.id}>
+                      <SelectItem key={option.id} value={option.id} className="text-xs">
                         {option.label}
                       </SelectItem>
                     ))}
@@ -1056,47 +1061,44 @@ export default function AdminTeachingPage() {
               </div>
 
               <div className="grid gap-1.5">
-                <Label htmlFor="edit-teacher">Teacher (from subject assignment)</Label>
+                <Label htmlFor="edit-teacher" className="text-xs font-semibold">Instructor</Label>
                 <Select
                   value={editingClass.teacherId || undefined}
                   onValueChange={(teacherId) => setEditingClass({ ...editingClass, teacherId })}
                   disabled={assignedTeachersFor(editingClass.subjectId).length === 0}
                 >
-                  <SelectTrigger id="edit-teacher" className="w-full">
+                  <SelectTrigger id="edit-teacher" className="w-full text-xs font-medium h-9">
                     <SelectValue
                       placeholder={
                         assignedTeachersFor(editingClass.subjectId).length === 0
                           ? "No teacher assigned to this subject"
-                          : "Select teacher"
+                          : "Select instructor"
                       }
                     />
                   </SelectTrigger>
                   <SelectContent position="popper">
                     {assignedTeachersFor(editingClass.subjectId).map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
+                      <SelectItem key={t.id} value={t.id} className="text-xs">
                         {t.name} ({t.employeeNo})
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Auto-filled from subject assignments. Assign teachers to subjects on the People page.
-                </p>
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="edit-day">Weekday</Label>
+                  <Label htmlFor="edit-day" className="text-xs font-semibold">Weekday</Label>
                   <Select
                     value={editingClass.dayOfWeek}
                     onValueChange={(dayOfWeek) => setEditingClass({ ...editingClass, dayOfWeek })}
                   >
-                    <SelectTrigger id="edit-day" className="w-full">
+                    <SelectTrigger id="edit-day" className="w-full text-xs font-medium h-9">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent position="popper">
                       {WORK_DAYS.map((day) => (
-                        <SelectItem key={day} value={day}>
+                        <SelectItem key={day} value={day} className="text-xs">
                           {titleCaseDay(day)}
                         </SelectItem>
                       ))}
@@ -1104,135 +1106,160 @@ export default function AdminTeachingPage() {
                   </Select>
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="edit-start">Start time</Label>
+                  <Label htmlFor="edit-start" className="text-xs font-semibold">Start Time</Label>
                   <Input
                     id="edit-start"
                     type="time"
                     value={editingClass.startTime}
                     onChange={(e) => setEditingClass({ ...editingClass, startTime: e.target.value })}
+                    className="text-xs h-9 font-mono"
                   />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="edit-end">End time</Label>
+                  <Label htmlFor="edit-end" className="text-xs font-semibold">End Time</Label>
                   <Input
                     id="edit-end"
                     type="time"
                     value={editingClass.endTime}
                     onChange={(e) => setEditingClass({ ...editingClass, endTime: e.target.value })}
+                    className="text-xs h-9 font-mono"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="edit-type">Slot type</Label>
+                  <Label htmlFor="edit-type" className="text-xs font-semibold">Slot Type</Label>
                   <Select
                     value={editingClass.type || undefined}
                     onValueChange={(type) => setEditingClass({ ...editingClass, type })}
                   >
-                    <SelectTrigger id="edit-type" className="w-full">
+                    <SelectTrigger id="edit-type" className="w-full text-xs font-medium h-9">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent position="popper">
-                      <SelectItem value="Lecture">Lecture</SelectItem>
-                      <SelectItem value="Practical">Practical</SelectItem>
+                      <SelectItem value="Lecture" className="text-xs">Lecture</SelectItem>
+                      <SelectItem value="Practical" className="text-xs">Practical / Lab</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="edit-group">Group (optional)</Label>
+                  <Label htmlFor="edit-group" className="text-xs font-semibold">Group (Optional)</Label>
                   <Input
                     id="edit-group"
                     type="text"
                     placeholder="e.g. Gr. A"
                     value={editingClass.group}
                     onChange={(e) => setEditingClass({ ...editingClass, group: e.target.value })}
+                    className="text-xs h-9"
                   />
                 </div>
               </div>
 
-              {error && <p className="text-[13px] text-destructive">{error}</p>}
+              {error && (
+                <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive font-medium">
+                  {error}
+                </p>
+              )}
 
-              <div className="flex flex-wrap justify-end gap-2.5">
-                <Button type="submit" disabled={saving}>
-                  {saving ? "Saving Changes…" : "Save Changes"}
-                </Button>
-                <Button variant="outline" type="button" onClick={() => setEditingClass(null)}>
+              <div className="flex flex-wrap justify-end gap-2.5 pt-2">
+                <Button variant="outline" type="button" onClick={() => setEditingClass(null)} className="text-xs">
                   Cancel
+                </Button>
+                <Button type="submit" disabled={saving} className="text-xs font-semibold">
+                  {saving ? "Saving Changes…" : "Save Changes"}
                 </Button>
               </div>
             </form>
           </AdminModal>
         )}
 
-        {/* Modal: Delete Class Slot */}
+        {/* ══════════════════════════════════════════════════════════ */}
+        {/* MODAL 3: DELETE CLASS CONFIRMATION                         */}
+        {/* ══════════════════════════════════════════════════════════ */}
         {deletingClass && (
           <AdminModal title="Delete Class Slot" onClose={() => setDeletingClass(null)}>
             <div className="grid gap-3 text-sm text-muted-foreground">
               <p>
-                Delete the slot for{" "}
+                Delete the scheduled slot for{" "}
                 <strong className="text-foreground">
                   {deletingClass.subject.name} ({deletingClass.subject.code})
                 </strong>{" "}
                 on {titleCaseDay(deletingClass.dayOfWeek)} ({formatTime(deletingClass.startTime)} –{" "}
                 {formatTime(deletingClass.endTime)})?
               </p>
-              <p className="flex items-center gap-2 rounded-lg border border-destructive/25 bg-destructive/10 px-3.5 py-2.5 text-[13px] font-medium text-destructive dark:border-destructive/40 dark:bg-destructive/20">
-                <IconAlertTriangle size={16} aria-hidden="true" className="shrink-0" />
-                Deleting this schedule removes its attendance sessions and student records.
-              </p>
-              {error && <p className="text-[13px] text-destructive">{error}</p>}
+              <div className="flex items-center gap-2 rounded-lg border border-destructive/25 bg-destructive/10 p-3 text-xs font-medium text-destructive">
+                <IconAlertTriangle size={16} className="shrink-0" />
+                <span>
+                  Deleting this slot will also remove associated student attendance logs and sessions.
+                </span>
+              </div>
+
+              {error && <p className="text-xs text-destructive">{error}</p>}
+
               <div className="mt-2 flex flex-wrap justify-end gap-2.5">
-                <Button variant="destructive" type="button" onClick={handleDeleteClass} disabled={saving}>
-                  {saving ? "Deleting…" : "Yes, Delete Slot"}
-                </Button>
                 <Button
                   variant="outline"
                   type="button"
                   onClick={() => setDeletingClass(null)}
                   disabled={saving}
+                  className="text-xs"
                 >
                   Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  type="button"
+                  onClick={handleDeleteClass}
+                  disabled={saving}
+                  className="text-xs font-semibold"
+                >
+                  {saving ? "Deleting…" : "Confirm Delete"}
                 </Button>
               </div>
             </div>
           </AdminModal>
         )}
 
-        {/* Modal: Edit Break */}
+        {/* ══════════════════════════════════════════════════════════ */}
+        {/* MODAL 4: EDIT BREAK PERIOD                                 */}
+        {/* ══════════════════════════════════════════════════════════ */}
         {editingBreak && (
-          <AdminModal title="Edit Break" onClose={() => setEditingBreak(null)}>
+          <AdminModal title="Edit Campus Break" onClose={() => setEditingBreak(null)}>
             <form className="grid gap-4" onSubmit={handleUpdateBreak}>
               <div className="flex items-center gap-2">
-                <Badge variant="secondary">{selectedProgram?.code}</Badge>
-                <span className="text-sm text-muted-foreground">Semester {selectedSemester}</span>
+                <Badge variant="secondary" className="font-bold">{selectedProgram?.code}</Badge>
+                <span className="text-xs text-muted-foreground font-semibold">Semester {selectedSemester}</span>
               </div>
-              <p className="rounded-lg border border-border/60 bg-muted/40 px-3.5 py-2.5 text-[13px] text-muted-foreground">
-                The break reserves this time on <strong className="text-foreground">every weekday</strong> — no
-                class can be scheduled during it.
+              <p className="rounded-lg border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
+                The break period reserves this time window across <strong>all weekdays</strong>.
               </p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="break-start">Start time</Label>
+                  <Label htmlFor="break-start" className="text-xs font-semibold">Start Time</Label>
                   <Input
                     id="break-start"
                     type="time"
                     value={editingBreak.startTime}
                     onChange={(e) => setEditingBreak({ ...editingBreak, startTime: e.target.value })}
+                    className="text-xs h-9 font-mono"
                   />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="break-end">End time</Label>
+                  <Label htmlFor="break-end" className="text-xs font-semibold">End Time</Label>
                   <Input
                     id="break-end"
                     type="time"
                     value={editingBreak.endTime}
                     onChange={(e) => setEditingBreak({ ...editingBreak, endTime: e.target.value })}
+                    className="text-xs h-9 font-mono"
                   />
                 </div>
               </div>
-              {error && <p className="text-[13px] text-destructive">{error}</p>}
-              <div className="flex flex-wrap justify-between gap-2.5">
+
+              {error && <p className="text-xs text-destructive">{error}</p>}
+
+              <div className="flex flex-wrap justify-between gap-2.5 pt-2">
                 <Button
                   variant="destructive"
                   type="button"
@@ -1241,15 +1268,16 @@ export default function AdminTeachingPage() {
                     setEditingBreak(null);
                   }}
                   disabled={saving}
+                  className="text-xs font-semibold"
                 >
                   Remove Break
                 </Button>
-                <div className="flex flex-wrap gap-2.5">
-                  <Button type="submit" disabled={saving}>
-                    {saving ? "Saving…" : "Save Changes"}
-                  </Button>
-                  <Button variant="outline" type="button" onClick={() => setEditingBreak(null)}>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" type="button" onClick={() => setEditingBreak(null)} className="text-xs">
                     Cancel
+                  </Button>
+                  <Button type="submit" disabled={saving} className="text-xs font-semibold">
+                    {saving ? "Saving…" : "Save Changes"}
                   </Button>
                 </div>
               </div>
@@ -1257,26 +1285,35 @@ export default function AdminTeachingPage() {
           </AdminModal>
         )}
 
-        {/* Modal: Delete Break */}
+        {/* ══════════════════════════════════════════════════════════ */}
+        {/* MODAL 5: DELETE BREAK CONFIRMATION                         */}
+        {/* ══════════════════════════════════════════════════════════ */}
         {deletingBreak && (
-          <AdminModal title="Remove Break" onClose={() => setDeletingBreak(null)}>
+          <AdminModal title="Remove Break Period" onClose={() => setDeletingBreak(null)}>
             <div className="grid gap-3 text-sm text-muted-foreground">
               <p>
-                Remove the break ({formatTime(deletingBreak.startTime)} –{" "}
-                {formatTime(deletingBreak.endTime)})? The time will become available for classes again.
+                Remove the daily break ({formatTime(deletingBreak.startTime)} –{" "}
+                {formatTime(deletingBreak.endTime)})? This time will become available for classes again.
               </p>
-              {error && <p className="text-[13px] text-destructive">{error}</p>}
+              {error && <p className="text-xs text-destructive">{error}</p>}
               <div className="mt-2 flex flex-wrap justify-end gap-2.5">
-                <Button variant="destructive" type="button" onClick={handleDeleteBreak} disabled={saving}>
-                  {saving ? "Removing…" : "Remove Break"}
-                </Button>
                 <Button
                   variant="outline"
                   type="button"
                   onClick={() => setDeletingBreak(null)}
                   disabled={saving}
+                  className="text-xs"
                 >
                   Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  type="button"
+                  onClick={handleDeleteBreak}
+                  disabled={saving}
+                  className="text-xs font-semibold"
+                >
+                  {saving ? "Removing…" : "Confirm Remove"}
                 </Button>
               </div>
             </div>

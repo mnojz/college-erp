@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { IconCloudUpload, IconX } from "@tabler/icons-react";
+import { IconCloudUpload, IconDownload, IconX } from "@tabler/icons-react";
 
 type IntakePreviewStudent = {
   enrollmentNumber: string;
@@ -152,19 +152,58 @@ export function BulkIntakeCard() {
     resetFile();
   }
 
+  function downloadSampleJson() {
+    const sample = [
+      {
+        enrollmentNumber: "079BCT001",
+        registrationId: "FWU-2026-001",
+        rollNumber: 1,
+        firstName: "Aarav",
+        lastName: "Sharma",
+        email: "aarav.sharma@example.edu.np",
+      },
+      {
+        enrollmentNumber: "079BCT002",
+        registrationId: "FWU-2026-002",
+        rollNumber: 2,
+        firstName: "Bikash",
+        lastName: "Thapa",
+        email: "bikash.thapa@example.edu.np",
+      },
+    ];
+    const blob = new Blob([JSON.stringify(sample, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "sample_student_intake.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Sample JSON downloaded.");
+  }
 
   return (
     <Card className="mt-5">
-      <CardHeader>
-        <CardTitle className="text-base">Bulk Intake — New Batch</CardTitle>
+      <CardHeader className="pb-3 border-b border-border/60">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <CardTitle className="text-base font-bold">Batch Student Intake</CardTitle>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={downloadSampleJson}
+            className="gap-1.5 text-xs font-semibold h-8.5 shrink-0"
+          >
+            <IconDownload size={14} />
+            <span>Download Sample JSON</span>
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-3">
-          <p className="m-0 text-sm text-muted-foreground">
-            Upload the entrance-system JSON export. Each entry needs an enrollment
-            number, registration ID, name and email (roll optional).
-          </p>
-
+        <div className="grid gap-3 pt-4">
           <div className="flex flex-wrap items-end gap-3">
             <div className="grid gap-1.5">
               <Label>Program</Label>
@@ -232,7 +271,7 @@ export function BulkIntakeCard() {
                 if (!busy) void handleFile(e.dataTransfer.files?.[0]);
               }}
               className={
-                "flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed px-4 py-7 text-center transition-colors " +
+                "flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed px-4 py-6 text-center transition-colors " +
                 (dragging
                   ? "border-primary bg-primary/5"
                   : "border-border hover:border-primary/60 hover:bg-muted/40") +
@@ -248,10 +287,10 @@ export function BulkIntakeCard() {
                 <p className="m-0 text-sm font-medium text-foreground">{fileName}</p>
               ) : (
                 <>
-                  <p className="m-0 text-sm font-medium text-foreground">
-                    Drag &amp; drop the JSON file here, or click to browse
+                  <p className="m-0 text-xs sm:text-sm font-medium text-foreground">
+                    Drag &amp; drop JSON file here, or click to browse
                   </p>
-                  <p className="m-0 text-xs text-muted-foreground">Accepts .json exports</p>
+                  <p className="m-0 text-[11px] text-muted-foreground">Accepts .json array of student records</p>
                 </>
               )}
               {fileName && !busy && (

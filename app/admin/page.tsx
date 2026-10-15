@@ -137,37 +137,36 @@ export default function AdminPage() {
         )}
 
         {/* Vital KPI Metric Cards */}
-        <section className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5 sm:gap-4">
+        <section className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-3.5">
           {loading ? (
             Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="rounded-xl border border-border/60 bg-card p-4 space-y-3"
+                className="rounded-xl border border-border/60 bg-card p-3 sm:p-3.5 space-y-2.5"
               >
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-7 w-14" />
-                <Skeleton className="h-3 w-28" />
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="size-7 rounded-md" />
+                </div>
+                <Skeleton className="h-8 w-20" />
               </div>
             ))
           ) : (
             <>
               {/* 1. Students */}
               <Link href="/admin/people" className="group">
-                <Card className="rounded-xl border border-border/70 bg-card p-4 shadow-xs transition-all duration-200 hover:border-primary/40 hover:shadow-sm">
+                <Card className="rounded-xl border border-border/70 bg-card p-3 sm:p-3.5 shadow-xs transition-all duration-200 hover:border-primary/40 hover:shadow-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
+                    <span className="text-sm font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
                       Students
                     </span>
-                    <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-                      <IconUsers size={16} />
+                    <span className="flex size-7.5 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <IconUsers size={17} />
                     </span>
                   </div>
-                  <div className="mt-2.5">
-                    <p className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
+                  <div className="mt-2">
+                    <p className="text-3xl font-extrabold tracking-tight text-foreground tabular-nums leading-none">
                       {stats?.totals.students ?? 0}
-                    </p>
-                    <p className="mt-1 text-[11px] text-muted-foreground truncate">
-                      {stats?.lifecycle.active ?? 0} active learners
                     </p>
                   </div>
                 </Card>
@@ -175,21 +174,18 @@ export default function AdminPage() {
 
               {/* 2. Teachers */}
               <Link href="/admin/people" className="group">
-                <Card className="rounded-xl border border-border/70 bg-card p-4 shadow-xs transition-all duration-200 hover:border-emerald-500/40 hover:shadow-sm">
+                <Card className="rounded-xl border border-border/70 bg-card p-3 sm:p-3.5 shadow-xs transition-all duration-200 hover:border-emerald-500/40 hover:shadow-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
+                    <span className="text-sm font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
                       Teachers
                     </span>
-                    <span className="flex size-7 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                      <IconSchool size={16} />
+                    <span className="flex size-7.5 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                      <IconSchool size={17} />
                     </span>
                   </div>
-                  <div className="mt-2.5">
-                    <p className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
+                  <div className="mt-2">
+                    <p className="text-3xl font-extrabold tracking-tight text-foreground tabular-nums leading-none">
                       {stats?.totals.teachers ?? 0}
-                    </p>
-                    <p className="mt-1 text-[11px] text-muted-foreground truncate">
-                      Teaching staff
                     </p>
                   </div>
                 </Card>
@@ -197,21 +193,18 @@ export default function AdminPage() {
 
               {/* 3. Programs */}
               <Link href="/admin/curriculum" className="group">
-                <Card className="rounded-xl border border-border/70 bg-card p-4 shadow-xs transition-all duration-200 hover:border-violet-500/40 hover:shadow-sm">
+                <Card className="rounded-xl border border-border/70 bg-card p-3 sm:p-3.5 shadow-xs transition-all duration-200 hover:border-violet-500/40 hover:shadow-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
+                    <span className="text-sm font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
                       Programs
                     </span>
-                    <span className="flex size-7 items-center justify-center rounded-md bg-violet-500/10 text-violet-600 dark:text-violet-400">
-                      <IconBriefcase size={16} />
+                    <span className="flex size-7.5 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                      <IconBriefcase size={17} />
                     </span>
                   </div>
-                  <div className="mt-2.5">
-                    <p className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
+                  <div className="mt-2">
+                    <p className="text-3xl font-extrabold tracking-tight text-foreground tabular-nums leading-none">
                       {stats?.totals.programs ?? 0}
-                    </p>
-                    <p className="mt-1 text-[11px] text-muted-foreground truncate">
-                      Degree programs
                     </p>
                   </div>
                 </Card>
@@ -219,21 +212,18 @@ export default function AdminPage() {
 
               {/* 4. Course Subjects */}
               <Link href="/admin/curriculum" className="group">
-                <Card className="rounded-xl border border-border/70 bg-card p-4 shadow-xs transition-all duration-200 hover:border-blue-500/40 hover:shadow-sm">
+                <Card className="rounded-xl border border-border/70 bg-card p-3 sm:p-3.5 shadow-xs transition-all duration-200 hover:border-blue-500/40 hover:shadow-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
+                    <span className="text-sm font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
                       Subjects
                     </span>
-                    <span className="flex size-7 items-center justify-center rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                      <IconBook size={16} />
+                    <span className="flex size-7.5 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                      <IconBook size={17} />
                     </span>
                   </div>
-                  <div className="mt-2.5">
-                    <p className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
+                  <div className="mt-2">
+                    <p className="text-3xl font-extrabold tracking-tight text-foreground tabular-nums leading-none">
                       {stats?.totals.subjects ?? 0}
-                    </p>
-                    <p className="mt-1 text-[11px] text-muted-foreground truncate">
-                      Course modules
                     </p>
                   </div>
                 </Card>
@@ -241,42 +231,36 @@ export default function AdminPage() {
 
               {/* 5. Class Slots */}
               <Link href="/admin/teaching" className="group">
-                <Card className="rounded-xl border border-border/70 bg-card p-4 shadow-xs transition-all duration-200 hover:border-amber-500/40 hover:shadow-sm">
+                <Card className="rounded-xl border border-border/70 bg-card p-3 sm:p-3.5 shadow-xs transition-all duration-200 hover:border-amber-500/40 hover:shadow-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
+                    <span className="text-sm font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
                       Class Slots
                     </span>
-                    <span className="flex size-7 items-center justify-center rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                      <IconCalendar size={16} />
+                    <span className="flex size-7.5 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                      <IconCalendar size={17} />
                     </span>
                   </div>
-                  <div className="mt-2.5">
-                    <p className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
+                  <div className="mt-2">
+                    <p className="text-3xl font-extrabold tracking-tight text-foreground tabular-nums leading-none">
                       {stats?.totals.classes ?? 0}
-                    </p>
-                    <p className="mt-1 text-[11px] text-muted-foreground truncate">
-                      Weekly periods
                     </p>
                   </div>
                 </Card>
               </Link>
 
               {/* 6. Attendance Rate */}
-              <Card className="rounded-xl border border-border/70 bg-card p-4 shadow-xs">
+              <Card className="rounded-xl border border-border/70 bg-card p-3 sm:p-3.5 shadow-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-muted-foreground">
+                  <span className="text-sm font-semibold text-muted-foreground">
                     Attendance Avg
                   </span>
-                  <span className="flex size-7 items-center justify-center rounded-md bg-sky-500/10 text-sky-600 dark:text-sky-400">
-                    <IconTrendingUp size={16} />
+                  <span className="flex size-7.5 items-center justify-center rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400">
+                    <IconTrendingUp size={17} />
                   </span>
                 </div>
-                <div className="mt-2.5">
-                  <p className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
+                <div className="mt-2">
+                  <p className="text-3xl font-extrabold tracking-tight text-foreground tabular-nums leading-none">
                     {stats?.totals.attendanceRate ?? 0}%
-                  </p>
-                  <p className="mt-1 text-[11px] text-muted-foreground truncate">
-                    Across {stats?.totals.totalAttendance ?? 0} logs
                   </p>
                 </div>
               </Card>

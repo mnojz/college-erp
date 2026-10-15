@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   IconBriefcase,
   IconCalendar,
@@ -370,26 +370,98 @@ export function StudentLifecycleDonutCard({ data }: { data: LifecycleData }) {
   );
 }
 
-/** ── 4. Weekly Schedule Load (Teaching Sessions by Day) ── */
+/** ── 4. Weekly Schedule Load (Smooth Curve Area Graph) ── */
 export function WeeklyTeachingLoadCard({ data }: { data: WeeklyDayDatum[] }) {
-  const max = data.reduce((m, d) => Math.max(m, d.count), 0);
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
   const total = data.reduce((sum, d) => sum + d.count, 0);
+  const max = data.reduce((m, d) => Math.max(m, d.count), 0);
+
+  // SVG dimensions
+  const svgWidth = 500;
+  const svgHeight = 210;
+  const padX = 45;
+  const padTop = 32;
+  const bottomY = 160;
+  const chartHeight = bottomY - padTop; // 128
+
+  // Headroom for peak so the curve crowns gracefully without clipping
+  const scaleMax = max > 0 ? Math.max(max * 1.25, max + 2) : 10;
+
+  function formatDay(str: string) {
+    if (!str) return "";
+    const clean = str.slice(0, 3);
+    return clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase();
+  }
+
+  // Calculate coordinates for each point
+  const points: Array<{ x: number; y: number; data: WeeklyDayDatum; index: number }> =
+    useMemo(() => {
+      return data.map((d, i) => {
+        const x =
+          data.length > 1
+            ? padX + (i * (svgWidth - 2 * padX)) / (data.length - 1)
+            : svgWidth / 2;
+        const ratio = scaleMax > 0 ? d.count / scaleMax : 0;
+        const y = bottomY - ratio * chartHeight;
+        return { x, y, data: d, index: i };
+      });
+    }, [data, scaleMax, bottomY, chartHeight]);
+
+  // Catmull-Rom to Cubic Bezier curve path generator
+  const linePath = useMemo(() => {
+    if (points.length === 0) return "";
+    if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+
+    return points.reduce((acc, pt, i, arr) => {
+      if (i === 0) return `M ${pt.x.toFixed(1)},${pt.y.toFixed(1)}`;
+      const prev2 = arr[i - 2] ?? arr[i - 1];
+      const prev1 = arr[i - 1];
+      const next1 = arr[i + 1] ?? pt;
+
+      const cp1x = prev1.x + (pt.x - prev2.x) / 6;
+      const cp1y = Math.min(Math.max(prev1.y + (pt.y - prev2.y) / 6, padTop - 5), bottomY);
+
+      const cp2x = pt.x - (next1.x - prev1.x) / 6;
+      const cp2y = Math.min(Math.max(pt.y - (next1.y - prev1.y) / 6, padTop - 5), bottomY);
+
+      return `${acc} C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${pt.x.toFixed(1)},${pt.y.toFixed(1)}`;
+    }, "");
+  }, [points, padTop, bottomY]);
+
+  // Closed area path for the gradient background
+  const areaPath = useMemo(() => {
+    if (points.length === 0) return "";
+    const firstX = points[0].x;
+    const lastX = points[points.length - 1].x;
+    return `${linePath} L ${lastX.toFixed(1)},${bottomY} L ${firstX.toFixed(1)},${bottomY} Z`;
+  }, [linePath, points, bottomY]);
+
+  // Horizontal grid lines
+  const gridSteps = [0.25, 0.5, 0.75, 1];
+
+  const activePoint = hoveredIdx !== null ? points[hoveredIdx] : null;
 
   return (
     <Card className="rounded-xl border border-border/70 shadow-xs bg-card overflow-hidden">
       <CardHeader className="p-4 sm:p-5 border-b border-border/50 bg-muted/20 pb-3.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="flex size-6 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <span className="flex size-6 items-center justify-center rounded-md bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
               <IconCalendar size={14} />
             </span>
             <CardTitle className="text-sm sm:text-base font-bold tracking-tight text-foreground">
               Weekly Teaching Load Distribution
             </CardTitle>
           </div>
-          <span className="text-xs text-muted-foreground font-semibold">
-            {total} Total Sessions / Week
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-muted-foreground hidden sm:inline">
+              Weekly View
+            </span>
+            <Badge variant="outline" className="text-xs font-bold px-2 py-0.5 bg-background/80 text-foreground">
+              {total} Total Sessions
+            </Badge>
+          </div>
         </div>
       </CardHeader>
 
@@ -397,27 +469,192 @@ export function WeeklyTeachingLoadCard({ data }: { data: WeeklyDayDatum[] }) {
         {data.length === 0 || max === 0 ? (
           <EmptyNote>No scheduled timetable slots found.</EmptyNote>
         ) : (
-          <div className="grid grid-cols-5 gap-2 sm:gap-3 text-center">
-            {data.map((d) => {
-              const heightPct = Math.round((d.count / max) * 100);
+          <div className="relative w-full">
+            <svg
+              viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+              className="w-full h-auto overflow-visible select-none"
+            >
+              <defs>
+                {/* Semi-transparent cyan gradient fill */}
+                <linearGradient id="teachingLoadGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.45" />
+                  <stop offset="55%" stopColor="#06b6d4" stopOpacity="0.14" />
+                  <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.0" />
+                </linearGradient>
 
-              return (
-                <div key={d.day} className="flex flex-col items-center justify-end h-32 gap-1.5">
-                  <span className="text-xs font-bold text-foreground tabular-nums">
-                    {d.count}
-                  </span>
-                  <div className="w-full flex items-end justify-center h-20 bg-muted/30 rounded-t-md overflow-hidden">
-                    <div
-                      className="w-full rounded-t-md bg-primary/85 transition-all duration-500"
-                      style={{ height: `${Math.max(heightPct, 8)}%` }}
+                {/* Subtle curve glow filter */}
+                <filter id="curveGlow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="3" result="blur" />
+                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+              </defs>
+
+              {/* Horizontal Grid lines */}
+              {gridSteps.map((step, idx) => {
+                const y = bottomY - step * chartHeight;
+                return (
+                  <line
+                    key={idx}
+                    x1={padX - 10}
+                    y1={y}
+                    x2={svgWidth - padX + 10}
+                    y2={y}
+                    stroke="currentColor"
+                    className="text-border/40"
+                    strokeWidth="1"
+                    strokeDasharray={step < 1 ? "4 4" : undefined}
+                  />
+                );
+              })}
+
+              {/* Baseline */}
+              <line
+                x1={padX - 10}
+                y1={bottomY}
+                x2={svgWidth - padX + 10}
+                y2={bottomY}
+                stroke="currentColor"
+                className="text-border/60"
+                strokeWidth="1"
+              />
+
+              {/* Area under curve with semi-transparent gradient */}
+              <path
+                d={areaPath}
+                fill="url(#teachingLoadGradient)"
+                className="transition-all duration-300"
+              />
+
+              {/* Glow backdrop path */}
+              <path
+                d={linePath}
+                fill="none"
+                stroke="#06b6d4"
+                strokeWidth="6"
+                strokeOpacity="0.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                filter="url(#curveGlow)"
+              />
+
+              {/* Crisp foreground smooth curve */}
+              <path
+                d={linePath}
+                fill="none"
+                className="stroke-cyan-500 dark:stroke-cyan-400"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+
+              {/* Vertical Guide line on hover */}
+              {activePoint && (
+                <line
+                  x1={activePoint.x}
+                  y1={padTop}
+                  x2={activePoint.x}
+                  y2={bottomY}
+                  stroke="currentColor"
+                  className="text-cyan-500/50 dark:text-cyan-400/50"
+                  strokeWidth="1"
+                  strokeDasharray="3 3"
+                />
+              )}
+
+              {/* Data points & hit targets */}
+              {points.map((pt) => {
+                const isHovered = hoveredIdx === pt.index;
+
+                return (
+                  <g key={pt.data.day} className="cursor-pointer">
+                    {/* Invisible larger hit target for smooth hover interactions */}
+                    <circle
+                      cx={pt.x}
+                      cy={pt.y}
+                      r="18"
+                      fill="transparent"
+                      onMouseEnter={() => setHoveredIdx(pt.index)}
+                      onMouseLeave={() => setHoveredIdx(null)}
                     />
-                  </div>
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    {d.shortDay}
-                  </span>
-                </div>
-              );
-            })}
+
+                    {/* Outer glow ring when hovered */}
+                    {isHovered && (
+                      <circle
+                        cx={pt.x}
+                        cy={pt.y}
+                        r="9"
+                        className="fill-cyan-500/20 stroke-cyan-400"
+                        strokeWidth="2"
+                      />
+                    )}
+
+                    {/* Outer node circle */}
+                    <circle
+                      cx={pt.x}
+                      cy={pt.y}
+                      r={isHovered ? 5.5 : 4.5}
+                      className={cn(
+                        "fill-card transition-all duration-150",
+                        isHovered
+                          ? "stroke-cyan-400"
+                          : "stroke-cyan-600 dark:stroke-cyan-400"
+                      )}
+                      strokeWidth="2.5"
+                    />
+
+                    {/* Inner center dot */}
+                    <circle
+                      cx={pt.x}
+                      cy={pt.y}
+                      r={isHovered ? 2.5 : 2}
+                      className="fill-cyan-600 dark:fill-cyan-400"
+                    />
+
+                    {/* X-axis Day Label */}
+                    <text
+                      x={pt.x}
+                      y={bottomY + 22}
+                      textAnchor="middle"
+                      className={cn(
+                        "text-[11px] font-semibold transition-colors duration-150 select-none",
+                        isHovered
+                          ? "fill-cyan-600 dark:fill-cyan-400 font-bold"
+                          : "fill-muted-foreground"
+                      )}
+                      onMouseEnter={() => setHoveredIdx(pt.index)}
+                      onMouseLeave={() => setHoveredIdx(null)}
+                    >
+                      {formatDay(pt.data.shortDay || pt.data.day)}
+                    </text>
+                  </g>
+                );
+              })}
+
+              {/* Floating Tooltip Pill on Hover */}
+              {activePoint && (
+                <g
+                  transform={`translate(${activePoint.x}, ${Math.max(activePoint.y - 28, 14)})`}
+                  className="pointer-events-none transition-all duration-150"
+                >
+                  <rect
+                    x="-34"
+                    y="-12"
+                    width="68"
+                    height="24"
+                    rx="12"
+                    className="fill-foreground text-background shadow-md"
+                  />
+                  <text
+                    x="0"
+                    y="4"
+                    textAnchor="middle"
+                    className="fill-background text-[11px] font-bold"
+                  >
+                    {activePoint.data.count} {activePoint.data.count === 1 ? "class" : "classes"}
+                  </text>
+                </g>
+              )}
+            </svg>
           </div>
         )}
       </CardContent>

@@ -1,20 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardAction,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -23,10 +21,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AdminShell } from "@/app/components/admin/AdminShell";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AdminShell } from "@/app/components/admin/AdminShell";
+import { StudentCourseStructurePanel } from "@/app/components/academics/StudentCourseStructurePanel";
 import { startProgress, doneProgress } from "@/app/components/layout/RouteProgress";
-import { IconLoader2, IconPlus, IconTrash, IconX } from "@tabler/icons-react";
+import { cn } from "@/lib/utils";
+import {
+  IconAlertCircle,
+  IconArrowBackUp,
+  IconBook2,
+  IconCheck,
+  IconChevronDown,
+  IconChevronUp,
+  IconDeviceFloppy,
+  IconDownload,
+  IconEye,
+  IconLayersLinked,
+  IconLoader2,
+  IconPencil,
+  IconPlus,
+  IconSearch,
+  IconSparkles,
+  IconTrash,
+  IconUpload,
+} from "@tabler/icons-react";
 
 type Program = {
   id: string;
@@ -43,8 +62,17 @@ type DraftCourse = {
   hasTheory: boolean;
   hasPractical: boolean;
 };
-type DraftSemester = { label: string; courses: DraftCourse[] };
-type DraftYear = { label: string; semesters: DraftSemester[] };
+
+type DraftSemester = {
+  label: string;
+  courses: DraftCourse[];
+};
+
+type DraftYear = {
+  label: string;
+  semesters: DraftSemester[];
+};
+
 type DraftElective = {
   group: "ELECTIVE_I" | "ELECTIVE_II";
   code: string;
@@ -52,21 +80,38 @@ type DraftElective = {
   credits: number;
 };
 
-type Draft = { years: DraftYear[]; electives: DraftElective[] };
+type Draft = {
+  years: DraftYear[];
+  electives: DraftElective[];
+};
 
 const emptyDraft: Draft = { years: [], electives: [] };
 
 export default function AdminCurriculumPage() {
   const router = useRouter();
+
+  // Programs & curriculum state
   const [programs, setPrograms] = useState<Program[]>([]);
   const [programId, setProgramId] = useState("");
   const [draft, setDraft] = useState<Draft>(emptyDraft);
+  const [originalDraft, setOriginalDraft] = useState<Draft>(emptyDraft);
   const [hasCurriculum, setHasCurriculum] = useState(false);
+
+  // Loading & network state
   const [loading, setLoading] = useState(true);
   const [loadingCurriculum, setLoadingCurriculum] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [saveTimestamp, setSaveTimestamp] = useState(Date.now());
 
+  // Navigation & View state
+  const [activeTab, setActiveTab] = useState<"builder" | "preview">("builder");
+  const [yearFilter, setYearFilter] = useState<"ALL" | number>("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [collapsedYears, setCollapsedYears] = useState<Record<number, boolean>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ─── Initial Load ────────────────────────────────────────────────
   useEffect(() => {
     async function load() {
       const me = await fetch("/api/auth/me");
@@ -87,6 +132,7 @@ export default function AdminCurriculumPage() {
     });
   }, [router]);
 
+  // ─── Fetch Curriculum for Selected Program ────────────────────────
   const loadCurriculum = useCallback(async (id: string) => {
     if (!id) return;
     setLoadingCurriculum(true);
@@ -96,13 +142,16 @@ export default function AdminCurriculumPage() {
       const res = await fetch(`/api/curriculum?programId=${id}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Unable to load curriculum");
+
       if (!data.curriculum) {
         setDraft(emptyDraft);
+        setOriginalDraft(emptyDraft);
         setHasCurriculum(false);
         return;
       }
+
       setHasCurriculum(true);
-      setDraft({
+      const parsedDraft: Draft = {
         years: (data.curriculum.years ?? []).map(
           (y: {
             label: string;
@@ -143,7 +192,10 @@ export default function AdminCurriculumPage() {
             credits: e.credits,
           }),
         ),
-      });
+      };
+
+      setDraft(parsedDraft);
+      setOriginalDraft(parsedDraft);
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : "Unable to load curriculum",
@@ -155,24 +207,61 @@ export default function AdminCurriculumPage() {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadCurriculum intentionally flips its loading flag before fetching; this fetch-on-id-change pattern is the desired behavior
     if (programId) void loadCurriculum(programId);
   }, [programId, loadCurriculum]);
 
+  // ─── Selected Program Details ────────────────────────────────────
+  const selectedProgram = useMemo(
+    () => programs.find((p) => p.id === programId),
+    [programs, programId],
+  );
+
+  // ─── Metrics Calculation ─────────────────────────────────────────
+  const metrics = useMemo(() => {
+    let totalCredits = 0;
+    let totalCourses = 0;
+    let totalSemesters = 0;
+
+    for (const y of draft.years) {
+      totalSemesters += y.semesters.length;
+      for (const s of y.semesters) {
+        totalCourses += s.courses.length;
+        for (const c of s.courses) {
+          totalCredits += Number.isFinite(c.credits) ? c.credits : 0;
+        }
+      }
+    }
+
+    return {
+      totalCredits,
+      totalCourses,
+      totalSemesters,
+      totalYears: draft.years.length,
+      totalElectives: draft.electives.length,
+    };
+  }, [draft]);
+
+  // ─── Dirty Check ─────────────────────────────────────────────────
+  const isDirty = useMemo(() => {
+    return JSON.stringify(draft) !== JSON.stringify(originalDraft);
+  }, [draft, originalDraft]);
+
   // ─── Mutators ────────────────────────────────────────────────────
   function addYear() {
-    setDraft((d) => ({
-      ...d,
-      years: [
-        ...d.years,
-        {
-          label: `Year ${d.years.length + 1}`,
-          semesters: [
-            { label: `Semester ${d.years.length * 2 + 1}`, courses: [] },
-          ],
-        },
-      ],
-    }));
+    setDraft((d) => {
+      const nextYearNo = d.years.length + 1;
+      const semNo = d.years.reduce((acc, y) => acc + y.semesters.length, 0) + 1;
+      return {
+        ...d,
+        years: [
+          ...d.years,
+          {
+            label: `Year ${nextYearNo}`,
+            semesters: [{ label: `Semester ${semNo}`, courses: [] }],
+          },
+        ],
+      };
+    });
   }
 
   function removeYear(index: number) {
@@ -343,15 +432,318 @@ export default function AdminCurriculumPage() {
   function updateElective(index: number, patch: Partial<DraftElective>) {
     setDraft((d) => ({
       ...d,
-      electives: d.electives.map((e, i) => (i === index ? { ...e, ...patch } : e)),
+      electives: d.electives.map((e, i) =>
+        i === index ? { ...e, ...patch } : e,
+      ),
     }));
   }
 
-  // ─── Save ────────────────────────────────────────────────────────
+  // ─── Standard Template Generator ─────────────────────────────────
+  function applyTemplate(type: "4-year" | "2-year") {
+    const yearsCount = type === "4-year" ? 4 : 2;
+    const newYears: DraftYear[] = [];
+    for (let y = 1; y <= yearsCount; y++) {
+      const sem1 = (y - 1) * 2 + 1;
+      const sem2 = (y - 1) * 2 + 2;
+      newYears.push({
+        label: `Year ${y}`,
+        semesters: [
+          { label: `Semester ${sem1}`, courses: [] },
+          { label: `Semester ${sem2}`, courses: [] },
+        ],
+      });
+    }
+    setDraft((d) => ({
+      ...d,
+      years: newYears,
+    }));
+    toast.success(`Generated standard ${type} academic structure`);
+  }
+
+  function handleDiscard() {
+    setDraft(JSON.parse(JSON.stringify(originalDraft)));
+    toast.info("Unsaved changes discarded");
+  }
+
+  // ─── JSON Sample Generator & Importer ────────────────────────────
+  function downloadSampleCurriculumJson() {
+    const sample = {
+      years: [
+        {
+          label: "Year 1",
+          semesters: [
+            {
+              label: "Semester 1",
+              courses: [
+                { code: "MTH101", name: "Engineering Mathematics I", credits: 3 },
+                { code: "PHY101", name: "Engineering Physics", credits: 4, hasTheory: true, hasPractical: true },
+                { code: "CS101", name: "Computer Programming", credits: 3, hasPractical: true },
+                { code: "ENG101", name: "Communication Skills", credits: 2 },
+              ],
+            },
+            {
+              label: "Semester 2",
+              courses: [
+                { code: "MTH102", name: "Engineering Mathematics II", credits: 3 },
+                { code: "CS102", name: "Object Oriented Programming", credits: 4, hasTheory: true, hasPractical: true },
+                { code: "EE101", name: "Basic Electrical Engineering", credits: 3 },
+              ],
+            },
+          ],
+        },
+        {
+          label: "Year 2",
+          semesters: [
+            {
+              label: "Semester 3",
+              courses: [
+                { code: "CS201", name: "Data Structures & Algorithms", credits: 4, hasTheory: true, hasPractical: true },
+                { code: "CS202", name: "Digital Logic", credits: 3 },
+              ],
+            },
+            {
+              label: "Semester 4",
+              courses: [
+                { code: "CS203", name: "Database Management Systems", credits: 4, hasTheory: true, hasPractical: true },
+                { code: "CS204", name: "Operating Systems", credits: 3 },
+              ],
+            },
+          ],
+        },
+      ],
+      electives: [
+        { group: "ELECTIVE_I", code: "CS401", name: "Machine Learning", credits: 3 },
+        { group: "ELECTIVE_I", code: "CS402", name: "Cloud Computing", credits: 3 },
+        { group: "ELECTIVE_II", code: "CS403", name: "Cybersecurity & Cryptography", credits: 3 },
+      ],
+    };
+
+    const blob = new Blob([JSON.stringify(sample, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${selectedProgram?.code || "curriculum"}_template.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Sample curriculum JSON downloaded.");
+  }
+
+  function parseCurriculumJson(jsonContent: string): Draft {
+    let parsed: any;
+    try {
+      parsed = JSON.parse(jsonContent);
+    } catch {
+      throw new Error("File contains invalid JSON syntax.");
+    }
+
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      if (parsed.curriculum) parsed = parsed.curriculum;
+      else if (parsed.data) parsed = parsed.data;
+    }
+
+    // Support flat course list: [{ semester: 1, code: "...", name: "..." }]
+    if (
+      Array.isArray(parsed) &&
+      parsed.length > 0 &&
+      (parsed[0].semester !== undefined || parsed[0].semesterNo !== undefined)
+    ) {
+      const yearMap = new Map<number, Map<number, DraftCourse[]>>();
+      for (const item of parsed) {
+        const semNo = Number(item.semester ?? item.semesterNo ?? 1);
+        const yearNo = Math.ceil(semNo / 2) || 1;
+        if (!yearMap.has(yearNo)) yearMap.set(yearNo, new Map());
+        const semMap = yearMap.get(yearNo)!;
+        if (!semMap.has(semNo)) semMap.set(semNo, []);
+
+        const code = String(item.code || item.courseCode || "").trim().toUpperCase();
+        const name = String(item.name || item.title || item.courseName || "").trim();
+        if (!name) continue;
+
+        const credits = Number.isFinite(Number(item.credits ?? item.credit))
+          ? Number(item.credits ?? item.credit)
+          : 3;
+        const valTh = item.hasTheory ?? item.th ?? item.theory;
+        const valPr = item.hasPractical ?? item.pr ?? item.practical;
+        let hasTheory = valTh !== undefined ? Boolean(valTh) : true;
+        let hasPractical = valPr !== undefined ? Boolean(valPr) : false;
+        if (!hasTheory && !hasPractical) hasTheory = true;
+
+        semMap.get(semNo)!.push({ code, name, credits, hasTheory, hasPractical });
+      }
+
+      const generatedYears: DraftYear[] = [];
+      const sortedYearKeys = Array.from(yearMap.keys()).sort((a, b) => a - b);
+      for (const yNo of sortedYearKeys) {
+        const semMap = yearMap.get(yNo)!;
+        const sortedSemKeys = Array.from(semMap.keys()).sort((a, b) => a - b);
+        const sems: DraftSemester[] = sortedSemKeys.map((sNo) => ({
+          label: `Semester ${sNo}`,
+          courses: semMap.get(sNo)!,
+        }));
+        generatedYears.push({
+          label: `Year ${yNo}`,
+          semesters: sems,
+        });
+      }
+
+      return {
+        years: generatedYears,
+        electives: [],
+      };
+    }
+
+    let rawYears: any[] = [];
+    let rawElectives: any[] = [];
+
+    if (Array.isArray(parsed)) {
+      rawYears = parsed;
+    } else if (parsed && typeof parsed === "object") {
+      rawYears = Array.isArray(parsed.years) ? parsed.years : [];
+      rawElectives = Array.isArray(parsed.electives) ? parsed.electives : [];
+    } else {
+      throw new Error("JSON must contain an object with 'years' or an array of years.");
+    }
+
+    if (rawYears.length === 0) {
+      throw new Error("No academic years found in the JSON file.");
+    }
+
+    const parsedYears: DraftYear[] = rawYears.map((rawY: any, yi: number) => {
+      const yearLabel = String(rawY.label || rawY.name || `Year ${yi + 1}`).trim();
+      const rawSemesters = Array.isArray(rawY.semesters) ? rawY.semesters : [];
+
+      const parsedSemesters: DraftSemester[] = rawSemesters.map((rawS: any, si: number) => {
+        const semLabel = String(rawS.label || rawS.name || `Semester ${yi * 2 + si + 1}`).trim();
+        const rawCourses = Array.isArray(rawS.courses)
+          ? rawS.courses
+          : Array.isArray(rawS.subjects)
+          ? rawS.subjects
+          : [];
+
+        const parsedCourses: DraftCourse[] = rawCourses
+          .map((rawC: any) => {
+            const code = String(rawC.code || rawC.courseCode || "").trim().toUpperCase();
+            const name = String(rawC.name || rawC.title || rawC.courseName || "").trim();
+            const credits = Number.isFinite(Number(rawC.credits ?? rawC.credit ?? rawC.cr))
+              ? Number(rawC.credits ?? rawC.credit ?? rawC.cr)
+              : 3;
+
+            // Make th and pr fields optional
+            const hasThSpecified =
+              rawC.hasTheory !== undefined || rawC.th !== undefined || rawC.theory !== undefined;
+            const hasPrSpecified =
+              rawC.hasPractical !== undefined || rawC.pr !== undefined || rawC.practical !== undefined;
+
+            const valTh = rawC.hasTheory ?? rawC.th ?? rawC.theory;
+            const valPr = rawC.hasPractical ?? rawC.pr ?? rawC.practical;
+
+            let hasTheory = hasThSpecified ? Boolean(valTh) : true;
+            let hasPractical = hasPrSpecified ? Boolean(valPr) : false;
+
+            if (!hasTheory && !hasPractical) {
+              hasTheory = true;
+            }
+
+            return {
+              code,
+              name,
+              credits,
+              hasTheory,
+              hasPractical,
+            };
+          })
+          .filter((c: DraftCourse) => c.name.length > 0);
+
+        return {
+          label: semLabel,
+          courses: parsedCourses,
+        };
+      });
+
+      return {
+        label: yearLabel,
+        semesters: parsedSemesters,
+      };
+    });
+
+    const parsedElectives: DraftElective[] = rawElectives
+      .map((rawE: any) => {
+        const rawGroup = String(rawE.group || "ELECTIVE_I").trim().toUpperCase();
+        const group: DraftElective["group"] =
+          rawGroup.includes("II") || rawGroup.includes("2") ? "ELECTIVE_II" : "ELECTIVE_I";
+        const code = String(rawE.code || "").trim().toUpperCase();
+        const name = String(rawE.name || rawE.title || "").trim();
+        const credits = Number.isFinite(Number(rawE.credits ?? rawE.credit))
+          ? Number(rawE.credits ?? rawE.credit)
+          : 3;
+
+        return {
+          group,
+          code,
+          name,
+          credits,
+        };
+      })
+      .filter((e: DraftElective) => e.name.length > 0);
+
+    return {
+      years: parsedYears,
+      electives: parsedElectives,
+    };
+  }
+
+  async function handleImportJson(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const newDraft = parseCurriculumJson(text);
+      const totalCourses = newDraft.years.reduce(
+        (sum, y) => sum + y.semesters.reduce((sSum, s) => sSum + s.courses.length, 0),
+        0,
+      );
+
+      setDraft(newDraft);
+      toast.success(
+        `Imported ${newDraft.years.length} years and ${totalCourses} courses from JSON. Review and click "Save & Publish".`,
+      );
+    } catch (err: any) {
+      toast.error(err.message || "Failed to parse curriculum JSON file.");
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  }
+
+  // ─── Save & Publish ──────────────────────────────────────────────
   async function handleSave() {
     if (!programId) return;
+
+    // Client-side validation: check for invalid courses
+    for (const y of draft.years) {
+      for (const s of y.semesters) {
+        for (const c of s.courses) {
+          if (!c.name.trim()) {
+            toast.error("Every course must have a title.");
+            return;
+          }
+          if (!c.hasTheory && !c.hasPractical) {
+            toast.error(`Course "${c.name}" must have at least Theory (TH) or Practical (PR) enabled.`);
+            return;
+          }
+        }
+      }
+    }
+
     setError("");
     setSaving(true);
+    startProgress();
     try {
       const res = await fetch("/api/curriculum", {
         method: "PUT",
@@ -365,15 +757,84 @@ export default function AdminCurriculumPage() {
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Unable to save curriculum");
+        toast.error(data.error ?? "Unable to save curriculum");
         return;
       }
       setHasCurriculum(true);
-      toast.success("Curriculum saved successfully.");
+      setOriginalDraft(JSON.parse(JSON.stringify(draft)));
+      setSaveTimestamp(Date.now());
+      toast.success("Curriculum published successfully!");
     } catch {
       setError("Unable to reach the server");
+      toast.error("Network error while saving curriculum");
     } finally {
       setSaving(false);
+      doneProgress();
     }
+  }
+
+  // ─── Filtered Years for Builder ──────────────────────────────────
+  const filteredYears = useMemo(() => {
+    let list = draft.years.map((y, originalIdx) => ({
+      ...y,
+      originalIndex: originalIdx,
+    }));
+
+    if (yearFilter !== "ALL") {
+      list = list.filter((_, idx) => idx + 1 === yearFilter);
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list
+        .map((year) => ({
+          ...year,
+          semesters: year.semesters
+            .map((sem) => ({
+              ...sem,
+              courses: sem.courses.filter(
+                (c) =>
+                  c.code.toLowerCase().includes(q) ||
+                  c.name.toLowerCase().includes(q),
+              ),
+            }))
+            .filter((sem) => sem.courses.length > 0),
+        }))
+        .filter((year) => year.semesters.length > 0);
+    }
+
+    return list;
+  }, [draft.years, yearFilter, searchQuery]);
+
+  // Toggle year collapse
+  function toggleYearCollapse(yearIdx: number) {
+    setCollapsedYears((prev) => ({
+      ...prev,
+      [yearIdx]: !prev[yearIdx],
+    }));
+  }
+
+  function setAllCollapsed(collapsed: boolean) {
+    const next: Record<number, boolean> = {};
+    draft.years.forEach((_, i) => {
+      next[i] = collapsed;
+    });
+    setCollapsedYears(next);
+  }
+
+  if (loading) {
+    return (
+      <AdminShell
+        title="Curriculum"
+        subtitle="Course Structure Management"
+        active="/admin/curriculum"
+      >
+        <div className="space-y-4">
+          <Skeleton className="h-14 w-full rounded-xl" />
+          <Skeleton className="h-96 w-full rounded-2xl" />
+        </div>
+      </AdminShell>
+    );
   }
 
   return (
@@ -383,361 +844,825 @@ export default function AdminCurriculumPage() {
       active="/admin/curriculum"
     >
       <div className="flex flex-col gap-5">
-        {/* Program selector + actions */}
-        <Card>
-          <CardContent className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-            <div className="grid min-w-0 flex-1 gap-1.5 sm:min-w-64">
-              <Label htmlFor="curriculum-program">Program</Label>
-              <Select
-                value={programId}
-                onValueChange={setProgramId}
-                disabled={loading || programs.length === 0}
-              >
-                <SelectTrigger id="curriculum-program" className="w-full">
-                  <SelectValue
-                    placeholder={programs.length === 0 ? "No programs" : "Select a program"}
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {programs.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.code} — {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        {/* ── Top Header Card: Program Selector & Quick Actions ── */}
+        <Card className="rounded-xl border border-border/70 p-3.5 sm:p-4 shadow-xs bg-card">
+          <div className="flex flex-col gap-3.5 sm:flex-row sm:items-center sm:justify-between">
+            {/* Hidden file input for JSON import */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={handleImportJson}
+            />
+
+            {/* Program Picker with clean status */}
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="w-full sm:w-80">
+                <Select
+                  value={programId}
+                  onValueChange={setProgramId}
+                  disabled={loading || programs.length === 0}
+                >
+                  <SelectTrigger id="program-select" className="h-9 text-xs font-semibold">
+                    <IconLayersLinked size={15} className="text-primary mr-1.5 shrink-0" />
+                    <SelectValue placeholder={programs.length === 0 ? "No programs" : "Select program..."} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {programs.map((p) => (
+                      <SelectItem key={p.id} value={p.id} className="text-xs">
+                        <span className="font-bold">{p.code}</span> — {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedProgram && (
+                <div className="flex items-center gap-2 shrink-0">
+                  {isDirty ? (
+                    <Badge variant="outline" className="text-xs py-0.5 px-2 bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 font-semibold animate-pulse">
+                      ● Unsaved Changes
+                    </Badge>
+                  ) : hasCurriculum ? (
+                    <Badge variant="outline" className="text-xs py-0.5 px-2 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 font-semibold">
+                      <IconCheck size={12} className="mr-1 inline" />
+                      Published
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs py-0.5 px-2 bg-muted/60 text-muted-foreground border-border/70 font-medium">
+                      Draft
+                    </Badge>
+                  )}
+                </div>
+              )}
             </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              onClick={addYear}
-              className="w-full sm:w-auto"
-            >
-              <IconPlus size={16} aria-hidden="true" />
-              Add Year
-            </Button>
+            {/* Actions Bar */}
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={downloadSampleCurriculumJson}
+                className="h-8.5 gap-1.5 text-xs font-semibold"
+                title="Download sample JSON template"
+              >
+                <IconDownload size={14} />
+                <span>Sample JSON</span>
+              </Button>
 
-            <Button
-              type="button"
-              onClick={handleSave}
-              disabled={saving || loadingCurriculum}
-              className="w-full sm:w-auto"
-            >
-              {saving ? (
-                <>
-                  <IconLoader2 size={16} className="animate-spin" aria-hidden="true" />
-                  Saving…
-                </>
-              ) : hasCurriculum ? (
-                "Save Changes"
-              ) : (
-                "Publish Curriculum"
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="h-8.5 gap-1.5 text-xs font-semibold"
+                title="Upload JSON file to populate curriculum"
+              >
+                <IconUpload size={14} />
+                <span>Import JSON</span>
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addYear}
+                className="h-8.5 gap-1.5 text-xs font-semibold"
+              >
+                <IconPlus size={14} />
+                <span>Add Year</span>
+              </Button>
+
+              {isDirty && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDiscard}
+                  className="h-8.5 gap-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <IconArrowBackUp size={14} />
+                  <span>Discard</span>
+                </Button>
               )}
-            </Button>
-          </CardContent>
+
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSave}
+                disabled={saving || loadingCurriculum}
+                className={cn(
+                  "h-8.5 gap-1.5 text-xs font-semibold transition-all",
+                  isDirty ? "shadow-sm shadow-primary/20" : "",
+                )}
+              >
+                {saving ? (
+                  <>
+                    <IconLoader2 size={14} className="animate-spin" />
+                    <span>Saving…</span>
+                  </>
+                ) : (
+                  <>
+                    <IconDeviceFloppy size={14} />
+                    <span>Save & Publish</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         </Card>
 
+        {/* Error notification */}
         {error && (
-          <p className="rounded-lg border border-destructive/20 bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive" role="alert">
-            {error}
-          </p>
-        )}
-
-        {loadingCurriculum && (
-          <div className="space-y-6">
-            {[1, 2].map((y) => (
-              <Card key={y} className="overflow-hidden border border-border/70">
-                <CardHeader className="border-b bg-muted/20 pb-4">
-                  <div className="flex items-center justify-between">
-                    <Skeleton className="h-6 w-36" />
-                    <Skeleton className="h-8 w-28 rounded-lg" />
-                  </div>
-                </CardHeader>
-                <CardContent className="p-5 space-y-4">
-                  <div className="rounded-xl border border-border/60 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Skeleton className="h-5 w-28" />
-                      <Skeleton className="h-7 w-24 rounded-md" />
-                    </div>
-                    <div className="space-y-2">
-                      <Skeleton className="h-10 w-full rounded-lg" />
-                      <Skeleton className="h-10 w-full rounded-lg" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive font-medium">
+            <IconAlertCircle size={16} className="shrink-0" />
+            <span>{error}</span>
           </div>
         )}
 
-        {!loadingCurriculum && !hasCurriculum && !error && (
-          <div className="rounded-xl border border-dashed px-8 py-10 text-center text-sm text-muted-foreground">
-            <p>
-              No curriculum published for this program yet. Add years,
-              semesters and courses below, then click “Publish Curriculum”.
-            </p>
-          </div>
-        )}
+        {/* ── Tabs: Curriculum Builder vs Student View Preview ── */}
+        <Tabs
+          value={activeTab}
+          onValueChange={(val) => setActiveTab(val as "builder" | "preview")}
+          className="space-y-4"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-border/60 pb-2.5">
+            <TabsList className="bg-muted/60 p-1.5 rounded-xl h-11">
+              <TabsTrigger
+                value="builder"
+                className="gap-2 px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg h-8 sm:h-8.5 data-[state=active]:bg-background data-[state=active]:shadow-xs"
+              >
+                <IconPencil size={15} />
+                Curriculum Builder
+              </TabsTrigger>
+              <TabsTrigger
+                value="preview"
+                className="gap-2 px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg h-8 sm:h-8.5 data-[state=active]:bg-background data-[state=active]:shadow-xs"
+              >
+                <IconEye size={15} />
+                Course Structure Preview
+              </TabsTrigger>
+            </TabsList>
 
-        {/* Years / semesters / courses editor */}
-        {!loadingCurriculum &&
-          draft.years.map((year, yi) => (
-            <Card key={`year-${yi}`}>
-              <CardHeader className="border-b">
-                <Input
-                  value={year.label}
-                  onChange={(e) => updateYearLabel(yi, e.target.value)}
-                  aria-label="Year label"
-                  placeholder="Year label"
-                  className="font-semibold"
-                />
-                <CardAction>
+            {/* Quick Helper Text */}
+            <span className="text-xs text-muted-foreground hidden md:inline-block">
+              {activeTab === "builder"
+                ? "Interactive curriculum design: configure years, semesters, credits & courses"
+                : "Live student & faculty visualization matching the academic portal"}
+            </span>
+          </div>
+
+          {/* ══════════════════════════════════════════════════════════ */}
+          {/* TAB 1: CURRICULUM BUILDER                                  */}
+          {/* ══════════════════════════════════════════════════════════ */}
+          <TabsContent value="builder" className="m-0 outline-hidden space-y-5">
+            {/* Filter & Search Bar */}
+            <Card className="p-3 sm:p-3.5 rounded-xl border border-border/70 shadow-xs bg-card">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                {/* Year Filter Pills */}
+                <div className="inline-flex flex-wrap rounded-xl border border-border/70 p-1 bg-muted/40">
+                  <button
+                    type="button"
+                    onClick={() => setYearFilter("ALL")}
+                    className={cn(
+                      "px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-colors cursor-pointer",
+                      yearFilter === "ALL"
+                        ? "bg-background text-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    All Years ({draft.years.length})
+                  </button>
+                  {draft.years.map((y, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setYearFilter(idx + 1)}
+                      className={cn(
+                        "px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-colors cursor-pointer",
+                        yearFilter === idx + 1
+                          ? "bg-primary text-primary-foreground shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {y.label || `Year ${idx + 1}`}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {/* Search Box */}
+                  <div className="relative w-full sm:w-64">
+                    <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Find course by name or code..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 text-xs sm:text-sm h-9"
+                    />
+                  </div>
+
+                  {/* Expand/Collapse All Buttons */}
                   <Button
                     type="button"
-                    variant="ghost"
-                    size="icon"
-                    title="Remove year"
-                    onClick={() => removeYear(yi)}
-                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const anyCollapsed = Object.values(collapsedYears).some(Boolean);
+                      setAllCollapsed(!anyCollapsed);
+                    }}
+                    className="h-9 px-2.5 text-xs text-muted-foreground hover:text-foreground hidden sm:inline-flex"
+                    title="Toggle Expand All / Collapse All"
                   >
-                    <IconTrash size={16} aria-hidden="true" />
+                    {Object.values(collapsedYears).some(Boolean) ? (
+                      <>
+                        <IconChevronDown size={14} className="mr-1" />
+                        Expand
+                      </>
+                    ) : (
+                      <>
+                        <IconChevronUp size={14} className="mr-1" />
+                        Collapse
+                      </>
+                    )}
                   </Button>
-                </CardAction>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                {year.semesters.map((sem, si) => {
-                  const totalCredits = sem.courses.reduce(
-                    (sum, c) =>
-                      sum + (Number.isFinite(c.credits) ? c.credits : 0),
+                </div>
+              </div>
+            </Card>
+
+            {/* Loading skeleton */}
+            {loadingCurriculum && (
+              <div className="space-y-4">
+                <Skeleton className="h-44 w-full rounded-xl" />
+                <Skeleton className="h-44 w-full rounded-xl" />
+              </div>
+            )}
+
+            {/* ── Empty State: No Curriculum Draft ── */}
+            {!loadingCurriculum && draft.years.length === 0 && (
+              <Card className="rounded-xl border-dashed border-2 p-10 text-center bg-card/60">
+                <div className="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-3">
+                  <IconBook2 size={24} />
+                </div>
+                <h3 className="text-base font-bold text-foreground">
+                  No Curriculum Defined Yet
+                </h3>
+                <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1 mb-5">
+                  Get started by scaffolding a standardized degree framework or start manually by adding your first academic year.
+                </p>
+
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <Button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="gap-1.5 text-xs font-semibold"
+                  >
+                    <IconUpload size={15} />
+                    Import from JSON File
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={downloadSampleCurriculumJson}
+                    className="gap-1.5 text-xs font-semibold"
+                  >
+                    <IconDownload size={15} />
+                    Download Sample JSON
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => applyTemplate("4-year")}
+                    className="gap-1.5 text-xs font-semibold"
+                  >
+                    <IconSparkles size={15} />
+                    Scaffold 4-Year
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addYear}
+                    className="gap-1.5 text-xs font-semibold"
+                  >
+                    <IconPlus size={15} />
+                    Add Year
+                  </Button>
+                </div>
+              </Card>
+            )}
+
+            {/* ── Years / Semesters / Courses Editor List ── */}
+            {!loadingCurriculum && filteredYears.length > 0 && (
+              <div className="space-y-6">
+                {filteredYears.map((year) => {
+                  const yi = year.originalIndex;
+                  const isCollapsed = collapsedYears[yi];
+
+                  // Year metrics
+                  const yearCredits = year.semesters.reduce(
+                    (ySum, s) =>
+                      ySum +
+                      s.courses.reduce(
+                        (sSum, c) => sSum + (Number.isFinite(c.credits) ? c.credits : 0),
+                        0,
+                      ),
                     0,
                   );
+                  const yearCourseCount = year.semesters.reduce(
+                    (sum, s) => sum + s.courses.length,
+                    0,
+                  );
+
                   return (
-                    <div
-                      key={`sem-${yi}-${si}`}
-                      className="overflow-hidden rounded-lg border"
+                    <Card
+                      key={`year-${yi}`}
+                      className="rounded-xl border border-border/70 shadow-xs bg-card overflow-hidden"
                     >
-                      <div className="flex flex-col gap-2.5 border-b bg-muted/40 p-3 sm:flex-row sm:flex-wrap sm:items-center">
-                        <Input
-                          value={sem.label}
-                          onChange={(e) => updateSemesterLabel(yi, si, e.target.value)}
-                          placeholder="Semester label"
-                          aria-label="Semester label"
-                          className="font-semibold sm:max-w-56"
-                        />
-                        <Badge variant="secondary" className="w-fit">
-                          {sem.courses.length} courses · {totalCredits} cr
-                        </Badge>
-                        <div className="flex flex-1 flex-wrap items-center gap-2 sm:justify-end">
+                      {/* Year Card Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-border/60 bg-muted/25">
+                        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                          {/* Year Number Badge */}
+                          <span className="flex size-6 items-center justify-center rounded-lg bg-primary/10 text-primary text-xs font-bold shrink-0">
+                            {yi + 1}
+                          </span>
+
+                          {/* Editable Year Label */}
+                          <Input
+                            value={year.label}
+                            onChange={(e) => updateYearLabel(yi, e.target.value)}
+                            placeholder={`Year ${yi + 1}`}
+                            aria-label="Year label"
+                            className="font-bold text-sm h-8 max-w-64 bg-background/80"
+                          />
+
+                          {/* Year quick stats */}
+                          <div className="flex items-center gap-1.5">
+                            <Badge variant="outline" className="text-[11px] font-semibold bg-background">
+                              {year.semesters.length} Semesters
+                            </Badge>
+                            <Badge variant="secondary" className="text-[11px] font-mono font-bold">
+                              {yearCredits} cr
+                            </Badge>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
                           <Button
                             type="button"
                             variant="outline"
-                            onClick={() => addCourse(yi, si)}
+                            size="sm"
+                            onClick={() => addSemester(yi)}
+                            className="h-8 gap-1 text-xs font-semibold"
                           >
-                            <IconPlus size={15} aria-hidden="true" />
-                            Course
+                            <IconPlus size={14} />
+                            Add Semester
                           </Button>
+
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            title="Remove semester"
-                            onClick={() => removeSemester(yi, si)}
-                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            title="Remove Year"
+                            onClick={() => {
+                              if (
+                                year.semesters.length > 0 &&
+                                !confirm(`Are you sure you want to remove ${year.label}? All containing semesters and courses will be deleted.`)
+                              ) {
+                                return;
+                              }
+                              removeYear(yi);
+                            }}
+                            className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
                           >
-                            <IconTrash size={16} aria-hidden="true" />
+                            <IconTrash size={15} />
+                          </Button>
+
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => toggleYearCollapse(yi)}
+                            className="size-8 text-muted-foreground hover:text-foreground"
+                            title={isCollapsed ? "Expand Year" : "Collapse Year"}
+                          >
+                            {isCollapsed ? (
+                              <IconChevronDown size={16} />
+                            ) : (
+                              <IconChevronUp size={16} />
+                            )}
                           </Button>
                         </div>
                       </div>
 
-                    <div className="flex flex-col gap-2.5 p-3">
-                        {sem.courses.length === 0 ? (
-                          <p className="py-2 text-center text-xs text-muted-foreground">
-                            No courses yet — use “Course” to add one.
-                          </p>
-                        ) : (
-                          sem.courses.map((course, ci) => (
-                            <div
-                              key={`course-${yi}-${si}-${ci}`}
-                              className="flex flex-col gap-2 sm:flex-row sm:items-center"
-                            >
-                              <Input
-                                value={course.code}
-                                onChange={(e) =>
-                                  updateCourse(yi, si, ci, { code: e.target.value })
-                                }
-                                placeholder="Code (optional)"
-                                aria-label="Course code"
-                                className="sm:max-w-36"
-                              />
-                              <Input
-                                value={course.name}
-                                onChange={(e) =>
-                                  updateCourse(yi, si, ci, { name: e.target.value })
-                                }
-                                placeholder="Course name"
-                                aria-label="Course name"
-                                className="flex-1"
-                              />
-                              <Input
-                                type="number"
-                                min={0}
-                                value={Number.isFinite(course.credits) ? course.credits : ""}
-                                onChange={(e) =>
-                                  updateCourse(yi, si, ci, {
-                                    credits: Number(e.target.value),
-                                  })
-                                }
-                                placeholder="Cr"
-                                aria-label="Credits"
-                                className="sm:max-w-24"
-                              />
-                              <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                                <Checkbox
-                                  checked={course.hasTheory}
-                                  onCheckedChange={(checked) =>
-                                    updateCourse(yi, si, ci, {
-                                      hasTheory: checked === true,
-                                    })
-                                  }
-                                  aria-label="Has theory component"
-                                />
-                                TH
-                              </label>
-                              <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                                <Checkbox
-                                  checked={course.hasPractical}
-                                  onCheckedChange={(checked) =>
-                                    updateCourse(yi, si, ci, {
-                                      hasPractical: checked === true,
-                                    })
-                                  }
-                                  aria-label="Has practical component"
-                                />
-                                PR
-                              </label>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                title="Remove course"
-                                onClick={() => removeCourse(yi, si, ci)}
-                                className="shrink-0 self-end text-destructive hover:bg-destructive/10 hover:text-destructive sm:self-auto"
-                              >
-                                <IconX size={16} aria-hidden="true" />
-                              </Button>
+                      {/* Year Card Body: Semesters Grid */}
+                      {!isCollapsed && (
+                        <CardContent className="p-4 sm:p-5 space-y-5">
+                          {year.semesters.length === 0 ? (
+                            <p className="py-6 text-center text-xs text-muted-foreground border border-dashed rounded-xl">
+                              No semesters in this year yet. Click “Add Semester” above to add one.
+                            </p>
+                          ) : (
+                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                              {year.semesters.map((sem, si) => {
+                                const semCredits = sem.courses.reduce(
+                                  (sum, c) =>
+                                    sum + (Number.isFinite(c.credits) ? c.credits : 0),
+                                  0,
+                                );
+
+                                return (
+                                  <div
+                                    key={`sem-${yi}-${si}`}
+                                    className="rounded-xl border border-border/70 overflow-hidden bg-card shadow-2xs flex flex-col justify-between"
+                                  >
+                                    {/* Semester Header */}
+                                    <div>
+                                      <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 border-b border-border/60 bg-muted/20">
+                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                          <Input
+                                            value={sem.label}
+                                            onChange={(e) =>
+                                              updateSemesterLabel(yi, si, e.target.value)
+                                            }
+                                            placeholder="Semester label"
+                                            aria-label="Semester label"
+                                            className="font-bold text-xs h-7.5 max-w-44 bg-background/80"
+                                          />
+                                          <Badge
+                                            variant="secondary"
+                                            className="font-mono text-[10px] font-bold px-1.5 py-0.5"
+                                          >
+                                            {sem.courses.length} c · {semCredits} cr
+                                          </Badge>
+                                        </div>
+
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => addCourse(yi, si)}
+                                            className="h-7 px-2 text-[11px] font-semibold gap-1"
+                                          >
+                                            <IconPlus size={13} />
+                                            Course
+                                          </Button>
+
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            title="Remove semester"
+                                            onClick={() => {
+                                              if (
+                                                sem.courses.length > 0 &&
+                                                !confirm(`Remove ${sem.label}?`)
+                                              ) {
+                                                return;
+                                              }
+                                              removeSemester(yi, si);
+                                            }}
+                                            className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                          >
+                                            <IconTrash size={14} />
+                                          </Button>
+                                        </div>
+                                      </div>
+
+                                      {/* Courses Table / List */}
+                                      <div className="overflow-x-auto">
+                                        <table className="w-full text-left text-xs">
+                                          <thead>
+                                            <tr className="border-b border-border/50 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider bg-muted/10">
+                                              <th className="py-2 px-2.5 w-24">Code</th>
+                                              <th className="py-2 px-2.5">Title</th>
+                                              <th className="py-2 px-2 w-16 text-center">Cr</th>
+                                              <th className="py-2 px-2 w-28 text-center">Type</th>
+                                              <th className="py-2 px-2 w-8 text-center"></th>
+                                            </tr>
+                                          </thead>
+                                          <tbody className="divide-y divide-border/40">
+                                            {sem.courses.length === 0 ? (
+                                              <tr>
+                                                <td
+                                                  colSpan={5}
+                                                  className="py-6 text-center text-xs text-muted-foreground/70"
+                                                >
+                                                  No courses yet. Click “+ Course” to add one.
+                                                </td>
+                                              </tr>
+                                            ) : (
+                                              sem.courses.map((course, ci) => (
+                                                <tr
+                                                  key={`course-${yi}-${si}-${ci}`}
+                                                  className="hover:bg-muted/15 transition-colors group"
+                                                >
+                                                  {/* Code Input */}
+                                                  <td className="py-1.5 px-2.5 align-middle">
+                                                    <Input
+                                                      value={course.code}
+                                                      onChange={(e) =>
+                                                        updateCourse(yi, si, ci, {
+                                                          code: e.target.value.toUpperCase(),
+                                                        })
+                                                      }
+                                                      placeholder="e.g. CS101"
+                                                      aria-label="Course code"
+                                                      className="h-7.5 font-mono text-[11px] font-bold uppercase"
+                                                    />
+                                                  </td>
+
+                                                  {/* Title Input */}
+                                                  <td className="py-1.5 px-2.5 align-middle">
+                                                    <Input
+                                                      value={course.name}
+                                                      onChange={(e) =>
+                                                        updateCourse(yi, si, ci, {
+                                                          name: e.target.value,
+                                                        })
+                                                      }
+                                                      placeholder="Course title..."
+                                                      aria-label="Course title"
+                                                      className="h-7.5 text-xs font-medium"
+                                                    />
+                                                  </td>
+
+                                                  {/* Credits Input */}
+                                                  <td className="py-1.5 px-2 align-middle">
+                                                    <Input
+                                                      type="number"
+                                                      min={0}
+                                                      max={30}
+                                                      value={
+                                                        Number.isFinite(course.credits)
+                                                          ? course.credits
+                                                          : ""
+                                                      }
+                                                      onChange={(e) =>
+                                                        updateCourse(yi, si, ci, {
+                                                          credits: Number(e.target.value),
+                                                        })
+                                                      }
+                                                      placeholder="3"
+                                                      aria-label="Credits"
+                                                      className="h-7.5 w-14 text-center font-mono text-xs mx-auto"
+                                                    />
+                                                  </td>
+
+                                                  {/* Theory & Practical Toggle Pills */}
+                                                  <td className="py-1.5 px-2 align-middle">
+                                                    <div className="flex items-center justify-center gap-1">
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                          if (course.hasTheory && !course.hasPractical) {
+                                                            toast.warning("Course must have at least Theory or Practical");
+                                                            return;
+                                                          }
+                                                          updateCourse(yi, si, ci, {
+                                                            hasTheory: !course.hasTheory,
+                                                          });
+                                                        }}
+                                                        className={cn(
+                                                          "px-1.5 py-0.5 rounded text-[10px] font-bold border transition-all cursor-pointer",
+                                                          course.hasTheory
+                                                            ? "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/40 shadow-2xs"
+                                                            : "bg-muted/40 text-muted-foreground/60 border-border/50 hover:bg-muted"
+                                                        )}
+                                                        title="Toggle Theory (TH)"
+                                                      >
+                                                        TH
+                                                      </button>
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                          if (course.hasPractical && !course.hasTheory) {
+                                                            toast.warning("Course must have at least Theory or Practical");
+                                                            return;
+                                                          }
+                                                          updateCourse(yi, si, ci, {
+                                                            hasPractical: !course.hasPractical,
+                                                          });
+                                                        }}
+                                                        className={cn(
+                                                          "px-1.5 py-0.5 rounded text-[10px] font-bold border transition-all cursor-pointer",
+                                                          course.hasPractical
+                                                            ? "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/40 shadow-2xs"
+                                                            : "bg-muted/40 text-muted-foreground/60 border-border/50 hover:bg-muted"
+                                                        )}
+                                                        title="Toggle Practical (PR)"
+                                                      >
+                                                        PR
+                                                      </button>
+                                                    </div>
+                                                  </td>
+
+                                                  {/* Delete Action */}
+                                                  <td className="py-1.5 px-2 align-middle text-center">
+                                                    <Button
+                                                      type="button"
+                                                      variant="ghost"
+                                                      size="icon"
+                                                      onClick={() => removeCourse(yi, si, ci)}
+                                                      className="size-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                      title="Remove course"
+                                                    >
+                                                      <IconTrash size={13} />
+                                                    </Button>
+                                                  </td>
+                                                </tr>
+                                              ))
+                                            )}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </div>
+
+                                    {/* Semester Footer Summary */}
+                                    <div className="px-3.5 py-2 border-t border-border/50 bg-muted/10 flex items-center justify-between text-[11px] text-muted-foreground font-medium">
+                                      <span>Total Semester Credits</span>
+                                      <span className="font-bold font-mono text-foreground">
+                                        {semCredits} Credits
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
+                          )}
+                        </CardContent>
+                      )}
+                    </Card>
                   );
                 })}
+              </div>
+            )}
 
-              <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => addSemester(yi)}
-                  className="w-full sm:w-auto sm:self-start"
-                >
-                  <IconPlus size={15} aria-hidden="true" />
-                  Add Semester
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-
-        {/* Electives editor */}
-        {!loadingCurriculum && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Electives</CardTitle>
-              <CardDescription>
-                Open elective courses offered alongside the core curriculum.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-6">
-              {(["ELECTIVE_I", "ELECTIVE_II"] as const).map((group) => {
-                const items = draft.electives.filter((e) => e.group === group);
-                return (
-                  <div key={group} className="flex flex-col gap-2.5">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h4 className="text-sm font-semibold">
-                        {group === "ELECTIVE_I" ? "Elective I" : "Elective II"}
-                      </h4>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => addElective(group)}
-                      >
-                        <IconPlus size={15} aria-hidden="true" />
-                        Add Elective
-                      </Button>
-                    </div>
-
-                    {items.length === 0 ? (
-                      <p className="rounded-md border border-dashed px-3 py-4 text-center text-xs text-muted-foreground">
-                        No electives added yet.
+            {/* ── Electives Builder Section ── */}
+            {!loadingCurriculum && (
+              <Card className="rounded-xl border border-border/70 shadow-xs bg-card">
+                <CardHeader className="pb-3 border-b border-border/60">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-base font-bold flex items-center gap-2">
+                        <span className="flex size-5 items-center justify-center rounded-md bg-primary/10 text-primary text-xs font-bold">
+                          ★
+                        </span>
+                        Program Electives
+                      </CardTitle>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Define elective course options that students can select throughout the degree.
                       </p>
-                    ) : (
-                      items.map((item) => {
-                        const realIndex = draft.electives.indexOf(item);
-                        return (
-                          <div
-                            key={`${group}-${realIndex}`}
-                            className="flex flex-col gap-2 sm:flex-row sm:items-center"
-                          >
-                            <Input
-                              value={item.code}
-                              onChange={(e) =>
-                                updateElective(realIndex, { code: e.target.value })
-                              }
-                              placeholder="Code"
-                              aria-label={`${group} code`}
-                              className="sm:max-w-36"
-                            />
-                            <Input
-                              value={item.name}
-                              onChange={(e) =>
-                                updateElective(realIndex, { name: e.target.value })
-                              }
-                              placeholder="Elective name"
-                              aria-label={`${group} name`}
-                              className="flex-1"
-                            />
-                            <Input
-                              type="number"
-                              min={0}
-                              value={item.credits}
-                              onChange={(e) =>
-                                updateElective(realIndex, {
-                                  credits: Number(e.target.value),
-                                })
-                              }
-                              placeholder="Cr"
-                              aria-label={`${group} credits`}
-                              className="sm:max-w-24"
-                            />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-5">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {(["ELECTIVE_I", "ELECTIVE_II"] as const).map((group) => {
+                      const items = draft.electives.filter((e) => e.group === group);
+                      const groupLabel =
+                        group === "ELECTIVE_I" ? "Elective I" : "Elective II";
+
+                      return (
+                        <div
+                          key={group}
+                          className="rounded-xl border border-border/70 overflow-hidden bg-card"
+                        >
+                          <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-border/60 bg-muted/20">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-foreground">
+                                {groupLabel}
+                              </span>
+                              <Badge variant="outline" className="text-[10px] bg-background">
+                                Choice of 1 Course
+                              </Badge>
+                            </div>
                             <Button
                               type="button"
-                              variant="ghost"
-                              size="icon"
-                              title="Remove elective"
-                              onClick={() => removeElective(realIndex)}
-                              className="shrink-0 self-end text-destructive hover:bg-destructive/10 hover:text-destructive sm:self-auto"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => addElective(group)}
+                              className="h-7 px-2 text-[11px] font-semibold gap-1"
                             >
-                              <IconX size={16} aria-hidden="true" />
+                              <IconPlus size={13} />
+                              Add Option
                             </Button>
                           </div>
-                        );
-                      })
-                    )}
+
+                          <div className="p-3 space-y-2">
+                            {items.length === 0 ? (
+                              <p className="py-4 text-center text-xs text-muted-foreground/70 border border-dashed rounded-lg">
+                                No elective options added yet. Click “Add Option” above.
+                              </p>
+                            ) : (
+                              items.map((item) => {
+                                const realIndex = draft.electives.indexOf(item);
+                                return (
+                                  <div
+                                    key={`${group}-${realIndex}`}
+                                    className="flex items-center gap-2 bg-muted/15 p-1.5 rounded-lg border border-border/40"
+                                  >
+                                    <Input
+                                      value={item.code}
+                                      onChange={(e) =>
+                                        updateElective(realIndex, {
+                                          code: e.target.value.toUpperCase(),
+                                        })
+                                      }
+                                      placeholder="Code"
+                                      aria-label={`${group} code`}
+                                      className="h-7.5 w-24 font-mono text-[11px] font-bold uppercase"
+                                    />
+                                    <Input
+                                      value={item.name}
+                                      onChange={(e) =>
+                                        updateElective(realIndex, {
+                                          name: e.target.value,
+                                        })
+                                      }
+                                      placeholder="Elective course title..."
+                                      aria-label={`${group} name`}
+                                      className="h-7.5 flex-1 text-xs font-medium"
+                                    />
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      value={item.credits}
+                                      onChange={(e) =>
+                                        updateElective(realIndex, {
+                                          credits: Number(e.target.value),
+                                        })
+                                      }
+                                      placeholder="Cr"
+                                      aria-label={`${group} credits`}
+                                      className="h-7.5 w-14 text-center font-mono text-xs"
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      title="Remove elective"
+                                      onClick={() => removeElective(realIndex)}
+                                      className="size-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
+                                    >
+                                      <IconTrash size={14} />
+                                    </Button>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        )}
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* ══════════════════════════════════════════════════════════ */}
+          {/* TAB 2: COURSE STRUCTURE PREVIEW (Reusing Academic Panel)   */}
+          {/* ══════════════════════════════════════════════════════════ */}
+          <TabsContent value="preview" className="m-0 outline-hidden space-y-4">
+            {/* Context Notification Banner */}
+            <Card className="rounded-xl border border-border/70 p-3.5 bg-linear-to-r from-primary/5 via-card to-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-2.5">
+                <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <IconEye size={18} />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-semibold text-foreground">
+                    Live Student & Faculty Course Structure
+                  </h4>
+                  <p className="text-[11px] sm:text-xs text-muted-foreground">
+                    This view uses the identical student component to render your published degree structure.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setActiveTab("builder")}
+                  className="gap-1.5 text-xs font-semibold h-8"
+                >
+                  <IconPencil size={14} />
+                  Edit in Builder
+                </Button>
+              </div>
+            </Card>
+
+            {/* Embedded StudentCourseStructurePanel */}
+            <StudentCourseStructurePanel
+              key={`${programId}-${saveTimestamp}`}
+              defaultProgramId={programId}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
     </AdminShell>
   );

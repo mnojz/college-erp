@@ -146,16 +146,18 @@ export function ProgressionCard() {
           </div>
         ) : (
           <div className="grid gap-3">
-            <p className="m-0 text-sm text-muted-foreground">
-              Active batches per program — promote each cohort when ready.{" "}
-              {currentYear && (
-                <>History rows attach to <strong className="font-medium text-foreground">{currentYear.name}</strong>.</>
-              )}
-            </p>
+            {currentYear && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span>Academic Year:</span>
+                <Badge variant="outline" className="text-xs font-semibold px-2 py-0 bg-background text-foreground">
+                  {currentYear.name}
+                </Badge>
+              </div>
+            )}
 
             {cohorts.length === 0 ? (
-              <p className="m-0 text-sm text-muted-foreground">
-                No active cohorts. Admit a new batch below to get started.
+              <p className="m-0 text-xs text-muted-foreground">
+                No active cohorts.
               </p>
             ) : (
               <div className="grid gap-2">
@@ -201,10 +203,8 @@ export function ProgressionCard() {
                   ))}
                 </ul>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="progression-confirm" className="text-[13px] text-muted-foreground">
-                    This is permanent and cannot be undone. Type{" "}
-                    <strong className="font-medium text-foreground">{preview.programCode}</strong> to
-                    enable the {preview.graduates ? "graduation" : "promotion"} button.
+                  <Label htmlFor="progression-confirm" className="text-xs text-muted-foreground">
+                    Type <strong className="font-bold text-foreground">{preview.programCode}</strong> to confirm:
                   </Label>
                   <Input
                     id="progression-confirm"
