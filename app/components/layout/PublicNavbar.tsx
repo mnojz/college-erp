@@ -8,7 +8,6 @@ import { Menu, X } from "lucide-react";
 import { ThemeToggle } from "@/app/components/common/ThemeToggle";
 import { Logo } from "@/app/components/common/Logo";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "cn";
 
 const NAV_LINKS = [
@@ -30,25 +29,10 @@ export function PublicNavbar({
     <header className="sticky top-0 z-40 w-full border-b border-border/80 bg-background/85 backdrop-blur-md supports-backdrop-filter:bg-background/70 shadow-2xs transition-colors duration-150">
       <div className="mx-auto flex h-14 sm:h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link href="/" className="group flex items-center gap-2.5">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-2xs group-hover:bg-primary/15 transition-all duration-200">
-            <Logo className="size-5 text-primary" />
-          </div>
-          <div className="flex flex-col leading-tight">
-            <div className="flex items-center gap-2">
-              <span className="text-sm sm:text-base font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
-                College-ERP
-              </span>
-              <Badge
-                variant="outline"
-                className="hidden sm:inline-flex text-[10px] font-semibold py-0 px-1.5 bg-muted/40 text-muted-foreground border-border/70"
-              >
-                Far Western University
-              </Badge>
-            </div>
-            <span className="sm:hidden text-[10px] text-muted-foreground">
-              Far Western University
-            </span>
-          </div>
+          <Logo className="size-7 sm:size-7.5 text-primary shrink-0 transition-transform duration-200 group-hover:scale-105" />
+          <span className="text-base sm:text-lg font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
+            College-ERP
+          </span>
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex" aria-label="Primary">

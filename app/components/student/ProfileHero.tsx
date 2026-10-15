@@ -3,8 +3,6 @@
 import { useState } from "react";
 import {
   IconCalendar,
-  IconCheck,
-  IconCopy,
   IconId,
   IconPencil,
   IconSchool,
@@ -15,7 +13,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { toast } from "sonner";
 import { ProfileImagePreviewModal } from "@/app/components/profile/ProfileImagePreviewModal";
 
 export type ProfileHeroProps = {
@@ -34,6 +31,20 @@ export type ProfileHeroProps = {
   onEdit?: () => void;
 };
 
+function AcademicDoodlePattern() {
+  return (
+    <div
+      className="academic-doodle-pattern absolute inset-0 size-full pointer-events-none select-none bg-repeat opacity-[0.35] dark:opacity-[0.28] transition-opacity"
+      style={{
+        backgroundImage: "url('/patterns/academic-doodle.png')",
+        backgroundSize: "460px auto",
+        backgroundPosition: "center",
+      }}
+      aria-hidden="true"
+    />
+  );
+}
+
 export function ProfileHero({
   name,
   email,
@@ -49,18 +60,7 @@ export function ProfileHero({
   reviewStatus,
   onEdit,
 }: ProfileHeroProps) {
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showImagePreview, setShowImagePreview] = useState(false);
-
-  const copyToClipboard = (text: string, label: string) => {
-    if (!text) return;
-    navigator.clipboard.writeText(text);
-    setCopiedKey(label);
-    toast.success(`${label} copied to clipboard`);
-    setTimeout(() => {
-      setCopiedKey(null);
-    }, 2000);
-  };
 
   const initials =
     name
@@ -76,23 +76,25 @@ export function ProfileHero({
   return (
     <>
       <Card className="overflow-hidden border border-border/70 shadow-sm rounded-2xl bg-card p-0 py-0 pt-0 gap-0 [--card-spacing:0px]">
-      {/* ── Banner Backdrop ── */}
-      <div className="relative h-28 sm:h-36 w-full bg-linear-to-r from-primary/25 via-primary/10 to-primary/5 dark:from-primary/20 dark:via-primary/10 dark:to-background border-b border-border/50">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/15 via-transparent to-transparent opacity-80" />
-        <div className="absolute right-4 top-4 sm:right-6 sm:top-6 flex items-center gap-2">
-          <Badge
-            variant="outline"
-            className="bg-background/80 backdrop-blur-md px-2.5 py-1 text-xs font-semibold shadow-xs"
-          >
-            <IconSparkles size={13} className="text-primary mr-1" />
-            {batch || "Undergraduate"}
-          </Badge>
+        {/* ── Banner Box with Academic Doodle Pattern ── */}
+        <div className="p-3 sm:p-4 pb-0">
+          <div className="relative h-28 sm:h-36 w-full rounded-2xl overflow-hidden bg-transparent">
+            <AcademicDoodlePattern />
+            <div className="absolute right-3 top-3 sm:right-4 sm:top-4 flex items-center gap-2">
+              <Badge
+                variant="outline"
+                className="bg-background/80 backdrop-blur-md px-2.5 py-1 text-xs font-semibold shadow-xs"
+              >
+                <IconSparkles size={13} className="text-primary mr-1" />
+                {batch || "Undergraduate"}
+              </Badge>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* ── Profile Header Info ── */}
-      <div className="px-5 pb-5 sm:px-7 sm:pb-6">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-14 sm:-mt-16">
+        {/* ── Profile Header Info ── */}
+        <div className="px-5 pb-5 sm:px-7 sm:pb-6">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-12 sm:-mt-14">
           {/* Avatar with status ring & click preview */}
           <div className="relative inline-block self-start">
             <button
@@ -120,13 +122,6 @@ export function ProfileHero({
                 <IconZoomIn className="size-6 drop-shadow-md" aria-hidden="true" />
               </div>
             </button>
-
-            <span
-              className={`absolute bottom-1 right-1 size-4 rounded-full ring-2 ring-background pointer-events-none ${
-                active ? "bg-emerald-500" : "bg-muted-foreground"
-              }`}
-              title={active ? "Active account" : "Inactive account"}
-            />
           </div>
 
           {/* Action buttons on the right */}
@@ -150,27 +145,14 @@ export function ProfileHero({
         <div className="mt-4">
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">{name}</h1>
-            <Badge
-              variant={active ? "default" : "secondary"}
-              className={`gap-1.5 px-2.5 py-0.5 text-xs font-medium rounded-full ${
-                active
-                  ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30"
-                  : ""
-              }`}
-            >
-              <span
-                className={`size-1.5 rounded-full ${active ? "bg-emerald-500" : "bg-muted-foreground"}`}
-              />
-              {active ? "Active Student" : status}
-            </Badge>
 
             {reviewStatus === "PENDING_REVIEW" && (
-              <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-xs">
+              <Badge variant="outline" className="border-transparent bg-amber-500/15 text-amber-700 dark:text-amber-400 text-xs">
                 Changes Pending Approval
               </Badge>
             )}
             {reviewStatus === "REJECTED" && (
-              <Badge variant="destructive" className="text-xs">
+              <Badge variant="outline" className="border-transparent bg-rose-500/15 text-rose-700 dark:text-rose-400 text-xs">
                 Changes Update Required
               </Badge>
             )}
@@ -198,25 +180,12 @@ export function ProfileHero({
             )}
           </div>
 
-          {/* ── Key Identity Tags with Quick-Copy ── */}
+          {/* ── Key Identity Tags ── */}
           <div className="mt-4 flex flex-wrap items-center gap-2 pt-3 border-t border-border/50">
             {rollNumber != null && (
               <div className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-muted/40 px-2.5 py-1 text-xs">
                 <span className="text-muted-foreground font-medium">Roll No:</span>
                 <span className="font-mono font-bold text-foreground">#{rollNumber}</span>
-                <button
-                  type="button"
-                  onClick={() => copyToClipboard(String(rollNumber), "Roll Number")}
-                  className="text-muted-foreground hover:text-foreground transition-colors ml-0.5"
-                  title="Copy Roll Number"
-                  aria-label="Copy Roll Number"
-                >
-                  {copiedKey === "Roll Number" ? (
-                    <IconCheck size={13} className="text-emerald-500" />
-                  ) : (
-                    <IconCopy size={13} />
-                  )}
-                </button>
               </div>
             )}
 
@@ -225,19 +194,6 @@ export function ProfileHero({
                 <IconId size={14} className="text-muted-foreground/80" />
                 <span className="text-muted-foreground font-medium">Reg No:</span>
                 <span className="font-mono font-semibold text-foreground">{admissionNo}</span>
-                <button
-                  type="button"
-                  onClick={() => copyToClipboard(admissionNo, "Registration ID")}
-                  className="text-muted-foreground hover:text-foreground transition-colors ml-0.5"
-                  title="Copy Registration ID"
-                  aria-label="Copy Registration ID"
-                >
-                  {copiedKey === "Registration ID" ? (
-                    <IconCheck size={13} className="text-emerald-500" />
-                  ) : (
-                    <IconCopy size={13} />
-                  )}
-                </button>
               </div>
             )}
 
@@ -245,23 +201,10 @@ export function ProfileHero({
               <div className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-muted/40 px-2.5 py-1 text-xs">
                 <span className="text-muted-foreground font-medium">Enrollment:</span>
                 <span className="font-mono font-semibold text-foreground">{enrollmentNumber}</span>
-                <button
-                  type="button"
-                  onClick={() => copyToClipboard(enrollmentNumber, "Enrollment Number")}
-                  className="text-muted-foreground hover:text-foreground transition-colors ml-0.5"
-                  title="Copy Enrollment Number"
-                  aria-label="Copy Enrollment Number"
-                >
-                  {copiedKey === "Enrollment Number" ? (
-                    <IconCheck size={13} className="text-emerald-500" />
-                  ) : (
-                    <IconCopy size={13} />
-                  )}
-                </button>
               </div>
             )}
 
-            <div className="inline-flex items-center gap-1.5 text-xs text-muted-foreground ml-auto hidden md:inline-flex">
+            <div className="inline-flex items-center gap-1.5 text-xs text-muted-foreground ml-auto md:inline-flex">
               <span>{email}</span>
             </div>
           </div>

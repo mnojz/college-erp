@@ -20,7 +20,7 @@ type Payload = {
   student: {
     name: string;
     registrationId: string | null;
-    program: { name: string; code: string } | null;
+    program: { name: string; code: string; durationYears?: number } | null;
     semester: number | null;
   };
   marksheet: Marksheet[];
@@ -42,7 +42,7 @@ export async function GET() {
         currentSemester: true,
         registrationId: true,
         user: { select: { firstName: true, lastName: true } },
-        program: { select: { name: true, code: true } },
+        program: { select: { name: true, code: true, durationYears: true } },
       },
     });
     if (!student) {
@@ -64,10 +64,9 @@ export async function GET() {
     const sessions = await prisma.examSession.findMany({
       where: {
         programId: student.programId,
-        semester: student.currentSemester,
         resultsPublishedAt: { not: null },
       },
-      orderBy: { resultsPublishedAt: "desc" },
+      orderBy: [{ semester: "asc" }, { resultsPublishedAt: "desc" }],
       select: {
         id: true,
         title: true,
@@ -124,7 +123,7 @@ export async function GET() {
         rows,
         gpa: sessionGpa(rows.map((r) => r.gradeValue)),
       };
-    });
+    }).filter((m) => m.rows.length > 0 || m.semester === student.currentSemester);
 
     const latestGpa = marksheet.find((m) => m.gpa !== null)?.gpa ?? null;
 

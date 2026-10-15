@@ -11,6 +11,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      position="bottom-right"
+      duration={4000}
+      closeButton
       icons={{
         success: (
           <CircleCheckIcon className="size-4" />
@@ -37,6 +40,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
         } as React.CSSProperties
       }
       toastOptions={{
+        duration: 4000,
         classNames: {
           toast: "cn-toast",
         },

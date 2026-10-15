@@ -1,6 +1,7 @@
 "use client";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { AdminModal } from "@/app/components/admin/AdminModal";
 import { TimetableGrid } from "@/app/components/timetable/TimetableGrid";
@@ -138,7 +139,6 @@ export default function AdminTeachingPage() {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -442,7 +442,7 @@ export default function AdminTeachingPage() {
         }
         await refreshBreaks();
         setShowClassModal(false);
-        setMessage("Break set successfully.");
+        toast.success("Break set successfully.");
       } catch {
         setError("Unable to reach the server");
       } finally {
@@ -486,7 +486,7 @@ export default function AdminTeachingPage() {
       }
       await refreshClasses();
       setShowClassModal(false);
-      setMessage("Class scheduled successfully.");
+      toast.success("Class scheduled successfully.");
     } catch {
       setError("Unable to reach the server");
     } finally {
@@ -531,7 +531,7 @@ export default function AdminTeachingPage() {
       }
       await refreshClasses();
       setEditingClass(null);
-      setMessage("Class updated successfully.");
+      toast.success("Class updated successfully.");
     } catch {
       setError("Unable to reach the server");
     } finally {
@@ -548,13 +548,15 @@ export default function AdminTeachingPage() {
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Failed to delete class slot");
+        toast.error(data.error ?? "Failed to delete class slot");
         return;
       }
       setClasses((prev) => prev.filter((c) => c.id !== deletingClass.id));
-      setMessage("Class slot deleted successfully.");
+      toast.success("Class slot deleted successfully.");
       setDeletingClass(null);
     } catch {
       setError("Unable to reach the server");
+      toast.error("Unable to reach the server");
     } finally {
       setSaving(false);
     }
@@ -598,7 +600,7 @@ export default function AdminTeachingPage() {
       }
       await refreshBreaks();
       setEditingBreak(null);
-      setMessage("Break updated successfully.");
+      toast.success("Break updated successfully.");
     } catch {
       setError("Unable to reach the server");
     } finally {
@@ -615,13 +617,15 @@ export default function AdminTeachingPage() {
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Failed to remove the break");
+        toast.error(data.error ?? "Failed to remove the break");
         return;
       }
       setBreaks((prev) => prev.filter((b) => b.id !== deletingBreak.id));
-      setMessage("Break removed — the time is available for classes again.");
+      toast.success("Break removed — the time is available for classes again.");
       setDeletingBreak(null);
     } catch {
       setError("Unable to reach the server");
+      toast.error("Unable to reach the server");
     } finally {
       setSaving(false);
     }
@@ -696,11 +700,6 @@ export default function AdminTeachingPage() {
         {error && (
           <p className="rounded-lg border border-destructive/20 bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive">
             {error}
-          </p>
-        )}
-        {message && (
-          <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2.5 text-[13px] text-emerald-600 dark:text-emerald-400">
-            {message}
           </p>
         )}
 
@@ -920,7 +919,7 @@ export default function AdminTeachingPage() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Auto-filled from subject assignments. Assign teachers to subjects on the Faculty page.
+                  Auto-filled from subject assignments. Assign teachers to subjects on the People page.
                 </p>
               </div>
 
@@ -1081,7 +1080,7 @@ export default function AdminTeachingPage() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Auto-filled from subject assignments. Assign teachers to subjects on the Faculty page.
+                  Auto-filled from subject assignments. Assign teachers to subjects on the People page.
                 </p>
               </div>
 

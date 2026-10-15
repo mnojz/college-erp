@@ -10,13 +10,17 @@ import {
   studentUserIdsForSemester,
 } from "@/app/lib/notify";
 
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024; // 25 MB
 const ALLOWED_ATTACHMENT_TYPES = new Set([
   "image/png",
   "image/jpeg",
   "image/webp",
   "image/gif",
   "application/pdf",
+  "video/mp4",
+  "video/webm",
+  "video/ogg",
+  "video/quicktime",
 ]);
 
 type AttachmentWrite = {
@@ -120,10 +124,10 @@ async function parseNoticeInput(request: Request): Promise<ParsedNoticeInput | n
 
 function validateAttachment(file: File): string | null {
   if (file.size > MAX_ATTACHMENT_BYTES) {
-    return "Attachment must be 10 MB or smaller";
+    return "Attachment must be 25 MB or smaller";
   }
   if (!ALLOWED_ATTACHMENT_TYPES.has(file.type)) {
-    return "Attachments must be an image (PNG, JPEG, WEBP, GIF) or a PDF";
+    return "Attachments must be an image, video (MP4, WebM), or a PDF";
   }
   return null;
 }

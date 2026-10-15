@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -44,7 +45,6 @@ export function ProgressionCard() {
   const [confirmText, setConfirmText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -72,7 +72,6 @@ export function ProgressionCard() {
   async function openPreview(cohort: Cohort) {
     setBusy(true);
     setError("");
-    setMessage("");
     setPreview(null);
     setConfirmText("");
     try {
@@ -98,7 +97,6 @@ export function ProgressionCard() {
     const [programId, fromSemester] = previewKey.split("::");
     setBusy(true);
     setError("");
-    setMessage("");
     try {
       const res = await fetch("/api/progression/cohorts", {
         method: "POST",
@@ -110,7 +108,7 @@ export function ProgressionCard() {
         setError(data.error ?? "Unable to advance cohort");
         return;
       }
-      setMessage(
+      toast.success(
         data.graduates
           ? `${data.moved} graduated from ${data.programCode}.`
           : `${data.moved} advanced: ${data.programCode} ${data.fromSemester} → ${data.toSemester} (${data.academicYear}).`,
@@ -246,7 +244,6 @@ export function ProgressionCard() {
             )}
 
             {error && <p className="m-0 text-[13px] text-destructive">{error}</p>}
-            {message && !error && <p className="m-0 text-[13px] text-[var(--ctp-green)]">{message}</p>}
           </div>
         )}
       </CardContent>

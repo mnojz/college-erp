@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -65,7 +66,6 @@ export default function AdminCurriculumPage() {
   const [loadingCurriculum, setLoadingCurriculum] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -92,7 +92,6 @@ export default function AdminCurriculumPage() {
     setLoadingCurriculum(true);
     startProgress();
     setError("");
-    setMessage("");
     try {
       const res = await fetch(`/api/curriculum?programId=${id}`);
       const data = await res.json();
@@ -352,7 +351,6 @@ export default function AdminCurriculumPage() {
   async function handleSave() {
     if (!programId) return;
     setError("");
-    setMessage("");
     setSaving(true);
     try {
       const res = await fetch("/api/curriculum", {
@@ -370,7 +368,7 @@ export default function AdminCurriculumPage() {
         return;
       }
       setHasCurriculum(true);
-      setMessage("Curriculum saved successfully.");
+      toast.success("Curriculum saved successfully.");
     } catch {
       setError("Unable to reach the server");
     } finally {
@@ -443,11 +441,6 @@ export default function AdminCurriculumPage() {
         {error && (
           <p className="rounded-lg border border-destructive/20 bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive" role="alert">
             {error}
-          </p>
-        )}
-        {message && (
-          <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2.5 text-[13px] text-emerald-600 dark:text-emerald-400" role="status">
-            {message}
           </p>
         )}
 

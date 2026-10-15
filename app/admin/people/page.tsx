@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -270,7 +271,7 @@ function AccountStatusBadge({ status }: { status: string }) {
 }
 
 /**
- * Subject-assignment picker for the faculty create/edit modals.
+ * Subject-assignment picker for the teacher create/edit modals.
  *
  * Shows only the subjects already assigned to the teacher as removable chips,
  * plus a dedicated "Assign Subject" button. Clicking it expands a searchable
@@ -660,7 +661,6 @@ export default function AdminPeoplePage() {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
 
   /**
    * Fetch one page of students with every filter applied in the DATABASE.
@@ -874,7 +874,6 @@ export default function AdminPeoplePage() {
   // Open Edit Teacher modal
   function openEditTeacher(teacher: TeacherItem) {
     setError("");
-    setMessage("");
     setEditingTeacher({
       id: teacher.id,
       firstName: teacher.user.firstName,
@@ -891,7 +890,6 @@ export default function AdminPeoplePage() {
   // Open Edit Student modal
   function openEditStudent(student: StudentItem) {
     setError("");
-    setMessage("");
     setEditingStudent({
       id: student.id,
       firstName: student.user.firstName,
@@ -938,9 +936,9 @@ export default function AdminPeoplePage() {
       setTeachers(refreshData.teachers ?? []);
       setTeacherForm(teacherEmpty);
       setShowTeacherModal(false);
-      setMessage(`Faculty account created for ${data.teacher.user.firstName} ${data.teacher.user.lastName}.`);
+      toast.success(`Teacher account created for ${data.teacher.user.firstName} ${data.teacher.user.lastName}.`);
     } catch {
-      setError("Failed to create faculty account");
+      setError("Failed to create teacher account");
     } finally {
       setSaving(false);
     }
@@ -974,16 +972,16 @@ export default function AdminPeoplePage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Failed to update faculty account");
+        setError(data.error ?? "Failed to update teacher account");
         return;
       }
       const refresh = await fetch("/api/teachers");
       const refreshData = await refresh.json();
       setTeachers(refreshData.teachers ?? []);
       setEditingTeacher(null);
-      setMessage(`Profile updated for ${data.teacher.user.firstName} ${data.teacher.user.lastName}.`);
+      toast.success(`Profile updated for ${data.teacher.user.firstName} ${data.teacher.user.lastName}.`);
     } catch {
-      setError("Failed to update faculty account");
+      setError("Failed to update teacher account");
     } finally {
       setSaving(false);
     }
@@ -1013,7 +1011,7 @@ export default function AdminPeoplePage() {
       await loadStudents(studentPage);
       setStudentForm(studentEmpty);
       setShowStudentModal(false);
-      setMessage(`Student account created for ${data.student.user.firstName} ${data.student.user.lastName}.`);
+      toast.success(`Student account created for ${data.student.user.firstName} ${data.student.user.lastName}.`);
     } catch {
       setError("Failed to create student account");
     } finally {
@@ -1063,7 +1061,7 @@ export default function AdminPeoplePage() {
       }
       await loadStudents(studentPage);
       setEditingStudent(null);
-      setMessage(`Student profile updated for ${data.student.user.firstName} ${data.student.user.lastName}.`);
+      toast.success(`Student profile updated for ${data.student.user.firstName} ${data.student.user.lastName}.`);
     } catch {
       setError("Failed to update student account");
     } finally {
@@ -1085,6 +1083,7 @@ export default function AdminPeoplePage() {
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Failed to delete account");
+        toast.error(data.error ?? "Failed to delete account");
         return;
       }
       if (deletingTarget.type === "teacher") {
@@ -1092,10 +1091,11 @@ export default function AdminPeoplePage() {
       } else {
         void loadStudents(studentPage);
       }
-      setMessage(`${deletingTarget.name} has been removed successfully.`);
+      toast.success(`${deletingTarget.name} has been removed successfully.`);
       setDeletingTarget(null);
     } catch {
       setError("Unable to process deletion");
+      toast.error("Unable to process deletion");
     } finally {
       setSaving(false);
     }
@@ -1112,6 +1112,7 @@ export default function AdminPeoplePage() {
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Failed to update account status");
+        toast.error(data.error ?? "Failed to update account status");
         return false;
       }
       setTeachers((prev) =>
@@ -1121,6 +1122,7 @@ export default function AdminPeoplePage() {
       return true;
     } catch {
       setError("Unable to update account status");
+      toast.error("Unable to update account status");
       return false;
     }
   }
@@ -1131,7 +1133,7 @@ export default function AdminPeoplePage() {
     setSaving(true);
     const ok = await applyAccountStatus(userId, "ACTIVE");
     if (ok) {
-      setMessage(`${name}'s account was reactivated — they can sign in again.`);
+      toast.success(`${name}'s account was reactivated — they can sign in again.`);
     }
     setSaving(false);
   }
@@ -1142,7 +1144,7 @@ export default function AdminPeoplePage() {
     setSaving(true);
     const ok = await applyAccountStatus(statusTarget.userId, "INACTIVE");
     if (ok) {
-      setMessage(
+      toast.success(
         `${statusTarget.name}'s account was deactivated — sign-in is blocked until reactivated.`,
       );
       setStatusTarget(null);
@@ -1153,7 +1155,7 @@ export default function AdminPeoplePage() {
   return (
     <AdminShell
       title="People & Accounts"
-      subtitle="Faculty, Students & Account Administration"
+      subtitle="Teachers, Students & Account Administration"
       active="/admin/people"
     >
       <div className="flex flex-col gap-5">
@@ -1238,11 +1240,11 @@ export default function AdminPeoplePage() {
               <p className="w-full text-xs text-muted-foreground">
                 {filteredTeachers.length === 0
                   ? teachers.length === 0
-                    ? "No faculty yet"
-                    : "No faculty match your search"
+                    ? "No teachers yet"
+                    : "No teachers match your search"
                   : filteredTeachers.length === teachers.length
-                    ? `${teachers.length} faculty member${teachers.length === 1 ? "" : "s"}`
-                    : `Showing ${filteredTeachers.length} of ${teachers.length} faculty`}
+                    ? `${teachers.length} teacher${teachers.length === 1 ? "" : "s"}`
+                    : `Showing ${filteredTeachers.length} of ${teachers.length} teachers`}
               </p>
             </div>
           ) : activeTab === "students" ? (
@@ -1365,19 +1367,14 @@ export default function AdminPeoplePage() {
             {error}
           </p>
         )}
-        {message && (
-          <p className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2.5 text-[13px] text-emerald-600 dark:text-emerald-400">
-            {message}
-          </p>
-        )}
 
-        {/* Tab 1: Faculty table */}
+        {/* Tab 1: Teachers table */}
         {activeTab === "teachers" && (
           <div className="overflow-hidden rounded-xl border">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead>Faculty member</TableHead>
+                  <TableHead>Teacher</TableHead>
                   <TableHead>Employee #</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Status</TableHead>
@@ -1397,7 +1394,7 @@ export default function AdminPeoplePage() {
                 ) : sortedTeachers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
-                      No faculty records found. Click <strong className="font-medium text-foreground">Add Teacher</strong> to create an account.
+                      No teacher records found. Click <strong className="font-medium text-foreground">Add Teacher</strong> to create an account.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -1432,7 +1429,7 @@ export default function AdminPeoplePage() {
                             <div className="truncate font-medium">
                               {t.user.firstName} {t.user.lastName}
                             </div>
-                            <div className="text-xs text-muted-foreground">Instructor / Faculty</div>
+                            <div className="text-xs text-muted-foreground">Teacher</div>
                           </div>
                         </div>
                       </TableCell>
@@ -1620,10 +1617,10 @@ export default function AdminPeoplePage() {
           </div>
         )}
 
-        {/* Modal 1: Create Faculty */}
+        {/* Modal 1: Create Teacher */}
         {showTeacherModal && (
           <AdminModal
-            title="Create Faculty / Teacher Account"
+            title="Create Teacher Account"
             wide
             onClose={() => {
               setShowTeacherModal(false);
@@ -1673,7 +1670,7 @@ export default function AdminPeoplePage() {
                   <Input
                     id="tf-email"
                     type="email"
-                    placeholder="faculty@fwu.edu.np"
+                    placeholder="teacher@fwu.edu.np"
                     value={teacherForm.email}
                     onChange={(e) => setTeacherForm({ ...teacherForm, email: e.target.value })}
                     required
@@ -1714,7 +1711,7 @@ export default function AdminPeoplePage() {
                   ) : (
                     <>
                       <IconPlus size={15} aria-hidden="true" />
-                      Create Faculty Account
+                      Create Teacher Account
                     </>
                   )}
                 </Button>
@@ -1733,10 +1730,10 @@ export default function AdminPeoplePage() {
           </AdminModal>
         )}
 
-        {/* Modal 2: Edit Faculty */}
+        {/* Modal 2: Edit Teacher */}
         {editingTeacher && (
           <AdminModal
-            title={`Edit Faculty: ${editingTeacher.firstName} ${editingTeacher.lastName}`}
+            title={`Edit Teacher: ${editingTeacher.firstName} ${editingTeacher.lastName}`}
             wide
             onClose={() => setEditingTeacher(null)}
           >
@@ -2365,7 +2362,7 @@ export default function AdminPeoplePage() {
         {/* Modal 5: Delete Confirmation */}
         {deletingTarget && (
           <AdminModal
-            title={`Delete ${deletingTarget.type === "teacher" ? "Faculty" : "Student"} Account`}
+            title={`Delete ${deletingTarget.type === "teacher" ? "Teacher" : "Student"} Account`}
             onClose={() => setDeletingTarget(null)}
           >
             <div className="grid gap-3 text-sm text-muted-foreground">
@@ -2570,8 +2567,8 @@ export default function AdminPeoplePage() {
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {isActive
-                          ? "Block this faculty member from signing in. Their data stays intact."
-                          : "Restore this faculty member's ability to sign in."}
+                          ? "Block this teacher from signing in. Their data stays intact."
+                          : "Restore this teacher's ability to sign in."}
                       </p>
                     </div>
                     <Button
@@ -2600,7 +2597,7 @@ export default function AdminPeoplePage() {
                     <div className="text-left">
                       <p className="text-sm font-semibold text-destructive">Delete account</p>
                       <p className="text-xs text-muted-foreground">
-                        Permanently remove this faculty member and all associated data.
+                        Permanently remove this teacher and all associated data.
                       </p>
                     </div>
                     <Button

@@ -1,18 +1,14 @@
 "use client";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { startProgress, doneProgress } from "@/app/components/layout/RouteProgress";
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { AdminModal } from "@/app/components/admin/AdminModal";
 import { FileDropzone } from "@/app/components/common/FileDropzone";
-import {
-  NoticeDetailData,
-  NoticeDetailModal,
-} from "@/app/components/common/NoticeDetailModal";
-import { NoticePostCard } from "@/app/components/common/NoticePostCard";
+import { AnnouncementsBoard } from "@/app/components/announcements/AnnouncementsBoard";
 import {
   IconAlertTriangle,
   IconPaperclip,
@@ -67,28 +63,6 @@ function attachmentMetaOf(a: AnnouncementItem): NoticeAttachmentMeta | null {
   };
 }
 
-function toNoticeDetail(a: AnnouncementItem): NoticeDetailData {
-  return {
-    id: a.id,
-    title: a.title,
-    body: a.body,
-    publishedAt: a.publishedAt,
-    createdAt: a.createdAt,
-    author: a.author,
-    scope:
-      a.teacherId && a.subject && a.program && a.semester != null
-        ? {
-            subjectName: a.subject.name,
-            subjectCode: a.subject.code,
-            programName: a.program.name,
-            programCode: a.program.code,
-            semester: a.semester,
-          }
-        : null,
-    attachment: attachmentMetaOf(a),
-  };
-}
-
 export default function AdminAnnouncementsPage() {
   const router = useRouter();
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
@@ -98,12 +72,10 @@ export default function AdminAnnouncementsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] = useState<EditingNotice | null>(null);
   const [deletingAnnouncement, setDeletingAnnouncement] = useState<AnnouncementItem | null>(null);
-  const [selectedNotice, setSelectedNotice] = useState<NoticeDetailData | null>(null);
 
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -148,7 +120,7 @@ export default function AdminAnnouncementsPage() {
       setAnnouncements(refreshData.announcements ?? []);
       setForm(emptyForm);
       setShowCreateModal(false);
-      setMessage("Announcement published successfully.");
+      toast.success("Announcement published successfully.");
     } catch {
       setError("Failed to submit announcement");
     } finally {
@@ -181,7 +153,7 @@ export default function AdminAnnouncementsPage() {
       const refreshData = await refresh.json();
       setAnnouncements(refreshData.announcements ?? []);
       setEditingAnnouncement(null);
-      setMessage("Announcement updated successfully.");
+      toast.success("Announcement updated successfully.");
     } catch {
       setError("Failed to update announcement");
     } finally {
@@ -198,26 +170,34 @@ export default function AdminAnnouncementsPage() {
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Failed to delete announcement");
+        toast.error(data.error ?? "Failed to delete announcement");
         return;
       }
       setAnnouncements((prev) => prev.filter((a) => a.id !== deletingAnnouncement.id));
-      setMessage("Announcement deleted successfully.");
+      toast.success("Announcement deleted successfully.");
       setDeletingAnnouncement(null);
     } catch {
       setError("Failed to delete announcement");
+      toast.error("Failed to delete announcement");
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <AdminShell title="Announcements & Notices" subtitle="Campus Communications" active="/admin/announcements">
-      {/* Top action bar */}
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-        <p style={{ margin: 0, color: "var(--muted-foreground)", fontSize: 13, fontFamily: "Arial, sans-serif" }}>
-          {loading ? "Fetching announcements…" : `${announcements.length} notice${announcements.length !== 1 ? "s" : ""} broadcasted`}
-        </p>
-        <div className="flex flex-wrap gap-2.5">
+    <AdminShell title="Announcements & Notices" subtitle="Campus Communications & Bulletins" active="/admin/announcements">
+      {error && <p className="mb-4 rounded-lg border border-destructive/20 bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive">{error}</p>}
+
+      <AnnouncementsBoard
+        variant="admin"
+        items={announcements}
+        loading={loading}
+        onRefresh={async () => {
+          const refresh = await fetch("/api/announcements");
+          const refreshData = await refresh.json();
+          setAnnouncements(refreshData.announcements ?? []);
+        }}
+        primaryAction={
           <Button
             size="sm"
             type="button"
@@ -229,143 +209,108 @@ export default function AdminAnnouncementsPage() {
             <IconPlus size={16} aria-hidden="true" />
             New Announcement
           </Button>
-        </div>
-      </div>
-
-      {/* Announcements List */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 [&>*]:h-full">
-        {loading ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="flex flex-col rounded-xl border border-border/70 bg-card p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <Skeleton className="h-5 w-24 rounded-full" />
-                <Skeleton className="h-4 w-28" />
-              </div>
-              <Skeleton className="h-6 w-3/4" />
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-5/6" />
-              </div>
-              <div className="pt-2 flex items-center justify-between">
-                <Skeleton className="h-4 w-32" />
-                <div className="flex gap-2">
-                  <Skeleton className="h-8 w-16 rounded-md" />
-                  <Skeleton className="h-8 w-16 rounded-md" />
-                </div>
-              </div>
+        }
+        renderCardActions={(_notice, a) => {
+          const attachmentMeta = attachmentMetaOf(a);
+          return (
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                title="Edit Announcement"
+                aria-label="Edit Announcement"
+                onClick={() => {
+                  setError("");
+                  setEditingAnnouncement({
+                    id: a.id,
+                    title: a.title,
+                    body: a.body,
+                    file: null,
+                    removeAttachment: false,
+                    existingAttachment: attachmentMeta,
+                  });
+                }}
+              >
+                <IconPencil size={14} aria-hidden="true" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                className="border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
+                title="Delete Announcement"
+                aria-label="Delete Announcement"
+                onClick={() => {
+                  setError("");
+                  setDeletingAnnouncement(a);
+                }}
+              >
+                <IconTrash size={14} aria-hidden="true" />
+              </Button>
             </div>
-          ))
-        ) : announcements.length === 0 ? (
-          <div className="col-span-full w-full overflow-x-auto rounded-lg border">
-            <div className="px-3 py-10 text-center text-sm text-muted-foreground">
-              No campus announcements yet. Click <strong>+ New Announcement</strong> to publish notices.
-            </div>
-          </div>
-        ) : (
-          announcements.map((a) => {
-            const attachmentMeta = attachmentMetaOf(a);
-            return (
-              <NoticePostCard
-                key={a.id}
-                notice={toNoticeDetail(a)}
-                onOpen={() => setSelectedNotice(toNoticeDetail(a))}
-                actions={
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline" size="icon-sm"
-                      title="Edit Announcement"
-                      aria-label="Edit Announcement"
-                      onClick={() => {
-                        setError("");
-                        setEditingAnnouncement({
-                          id: a.id,
-                          title: a.title,
-                          body: a.body,
-                          file: null,
-                          removeAttachment: false,
-                          existingAttachment: attachmentMeta,
-                        });
-                      }}
-                    >
-                      <IconPencil size={15} aria-hidden="true" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline" size="icon-sm" className="border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
-                      title="Delete Announcement"
-                      aria-label="Delete Announcement"
-                      onClick={() => {
-                        setError("");
-                        setDeletingAnnouncement(a);
-                      }}
-                    >
-                      <IconTrash size={15} aria-hidden="true" />
-                    </Button>
-                  </>
-                }
-              />
-            );
-          })
-        )}
-      </div>
-
-      {error && <p className="mt-3.5 rounded-lg border border-destructive/20 bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive">{error}</p>}
-      {message && <p className="mt-3.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2.5 text-[13px] text-emerald-600 dark:text-emerald-400">{message}</p>}
+          );
+        }}
+      />
 
       {/* Modal 1: Create Announcement */}
       {showCreateModal && (
         <AdminModal
-          title="Publish New Notice / Announcement"
+          wide
+          title="New Announcement"
           onClose={() => {
             setShowCreateModal(false);
             setForm(emptyForm);
           }}
         >
-          <form className="grid gap-4" onSubmit={handleCreate}>
-            <label className="form-field">
-              Announcement Headline
-              <input
- className="form-control"
-                type="text"
-                placeholder="e.g. Mid-Term Examination Schedule Released"
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                required
-              />
-            </label>
+          <form className="flex flex-col gap-4" onSubmit={handleCreate}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch">
+              {/* Left Column: Title & Content */}
+              <div className="flex flex-col gap-3 min-w-0">
+                <label className="form-field">
+                  Title
+                  <input
+                    className="form-control"
+                    type="text"
+                    placeholder="Title"
+                    value={form.title}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                    required
+                  />
+                </label>
 
-            <label className="form-field">
-              Full Announcement Content
-              <textarea
- className="form-control"
-                placeholder="Write the full message for faculty and students..."
-                value={form.body}
-                onChange={(e) => setForm({ ...form, body: e.target.value })}
-                rows={6}
-                required
-              />
-            </label>
+                <label className="form-field flex-1 flex flex-col">
+                  Content
+                  <textarea
+                    className="form-control flex-1 resize-none"
+                    placeholder="Write announcement..."
+                    value={form.body}
+                    onChange={(e) => setForm({ ...form, body: e.target.value })}
+                    rows={5}
+                    required
+                  />
+                </label>
+              </div>
 
-            <label className="form-field">
-              Attachment <span className="text-xs font-normal text-muted-foreground">(optional image or PDF)</span>
-              <FileDropzone
-                id="notice-create-attachment"
-                accept="image/png,image/jpeg,image/webp,image/gif,application/pdf"
-                file={form.file}
-                onFileChange={(file) => setForm({ ...form, file })}
-                label="Drag & drop an image or PDF here"
-                dropLabel="Drop the attachment here"
-                hint="or click to browse — PNG, JPEG, WEBP, GIF or PDF, up to 10 MB"
-              />
-            </label>
+              {/* Right Column: Attachment */}
+              <div className="flex flex-col gap-1.5 min-w-0">
+                <span className="text-xs font-medium text-foreground">Attachment</span>
+                <FileDropzone
+                  id="notice-create-attachment"
+                  className="flex-1 min-h-[140px]"
+                  accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/ogg,video/quicktime,application/pdf"
+                  file={form.file}
+                  onFileChange={(file) => setForm({ ...form, file })}
+                  label="Upload file or drag & drop"
+                  dropLabel="Drop attachment here"
+                  hint="Max 25 MB (Images, Videos, PDF)"
+                />
+              </div>
+            </div>
 
             {error && <p className="m-0 text-[13px] text-destructive">{error}</p>}
 
-            <div className="flex flex-wrap justify-end gap-2.5">
-              <Button type="submit" disabled={saving}>
-                {saving ? "Publishing…" : "Publish Announcement"}
-              </Button>
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/60">
               <Button
                 variant="outline"
                 type="button"
@@ -376,6 +321,9 @@ export default function AdminAnnouncementsPage() {
               >
                 Cancel
               </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Publishing…" : "Publish"}
+              </Button>
             </div>
           </form>
         </AdminModal>
@@ -384,83 +332,110 @@ export default function AdminAnnouncementsPage() {
       {/* Modal 2: Edit Announcement */}
       {editingAnnouncement && (
         <AdminModal
-          title="Edit Announcement / Notice"
+          wide
+          title="Edit Announcement"
           onClose={() => setEditingAnnouncement(null)}
         >
-          <form className="grid gap-4" onSubmit={handleUpdate}>
-            <label className="form-field">
-              Announcement Headline
-              <input
- className="form-control"
-                type="text"
-                value={editingAnnouncement.title}
-                onChange={(e) => setEditingAnnouncement({ ...editingAnnouncement, title: e.target.value })}
-                required
-              />
-            </label>
-
-            <label className="form-field">
-              Full Announcement Content
-              <textarea
- className="form-control"
-                value={editingAnnouncement.body}
-                onChange={(e) => setEditingAnnouncement({ ...editingAnnouncement, body: e.target.value })}
-                rows={6}
-                required
-              />
-            </label>
-
-            <label className="form-field">
-              Attachment <span className="text-xs font-normal text-muted-foreground">(optional image or PDF)</span>
-              {editingAnnouncement.existingAttachment && !editingAnnouncement.file && (
-                <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground">
-                  <IconPaperclip size={13} aria-hidden="true" />
-                  Current: {editingAnnouncement.existingAttachment.fileName}
-                </span>
-              )}
-              <FileDropzone
-                id="notice-edit-attachment"
-                accept="image/png,image/jpeg,image/webp,image/gif,application/pdf"
-                file={editingAnnouncement.file}
-                onFileChange={(file) =>
-                  setEditingAnnouncement({ ...editingAnnouncement, file, removeAttachment: false })
-                }
-                label="Drag & drop a new image or PDF here"
-                dropLabel="Drop the attachment here"
-                hint="or click to browse — a new file replaces the current attachment"
-              />
-              {editingAnnouncement.existingAttachment && (
-                <span className="inline-flex cursor-pointer items-center gap-2 text-[13px] text-muted-foreground">
+          <form className="flex flex-col gap-4" onSubmit={handleUpdate}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch">
+              {/* Left Column: Title & Content */}
+              <div className="flex flex-col gap-3 min-w-0">
+                <label className="form-field">
+                  Title
                   <input
-                    type="checkbox"
-                    id="notice-remove-attachment"
- className="accent-primary"
-                    checked={editingAnnouncement.removeAttachment}
+                    className="form-control"
+                    type="text"
+                    placeholder="Title"
+                    value={editingAnnouncement.title}
                     onChange={(e) =>
-                      setEditingAnnouncement({
-                        ...editingAnnouncement,
-                        removeAttachment: e.target.checked,
-                        file: null,
-                      })
+                      setEditingAnnouncement({ ...editingAnnouncement, title: e.target.value })
                     }
+                    required
                   />
-                  <label htmlFor="notice-remove-attachment">Remove attachment</label>
-                </span>
-              )}
-            </label>
+                </label>
+
+                <label className="form-field flex-1 flex flex-col">
+                  Content
+                  <textarea
+                    className="form-control flex-1 resize-none"
+                    placeholder="Write announcement..."
+                    value={editingAnnouncement.body}
+                    onChange={(e) =>
+                      setEditingAnnouncement({ ...editingAnnouncement, body: e.target.value })
+                    }
+                    rows={5}
+                    required
+                  />
+                </label>
+              </div>
+
+              {/* Right Column: Attachment */}
+              <div className="flex flex-col gap-1.5 min-w-0">
+                <span className="text-xs font-medium text-foreground">Attachment</span>
+                {editingAnnouncement.existingAttachment &&
+                  !editingAnnouncement.file &&
+                  !editingAnnouncement.removeAttachment && (
+                    <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-border/80 bg-muted/30 text-xs min-w-0">
+                      <span className="inline-flex items-center gap-1.5 truncate min-w-0 font-medium">
+                        <IconPaperclip size={13} className="shrink-0 text-primary" aria-hidden="true" />
+                        <span className="truncate">{editingAnnouncement.existingAttachment.fileName}</span>
+                      </span>
+                      <button
+                        type="button"
+                        className="text-destructive hover:underline shrink-0 text-[11px] font-semibold cursor-pointer"
+                        onClick={() =>
+                          setEditingAnnouncement({ ...editingAnnouncement, removeAttachment: true })
+                        }
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                {editingAnnouncement.removeAttachment && (
+                  <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-destructive/30 bg-destructive/10 text-destructive text-xs">
+                    <span>Attachment will be removed</span>
+                    <button
+                      type="button"
+                      className="text-foreground hover:underline shrink-0 text-[11px] font-semibold cursor-pointer"
+                      onClick={() =>
+                        setEditingAnnouncement({ ...editingAnnouncement, removeAttachment: false })
+                      }
+                    >
+                      Undo
+                    </button>
+                  </div>
+                )}
+                <FileDropzone
+                  id="notice-edit-attachment"
+                  className="flex-1 min-h-[120px]"
+                  accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/ogg,video/quicktime,application/pdf"
+                  file={editingAnnouncement.file}
+                  onFileChange={(file) =>
+                    setEditingAnnouncement({
+                      ...editingAnnouncement,
+                      file,
+                      removeAttachment: false,
+                    })
+                  }
+                  label="Upload new file or drag & drop"
+                  dropLabel="Drop attachment here"
+                  hint="Replaces existing attachment (up to 25 MB)"
+                />
+              </div>
+            </div>
 
             {error && <p className="m-0 text-[13px] text-destructive">{error}</p>}
 
-            <div className="flex flex-wrap justify-end gap-2.5">
-              <Button type="submit" disabled={saving}>
-                {saving ? "Saving Changes…" : "Save Changes"}
-              </Button>
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/60">
               <Button
                 variant="outline"
                 type="button"
                 onClick={() => setEditingAnnouncement(null)}
               >
                 Cancel
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Saving…" : "Save Changes"}
               </Button>
             </div>
           </form>
@@ -492,10 +467,6 @@ export default function AdminAnnouncementsPage() {
             </div>
           </div>
         </AdminModal>
-      )}
-      {/* Modal 4: Notice details with attachment preview */}
-      {selectedNotice && (
-        <NoticeDetailModal notice={selectedNotice} onClose={() => setSelectedNotice(null)} />
       )}
     </AdminShell>
   );

@@ -13,7 +13,6 @@ import { Logo } from "@/app/components/common/Logo";
 import { clearProfileCache } from "@/app/lib/profile-cache";
 import { useShellIdentity } from "./UserIdentityProvider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -90,28 +89,11 @@ export function DashboardNav({
             href={brandHomeHref}
             className="group flex items-center gap-2.5 rounded-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2"
           >
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-2xs group-hover:bg-primary/15 group-hover:scale-102 transition-all duration-200">
-              <Logo className="size-5 text-primary" />
-            </div>
+            <Logo className="size-7 sm:size-7.5 text-primary shrink-0 transition-transform duration-200 group-hover:scale-105" />
 
-            <div className="flex flex-col min-w-0 leading-tight">
-              <div className="flex items-center gap-2">
-                <span className="truncate text-sm sm:text-base font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
-                  {brandTitle}
-                </span>
-                {brandSubtitle && (
-                  <Badge
-                    variant="outline"
-                    className="hidden sm:inline-flex text-[10px] font-semibold py-0 px-1.5 bg-muted/40 text-muted-foreground border-border/70"
-                  >
-                    {brandSubtitle}
-                  </Badge>
-                )}
-              </div>
-              <span className="sm:hidden text-[10px] font-medium text-muted-foreground truncate">
-                {brandSubtitle}
-              </span>
-            </div>
+            <span className="truncate text-base sm:text-lg font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
+              {brandTitle}
+            </span>
           </Link>
         </div>
 

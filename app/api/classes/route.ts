@@ -122,7 +122,7 @@ async function resolveTeacherForSubject(
   if (assignments.length === 0) {
     return {
       teacherId: null,
-      error: "No teacher is assigned to this subject yet. Assign one on the Faculty page first.",
+      error: "No teacher is assigned to this subject yet. Assign one on the People page first.",
     };
   }
 

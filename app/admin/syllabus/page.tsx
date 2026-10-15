@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { AdminModal } from "@/app/components/admin/AdminModal";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,6 @@ export default function AdminSyllabiPage() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
 
   // Modals
   const [previewSyllabus, setPreviewSyllabus] = useState<Syllabus | null>(null);
@@ -99,7 +99,6 @@ export default function AdminSyllabiPage() {
 
   /** Direct-to-slot upload: triggers immediately when user picks or drops a file on any card */
   async function handleDirectUpload(programId: string | null, semester: number, file: File) {
-    setMessage("");
     setError("");
     const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
     if (!isPdf) {
@@ -123,9 +122,11 @@ export default function AdminSyllabiPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Unable to upload syllabus");
       await refresh();
-      setMessage("Syllabus uploaded successfully.");
+      toast.success("Syllabus uploaded successfully.");
     } catch (err) {
-      setError((err as Error).message ?? "Unable to upload syllabus");
+      const msg = (err as Error).message ?? "Unable to upload syllabus";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
       setUploadingSlot(null);
@@ -135,7 +136,6 @@ export default function AdminSyllabiPage() {
   async function handleUpdate(values: SyllabusSubmitValues) {
     if (!editing) return;
     setFormError("");
-    setMessage("");
     setSaving(true);
     try {
       const fd = new FormData();
@@ -150,9 +150,11 @@ export default function AdminSyllabiPage() {
       if (!res.ok) throw new Error(data.error ?? "Unable to update syllabus");
       await refresh();
       setEditing(null);
-      setMessage("Syllabus updated successfully.");
+      toast.success("Syllabus updated successfully.");
     } catch (err) {
-      setFormError((err as Error).message ?? "Unable to update syllabus");
+      const msg = (err as Error).message ?? "Unable to update syllabus";
+      setFormError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -168,9 +170,11 @@ export default function AdminSyllabiPage() {
       if (!res.ok) throw new Error(data.error ?? "Unable to delete syllabus");
       await refresh();
       setDeleting(null);
-      setMessage("Syllabus deleted successfully.");
+      toast.success("Syllabus deleted successfully.");
     } catch (err) {
-      setFormError((err as Error).message ?? "Unable to delete syllabus");
+      const msg = (err as Error).message ?? "Unable to delete syllabus";
+      setFormError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -213,11 +217,6 @@ export default function AdminSyllabiPage() {
     >
       <div className="space-y-5">
         {/* Feedback messages */}
-        {message && (
-          <p className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-xs sm:text-sm font-medium text-emerald-600 dark:text-emerald-400">
-            {message}
-          </p>
-        )}
         {error && (
           <p className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-xs sm:text-sm font-medium text-destructive">
             {error}
@@ -281,7 +280,7 @@ export default function AdminSyllabiPage() {
               <p className="flex items-start gap-2 text-xs sm:text-sm leading-relaxed text-muted-foreground">
                 <IconAlertTriangle size={18} className="shrink-0 text-destructive mt-0.5" aria-hidden="true" />
                 <span>
-                  This PDF will be permanently deleted and will no longer be accessible to students or faculty.
+                  This PDF will be permanently deleted and will no longer be accessible to students or teachers.
                 </span>
               </p>
 

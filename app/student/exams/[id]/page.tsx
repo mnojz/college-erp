@@ -305,8 +305,14 @@ export default function StudentExamDetailPage() {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-heading truncate font-semibold">{exam.title}</p>
-                <Badge variant="outline">{TYPE_LABEL[exam.type]}</Badge>
-                {exam.isBacklog && <Badge variant="secondary">Backlog</Badge>}
+                <Badge variant="outline" className="border-transparent bg-primary/15 text-primary">
+                  {TYPE_LABEL[exam.type]}
+                </Badge>
+                {exam.isBacklog && (
+                  <Badge variant="outline" className="border-transparent bg-amber-500/15 text-amber-700 dark:text-amber-400">
+                    Backlog
+                  </Badge>
+                )}
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
                 Semester {exam.semester}
@@ -319,8 +325,19 @@ export default function StudentExamDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {exam.resultsPublishedAt && <Badge variant="outline">Results published</Badge>}
-            <Badge variant={windowOpen ? "default" : "secondary"} className="gap-1.5">
+            {exam.resultsPublishedAt && (
+              <Badge variant="outline" className="border-transparent bg-primary/15 text-primary">
+                Results published
+              </Badge>
+            )}
+            <Badge
+              variant="outline"
+              className={`gap-1.5 border-transparent ${
+                windowOpen
+                  ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
               {windowOpen ? "Registration open" : "Registration closed"}
             </Badge>
           </div>
@@ -331,7 +348,7 @@ export default function StudentExamDetailPage() {
         <p
           className={`rounded-lg border px-3 py-2 text-sm ${
             notice.kind === "ok"
-              ? "border-[var(--ctp-green)]/40 text-[var(--ctp-green)]"
+              ? "border-(--ctp-green)/40 text-(--ctp-green)"
               : "border-destructive/40 text-destructive"
           }`}
         >

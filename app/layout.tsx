@@ -23,7 +23,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <RouteProgress />
         </Suspense>
         {children}
-        <Toaster richColors position="top-center" />
+        <Toaster richColors position="bottom-right" duration={4000} closeButton />
         <Analytics />
         <SpeedInsights />
       </body>

@@ -14,7 +14,6 @@ import {
   IconList,
   IconSearch,
   IconUser,
-  IconUsers,
 } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -207,20 +206,6 @@ export function StudentSubjectsPanel({ initialProfile }: Props) {
     return list;
   }, [programSubjects, effectiveSemester, searchQuery]);
 
-  // Stats calculation
-  const visibleStats = useMemo(() => {
-    const ids = new Set(visibleSubjects.map((s) => s.id));
-    const teacherIds = new Set<string>();
-    for (const s of visibleSubjects) {
-      for (const st of s.subjectTeachers) teacherIds.add(st.teacher.id);
-    }
-    return {
-      classes: classes.filter((c) => ids.has(c.subjectId)).length,
-      faculty: teacherIds.size,
-      materials: materials.filter((m) => m.subjectId && ids.has(m.subjectId)).length,
-    };
-  }, [visibleSubjects, classes, materials]);
-
   if (error) {
     return (
       <p className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive font-medium">
@@ -232,12 +217,6 @@ export function StudentSubjectsPanel({ initialProfile }: Props) {
   if (loading || !profile) {
     return (
       <div className="space-y-4">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Skeleton className="h-18 w-full rounded-xl" />
-          <Skeleton className="h-18 w-full rounded-xl" />
-          <Skeleton className="h-18 w-full rounded-xl" />
-          <Skeleton className="h-18 w-full rounded-xl" />
-        </div>
         <Skeleton className="h-64 w-full rounded-2xl" />
       </div>
     );
@@ -245,75 +224,6 @@ export function StudentSubjectsPanel({ initialProfile }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* ── Compact Stat Strip ── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {/* Card 1: Subjects Count */}
-        <Card className="rounded-xl border border-border/70 p-3 shadow-xs bg-card">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-[11px] font-medium">Enrolled Subjects</span>
-            <span className="flex size-5 items-center justify-center rounded-md bg-primary/10 text-primary">
-              <IconBook2 size={13} />
-            </span>
-          </div>
-          <div className="mt-1 text-xl font-bold tracking-tight text-foreground">
-            {visibleSubjects.length}
-          </div>
-          <p className="mt-1 text-[11px] text-muted-foreground truncate">
-            {effectiveSemester === "ALL"
-              ? `Across ${semesters.length} semesters`
-              : `Semester ${effectiveSemester} (${programSubjects.length} total)`}
-          </p>
-        </Card>
-
-        {/* Card 2: Weekly Classes */}
-        <Card className="rounded-xl border border-border/70 p-3 shadow-xs bg-card">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-[11px] font-medium">Weekly Classes</span>
-            <span className="flex size-5 items-center justify-center rounded-md bg-primary/10 text-primary">
-              <IconClock size={13} />
-            </span>
-          </div>
-          <div className="mt-1 text-xl font-bold tracking-tight text-foreground">
-            {visibleStats.classes}
-          </div>
-          <p className="mt-1 text-[11px] text-muted-foreground truncate">
-            Lectures &amp; practicals
-          </p>
-        </Card>
-
-        {/* Card 3: Faculty Teaching */}
-        <Card className="rounded-xl border border-border/70 p-3 shadow-xs bg-card">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-[11px] font-medium">Course Faculty</span>
-            <span className="flex size-5 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-              <IconUsers size={13} />
-            </span>
-          </div>
-          <div className="mt-1 text-xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
-            {visibleStats.faculty}
-          </div>
-          <p className="mt-1 text-[11px] text-muted-foreground truncate">
-            Assigned professors
-          </p>
-        </Card>
-
-        {/* Card 4: Study Materials */}
-        <Card className="rounded-xl border border-border/70 p-3 shadow-xs bg-card">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-[11px] font-medium">Study Materials</span>
-            <span className="flex size-5 items-center justify-center rounded-md bg-primary/10 text-primary">
-              <IconFileText size={13} />
-            </span>
-          </div>
-          <div className="mt-1 text-xl font-bold tracking-tight text-foreground">
-            {visibleStats.materials}
-          </div>
-          <p className="mt-1 text-[11px] text-muted-foreground truncate">
-            Notes &amp; handouts
-          </p>
-        </Card>
-      </div>
-
       {/* ── Filter Toolbar ── */}
       <Card className="p-3 sm:p-3.5 rounded-xl border border-border/70 shadow-xs bg-card">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
@@ -435,7 +345,7 @@ export function StudentSubjectsPanel({ initialProfile }: Props) {
                       {isCurrentSem && (
                         <Badge
                           variant="outline"
-                          className="border-primary/40 bg-primary/10 text-primary text-[10px] font-bold"
+                          className="border-transparent bg-primary/10 text-primary text-[10px] font-bold"
                         >
                           Active
                         </Badge>
@@ -451,7 +361,7 @@ export function StudentSubjectsPanel({ initialProfile }: Props) {
                     {sub.name}
                   </h3>
 
-                  {/* Faculty Assigned */}
+                  {/* Teacher Assigned */}
                   <div className="mt-3 pt-2.5 border-t border-border/50 text-xs">
                     <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
                       <IconUser size={13} className="text-primary/70 shrink-0" />
@@ -485,7 +395,7 @@ export function StudentSubjectsPanel({ initialProfile }: Props) {
                       asChild
                       variant="outline"
                       size="sm"
-                      className="h-7 text-xs font-semibold px-2.5 bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
+                      className="h-7 text-xs font-semibold px-2.5 bg-emerald-500/15 border-transparent text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25"
                     >
                       <Link href={`/student/notes?subjectId=${sub.id}`}>
                         <IconFileText size={13} className="mr-1" />
@@ -525,7 +435,7 @@ export function StudentSubjectsPanel({ initialProfile }: Props) {
                   <TableHead className="w-28 text-xs font-bold uppercase tracking-wider py-2.5">Code</TableHead>
                   <TableHead className="text-xs font-bold uppercase tracking-wider py-2.5">Subject</TableHead>
                   <TableHead className="w-28 text-xs font-bold uppercase tracking-wider py-2.5">Semester</TableHead>
-                  <TableHead className="text-xs font-bold uppercase tracking-wider py-2.5">Faculty</TableHead>
+                  <TableHead className="text-xs font-bold uppercase tracking-wider py-2.5">Teacher</TableHead>
                   <TableHead className="w-32 text-xs font-bold uppercase tracking-wider py-2.5">Sessions</TableHead>
                   <TableHead className="w-40 text-right pr-4 text-xs font-bold uppercase tracking-wider py-2.5">Resources</TableHead>
                 </TableRow>
@@ -553,7 +463,7 @@ export function StudentSubjectsPanel({ initialProfile }: Props) {
                           {isCurrentSem && (
                             <Badge
                               variant="outline"
-                              className="border-primary/40 bg-primary/10 text-primary text-[10px] font-bold py-0 px-1.5"
+                              className="border-transparent bg-primary/10 text-primary text-[10px] font-bold py-0 px-1.5"
                             >
                               Current
                             </Badge>

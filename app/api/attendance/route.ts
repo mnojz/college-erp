@@ -124,24 +124,42 @@ export async function GET(request: Request) {
       },
     });
 
-    // Per-student roll-call rate, scoped to THIS class: total = sessions held
-    // for the class so far, present = that student's PRESENT records among
-    // them. Two aggregates cover every class at once, so the meters ride along
-    // inside the roster payload — no extra round-trip, free on class switch.
+    // Per-student overall attendance rate, scoped to the SUBJECT across all
+    // timetable sessions for this cohort (program + semester + subject).
+    const cohortSubjectClasses = await prisma.class.findMany({
+      where: {
+        OR: classes.map((c) => ({
+          subjectId: c.subjectId,
+          programId: c.programId,
+          semester: c.semester,
+        })),
+      },
+      select: {
+        id: true,
+        subjectId: true,
+        programId: true,
+        semester: true,
+      },
+    });
+
+    const allSubjectClassIds = cohortSubjectClasses.map((c) => c.id);
+    const classToSubjectKey = new Map<string, string>();
+    for (const sc of cohortSubjectClasses) {
+      classToSubjectKey.set(sc.id, `${sc.subjectId}:${sc.programId}:${sc.semester}`);
+    }
+
     const classIds = classes.map((c) => c.id);
     const todayStr = campusTodayISO();
     const todayDate = parseSessionDate(todayStr);
 
-    const [sessionCounts, presentRecords, todaySessions] = await Promise.all([
-      prisma.attendanceSession.groupBy({
-        by: ["classId"],
-        where: { classId: { in: classIds } },
-        _count: { _all: true },
+    const [allSubjectSessions, presentRecords, todaySessions] = await Promise.all([
+      prisma.attendanceSession.findMany({
+        where: { classId: { in: allSubjectClassIds } },
+        select: { id: true, classId: true },
       }),
-      // Only PRESENT rows feed the numerator — far fewer rows than pulling
-      // every record just to count successes.
+      // Only PRESENT rows feed the numerator across all sessions of this subject
       prisma.attendanceRecord.findMany({
-        where: { status: "PRESENT", session: { classId: { in: classIds } } },
+        where: { status: "PRESENT", session: { classId: { in: allSubjectClassIds } } },
         select: { studentId: true, session: { select: { classId: true } } },
       }),
       todayDate
@@ -151,28 +169,44 @@ export async function GET(request: Request) {
           })
         : Promise.resolve([]),
     ]);
-    const totalByClass = new Map(sessionCounts.map((sc) => [sc.classId, sc._count._all]));
-    const todaySessionClassIds = new Set(todaySessions.map((s) => s.classId));
-    const presentByClassStudent = new Map<string, number>();
-    for (const record of presentRecords) {
-      const key = `${record.session.classId}:${record.studentId}`;
-      presentByClassStudent.set(key, (presentByClassStudent.get(key) ?? 0) + 1);
+
+    const totalBySubjectKey = new Map<string, number>();
+    for (const sess of allSubjectSessions) {
+      const key = classToSubjectKey.get(sess.classId);
+      if (key) {
+        totalBySubjectKey.set(key, (totalBySubjectKey.get(key) ?? 0) + 1);
+      }
     }
 
-    const classesWithAttendance = classes.map((c) => ({
-      ...c,
-      hasTodaySession: todaySessionClassIds.has(c.id),
-      program: {
-        ...c.program,
-        students: c.program.students.map((s) => ({
-          ...s,
-          attendance: {
-            present: presentByClassStudent.get(`${c.id}:${s.id}`) ?? 0,
-            total: totalByClass.get(c.id) ?? 0,
-          },
-        })),
-      },
-    }));
+    const presentBySubjectStudent = new Map<string, number>();
+    for (const record of presentRecords) {
+      const subjectKey = classToSubjectKey.get(record.session.classId);
+      if (subjectKey) {
+        const studentKey = `${subjectKey}:${record.studentId}`;
+        presentBySubjectStudent.set(studentKey, (presentBySubjectStudent.get(studentKey) ?? 0) + 1);
+      }
+    }
+
+    const todaySessionClassIds = new Set(todaySessions.map((s) => s.classId));
+
+    const classesWithAttendance = classes.map((c) => {
+      const subjectKey = `${c.subjectId}:${c.programId}:${c.semester}`;
+      const totalSubjectSessions = totalBySubjectKey.get(subjectKey) ?? 0;
+      return {
+        ...c,
+        hasTodaySession: todaySessionClassIds.has(c.id),
+        program: {
+          ...c.program,
+          students: c.program.students.map((s) => ({
+            ...s,
+            attendance: {
+              present: presentBySubjectStudent.get(`${subjectKey}:${s.id}`) ?? 0,
+              total: totalSubjectSessions,
+            },
+          })),
+        },
+      };
+    });
 
     return NextResponse.json({ classes: classesWithAttendance });
   } catch (error) {

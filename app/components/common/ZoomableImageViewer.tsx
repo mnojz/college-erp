@@ -9,7 +9,13 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { IconExternalLink, IconRefresh, IconZoomIn, IconZoomOut } from "@tabler/icons-react";
+import {
+  IconExternalLink,
+  IconRefresh,
+  IconRotateClockwise,
+  IconZoomIn,
+  IconZoomOut,
+} from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "cn";
 
@@ -22,14 +28,19 @@ export function ZoomableImageViewer({
   src,
   alt,
   openUrl,
+  className,
+  fillParent = false,
 }: {
   src: string;
   alt: string;
   openUrl?: string;
+  className?: string;
+  fillParent?: boolean;
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(MIN_ZOOM);
   const [offset, setOffset] = useState<Offset>({ x: 0, y: 0 });
+  const [rotation, setRotation] = useState(0);
   const viewRef = useRef<{ zoom: number; offset: Offset }>({
     zoom: MIN_ZOOM,
     offset: { x: 0, y: 0 },
@@ -129,8 +140,18 @@ export function ZoomableImageViewer({
     );
   };
 
+  const rotate = () => {
+    setRotation((r) => (r + 90) % 360);
+  };
+
+  const resetView = () => {
+    applyView(MIN_ZOOM, { x: 0, y: 0 });
+    setRotation(0);
+  };
+
   const handleImageLoad = () => {
     applyView(MIN_ZOOM, { x: 0, y: 0 });
+    setRotation(0);
   };
 
   const handleKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -145,7 +166,7 @@ export function ZoomableImageViewer({
       zoomAround(z / 1.25);
     } else if (e.key === "0") {
       e.preventDefault();
-      applyView(MIN_ZOOM, { x: 0, y: 0 });
+      resetView();
     } else if (e.key === "ArrowLeft") {
       e.preventDefault();
       applyView(z, { x: o.x + step, y: o.y });
@@ -164,11 +185,12 @@ export function ZoomableImageViewer({
   const canPan = zoom > MIN_ZOOM;
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className={cn("flex flex-col gap-2.5", fillParent && "size-full h-full min-h-0", className)}>
       <div
         ref={stageRef}
         className={cn(
-          "relative flex h-72 w-full touch-none items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/40 select-none sm:h-96",
+          "relative flex w-full touch-none items-center justify-center overflow-hidden rounded-xl border border-slate-200 dark:border-zinc-800 bg-muted/30 select-none",
+          fillParent ? "flex-1 min-h-0 h-full" : "h-72 sm:h-96",
           canPan && "cursor-grab active:cursor-grabbing"
         )}
         role="application"
@@ -186,35 +208,88 @@ export function ZoomableImageViewer({
           src={src}
           alt={alt}
           draggable={false}
-          className="max-h-full max-w-full object-contain"
+          className="max-h-full max-w-full object-contain select-none transition-transform duration-75"
           onLoad={handleImageLoad}
           style={{
-            transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
+            transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom}) rotate(${rotation}deg)`,
           }}
         />
         {!canPan && (
-          <span className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">
+          <span className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-background/85 px-3 py-1 text-xs font-medium text-muted-foreground shadow-xs backdrop-blur-xs border border-slate-200 dark:border-zinc-800">
             Scroll or double-click to zoom
           </span>
         )}
       </div>
 
-      <div className="flex items-center justify-center gap-1">
-        <Button type="button" variant="outline" size="icon-sm" onClick={() => zoomAround(viewRef.current.zoom / 1.25)} disabled={zoom <= MIN_ZOOM} aria-label="Zoom out" title="Zoom out">
+      <div className="flex items-center justify-center gap-1.5 shrink-0 pt-0.5">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-sm"
+          onClick={() => zoomAround(viewRef.current.zoom / 1.25)}
+          disabled={zoom <= MIN_ZOOM}
+          aria-label="Zoom out"
+          title="Zoom out"
+          className="border-slate-200 dark:border-zinc-800 hover:bg-muted"
+        >
           <IconZoomOut size={16} aria-hidden="true" />
         </Button>
-        <span className="min-w-14 text-center text-xs font-medium tabular-nums" aria-live="polite">
+        <span
+          className="min-w-14 text-center text-xs font-semibold tabular-nums select-none text-foreground/90"
+          aria-live="polite"
+        >
           {Math.round(zoom * 100)}%
         </span>
-        <Button type="button" variant="outline" size="icon-sm" onClick={() => zoomAround(viewRef.current.zoom * 1.25)} disabled={zoom >= MAX_ZOOM} aria-label="Zoom in" title="Zoom in">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-sm"
+          onClick={() => zoomAround(viewRef.current.zoom * 1.25)}
+          disabled={zoom >= MAX_ZOOM}
+          aria-label="Zoom in"
+          title="Zoom in"
+          className="border-slate-200 dark:border-zinc-800 hover:bg-muted"
+        >
           <IconZoomIn size={16} aria-hidden="true" />
         </Button>
-        <Button type="button" variant="outline" size="icon-sm" onClick={() => applyView(MIN_ZOOM, { x: 0, y: 0 })} disabled={!canPan} aria-label="Reset zoom and position" title="Reset view (1:1)">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-sm"
+          onClick={rotate}
+          aria-label="Rotate clockwise"
+          title="Rotate (90°)"
+          className="border-slate-200 dark:border-zinc-800 hover:bg-muted"
+        >
+          <IconRotateClockwise size={16} aria-hidden="true" />
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-sm"
+          onClick={resetView}
+          disabled={!canPan && rotation === 0}
+          aria-label="Reset zoom and position"
+          title="Reset view (1:1)"
+          className="border-slate-200 dark:border-zinc-800 hover:bg-muted"
+        >
           <IconRefresh size={16} aria-hidden="true" />
         </Button>
         {openUrl && (
-          <Button type="button" variant="outline" size="icon-sm" asChild>
-            <a href={openUrl} target="_blank" rel="noreferrer" aria-label="Open full size image in a new tab" title="Open full size">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            asChild
+            className="border-slate-200 dark:border-zinc-800 hover:bg-muted"
+          >
+            <a
+              href={openUrl}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Open full size image in a new tab"
+              title="Open full size"
+            >
               <IconExternalLink size={16} aria-hidden="true" />
             </a>
           </Button>

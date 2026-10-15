@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { ProgressionCard } from "@/app/components/admin/ProgressionCard";
@@ -61,7 +62,6 @@ export default function AdminSetupPage() {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
 
   async function refresh() {
     const [pRes, dRes] = await Promise.all([
@@ -113,7 +113,7 @@ export default function AdminSetupPage() {
       if (!res.ok) { setError(data.error ?? "Unable to save department"); return; }
       await refresh();
       setShowSetDept(false);
-      setMessage(
+      toast.success(
         updating
           ? "Department updated successfully. Its new name/code is used everywhere across the system."
           : `Department ${data.department.code} set successfully. It is used everywhere across the system.`,
@@ -142,7 +142,7 @@ export default function AdminSetupPage() {
       await refresh();
       setProgramForm(programEmpty);
       setShowCreateProgram(false);
-      setMessage(`Program ${data.program.code} created successfully.`);
+      toast.success(`Program ${data.program.code} created successfully.`);
     } catch {
       setError("Unable to submit program");
     } finally {
@@ -170,7 +170,7 @@ export default function AdminSetupPage() {
       if (!res.ok) { setError(data.error ?? "Unable to update program"); return; }
       await refresh();
       setEditingProgram(null);
-      setMessage(`Program ${data.program.code} updated successfully.`);
+      toast.success(`Program ${data.program.code} updated successfully.`);
     } catch {
       setError("Unable to update program");
     } finally {
@@ -194,7 +194,7 @@ export default function AdminSetupPage() {
         return;
       }
       await refresh();
-      setMessage(
+      toast.success(
         archived
           ? `Program ${p.code} archived. Nothing was deleted — restore it any time.`
           : `Program ${p.code} restored and available again.`,
@@ -213,12 +213,17 @@ export default function AdminSetupPage() {
     try {
       const res = await fetch(`/api/programs?id=${deletingProgram.id}`, { method: "DELETE" });
       const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Unable to delete program"); return; }
+      if (!res.ok) {
+        setError(data.error ?? "Unable to delete program");
+        toast.error(data.error ?? "Unable to delete program");
+        return;
+      }
       await refresh();
-      setMessage(`Program ${deletingProgram.code} has been deleted.`);
+      toast.success(`Program ${deletingProgram.code} has been deleted.`);
       setDeletingProgram(null);
     } catch {
       setError("Unable to delete program");
+      toast.error("Unable to delete program");
     } finally {
       setSaving(false);
     }
@@ -270,7 +275,6 @@ export default function AdminSetupPage() {
       </div>
 
       {error && <p className="mt-3.5 rounded-lg border border-destructive/20 bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive">{error}</p>}
-      {message && <p className="mt-3.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2.5 text-[13px] text-emerald-600 dark:text-emerald-400">{message}</p>}
 
       {/* Department card (single, one-time setup) */}
       {department ? (

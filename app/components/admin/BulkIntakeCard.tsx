@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -43,7 +44,6 @@ export function BulkIntakeCard() {
   const [problems, setProblems] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   /** Drag-over highlight for the drop-zone; cleared on drag-leave/drop. */
   const [dragging, setDragging] = useState(false);
@@ -110,7 +110,6 @@ export function BulkIntakeCard() {
   async function handleFile(file: File | undefined) {
     if (!file) return;
     setError("");
-    setMessage("");
     setPreview(null);
     setProblems([]);
     setFileName(file.name);
@@ -140,7 +139,6 @@ export function BulkIntakeCard() {
   async function confirmIntake() {
     if (!rows || !programId) return;
     setError("");
-    setMessage("");
     const data = await validateOnServer(rows, false);
     if (!data) return;
     if (!data.ok) {
@@ -148,7 +146,7 @@ export function BulkIntakeCard() {
       setPreview(null);
       return;
     }
-    setMessage(
+    toast.success(
       `${(data as { created?: number }).created ?? preview?.count ?? 0} admitted to ${preview?.programCode ?? ""} semester ${semester}. Default password: student1234.`,
     );
     resetFile();
@@ -337,7 +335,6 @@ export function BulkIntakeCard() {
           )}
 
           {error && <p className="m-0 text-[13px] text-destructive">{error}</p>}
-          {message && !error && <p className="m-0 text-[13px] text-[var(--ctp-green)]">{message}</p>}
         </div>
       </CardContent>
     </Card>

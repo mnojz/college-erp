@@ -34,6 +34,10 @@ import { approveProfileChanges, rejectProfileChanges } from "@/app/actions/profi
 import { cn } from "cn";
 
 const PROFILE_FIELD_LABELS: Record<string, string> = {
+  gender: "Gender",
+  nationality: "Nationality",
+  religion: "Religion",
+  category: "Category / Caste",
   bloodGroup: "Blood Group",
   phone: "Primary Phone",
   emergencyContact: "Emergency Contact",
@@ -57,6 +61,10 @@ const PROFILE_FIELD_LABELS: Record<string, string> = {
 };
 
 const DISPLAY_KEYS = [
+  "gender",
+  "nationality",
+  "religion",
+  "category",
   "bloodGroup",
   "phone",
   "emergencyContact",
@@ -423,7 +431,7 @@ export function ProfileReviewClient({
                 const roleBadge = u.student
                   ? `Student · ${u.student.program?.code ?? "General"} · ${u.student.enrollmentNumber}`
                   : u.teacher
-                    ? `Faculty · ${u.teacher.employeeNo}`
+                    ? `Teacher · ${u.teacher.employeeNo}`
                     : u.role;
 
                 const pendingData = (u.pendingProfileData ?? {}) as Record<string, unknown>;
@@ -457,7 +465,7 @@ export function ProfileReviewClient({
                           </Badge>
                           <Badge
                             variant="outline"
-                            className="text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                            className="text-[11px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border-transparent"
                           >
                             Awaiting Review
                           </Badge>
@@ -627,7 +635,7 @@ export function ProfileReviewClient({
                 const roleBadge = user?.student
                   ? `Student · ${user.student.program?.code ?? "—"} · ${user.student.enrollmentNumber}`
                   : user?.teacher
-                    ? `Faculty · ${user.teacher.employeeNo}`
+                    ? `Teacher · ${user.teacher.employeeNo}`
                     : user?.role ?? "User";
 
                 return (
@@ -674,10 +682,10 @@ export function ProfileReviewClient({
                         <Badge
                           variant="outline"
                           className={cn(
-                            "gap-1 text-[11px] font-bold px-2 py-0.5 uppercase tracking-wide",
+                            "gap-1 text-[11px] font-bold px-2 py-0.5 uppercase tracking-wide border-transparent",
                             isApproved
-                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-                              : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30",
+                              ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                              : "bg-rose-500/15 text-rose-600 dark:text-rose-400",
                           )}
                         >
                           {isApproved ? <IconCheck size={12} /> : <IconX size={12} />}

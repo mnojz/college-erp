@@ -10,18 +10,22 @@ import { startProgress, doneProgress } from "@/app/components/layout/RouteProgre
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   IconAlertTriangle,
   IconArrowsShuffle,
   IconCalendarCheck,
   IconCalendarEvent,
+  IconCheck,
   IconCircleCheck,
   IconCircleX,
   IconClipboardList,
@@ -140,7 +144,6 @@ export default function TeacherAttendancePage() {
   const [statusFilter, setStatusFilter] = useState<"ALL" | "PRESENT" | "ABSENT">("ALL");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   /** Filter bar state — narrows the class dropdown by program/semester. */
@@ -189,18 +192,21 @@ export default function TeacherAttendancePage() {
     }
   }
 
-  /** Attendance is always for the current day — shown as read-only info. */
-  const todayISO = campusTodayISO();
+  /** Attendance is always for the current day — automatically rolls over at midnight. */
+  const [currentDateISO, setCurrentDateISO] = useState(campusTodayISO);
+  const todayISO = currentDateISO;
   const { day: todayKey } = campusNow();
   const displayDayName = todayKey.charAt(0) + todayKey.slice(1).toLowerCase();
 
-  const todayLabel = new Date().toLocaleDateString("en-GB", {
-    timeZone: CAMPUS_TIME_ZONE,
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  const todayLabel = useMemo(() => {
+    return new Date().toLocaleDateString("en-GB", {
+      timeZone: CAMPUS_TIME_ZONE,
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  }, [currentDateISO]);
 
   /** Minutes after the FIRST submission during which edits remain possible. */
   const EDIT_WINDOW_MINUTES = 5;
@@ -226,15 +232,12 @@ export default function TeacherAttendancePage() {
     [classes, selectedClassId],
   );
 
-  /** Today's scheduled classes */
+  /** Today's scheduled classes (sorted by start time) */
   const todaysScheduledClasses = useMemo(() => {
-    return classes.filter((c) => c.dayOfWeek === todayKey);
+    return classes
+      .filter((c) => c.dayOfWeek === todayKey)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
   }, [classes, todayKey]);
-
-  /** Dropdown value: the distinct-subject key the selected class belongs to. */
-  const selectedSubjectKey = selectedClass
-    ? `${selectedClass.program.id}|${selectedClass.semester}|${selectedClass.subject.code}`
-    : "";
 
   /** Distinct programs for the filter dropdown (sorted by code). */
   const availablePrograms = useMemo(() => {
@@ -258,31 +261,56 @@ export default function TeacherAttendancePage() {
     return Array.from(sems).sort((a, b) => a - b);
   }, [classes, selectedProgram]);
 
-  /** Classes narrowed by the filter bar. */
-  const filteredClasses = useMemo(
-    () => filterClassesFor(classes, selectedProgram, selectedSemester),
-    [classes, selectedProgram, selectedSemester],
-  );
+  /** Distinct subject offerings across all programs/semesters (excluding today's specific slots) */
+  const otherSubjectOptions = useMemo(() => {
+    const todaySubjectKeys = new Set(
+      todaysScheduledClasses.map((c) => `${c.program.id}|${c.semester}|${c.subject.code}`),
+    );
 
-  /** One dropdown entry per SUBJECT */
-  const subjectOptions = useMemo(() => {
-    const subjects = new Map<string, { key: string; label: string; hasPractical: boolean }>();
-    for (const c of filteredClasses) {
-      const key = `${c.program.id}|${c.semester}|${c.subject.code}`;
-      const isPractical = c.type === "Practical";
-      const existing = subjects.get(key);
-      if (existing) {
-        if (isPractical) existing.hasPractical = true;
-        continue;
+    const map = new Map<
+      string,
+      {
+        classId: string;
+        subjectCode: string;
+        subjectName: string;
+        programCode: string;
+        programId: string;
+        semester: number;
+        hasPractical: boolean;
       }
-      subjects.set(key, {
-        key,
-        label: `[${c.program.code} · Sem ${c.semester}] ${c.subject.name} (${c.subject.code})`,
-        hasPractical: isPractical,
-      });
+    >();
+
+    for (const c of classes) {
+      if (selectedProgram !== "ALL" && c.program.id !== selectedProgram) continue;
+      if (selectedSemester !== "ALL" && c.semester !== Number(selectedSemester)) continue;
+
+      const key = `${c.program.id}|${c.semester}|${c.subject.code}`;
+      if (todaySubjectKeys.has(key)) continue;
+
+      if (!map.has(key)) {
+        map.set(key, {
+          classId: c.id,
+          subjectCode: c.subject.code,
+          subjectName: c.subject.name,
+          programCode: c.program.code,
+          programId: c.program.id,
+          semester: c.semester,
+          hasPractical: c.type === "Practical",
+        });
+      }
     }
-    return Array.from(subjects.values());
-  }, [filteredClasses]);
+
+    return Array.from(map.values()).sort((a, b) =>
+      a.subjectName.localeCompare(b.subjectName),
+    );
+  }, [classes, todaysScheduledClasses, selectedProgram, selectedSemester]);
+
+  const isSelectedInList = useMemo(() => {
+    return (
+      todaysScheduledClasses.some((c) => c.id === selectedClassId) ||
+      otherSubjectOptions.some((s) => s.classId === selectedClassId)
+    );
+  }, [todaysScheduledClasses, otherSubjectOptions, selectedClassId]);
 
   function syncSelectedClassWith(nextFiltered: ClassItem[]) {
     if (nextFiltered.length === 0) {
@@ -295,69 +323,79 @@ export default function TeacherAttendancePage() {
     if (selectedClassId && !nextFiltered.some((c) => c.id === selectedClassId)) {
       const next = findCurrentClassId(nextFiltered) || nextFiltered[0].id;
       setSelectedClassId(next);
-      setMessage("");
       setError("");
       void loadExistingSession(next);
     }
   }
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        startProgress();
-        const [attRes, profRes] = await Promise.all([
-          fetch("/api/attendance"),
-          fetch("/api/teacher/profile"),
-        ]);
+  const loadData = useCallback(async () => {
+    try {
+      startProgress();
+      const [attRes, profRes] = await Promise.all([
+        fetch("/api/attendance"),
+        fetch("/api/teacher/profile"),
+      ]);
 
-        if (attRes.status === 403 || attRes.status === 401 || profRes.status === 403 || profRes.status === 401) {
-          router.replace("/dashboard");
-          return;
-        }
-
-        const attResult = await attRes.json();
-        const profResult = await profRes.json();
-
-        if (!attRes.ok) {
-          setError(attResult.error ?? "Unable to load classes");
-          return;
-        }
-
-        const loadedClasses: ClassItem[] = attResult.classes ?? [];
-        setClasses(loadedClasses);
-
-        // Smart-default: if classId is provided in URL, preselect it; otherwise find the class currently in session.
-        const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
-        const urlClassId = urlParams?.get("classId");
-        const matchedClass = urlClassId ? loadedClasses.find((c) => c.id === urlClassId) : null;
-        const initialClassId = matchedClass?.id ?? findCurrentClassId(loadedClasses) ?? "";
-
-        if (matchedClass) {
-          setSelectedProgram(matchedClass.program.id);
-          setSelectedSemester(String(matchedClass.semester));
-        }
-        setSelectedClassId(initialClassId);
-        await loadExistingSession(initialClassId);
-
-        if (profRes.ok && profResult.teacher) {
-          setTeacherInfo({
-            firstName: profResult.teacher.user.firstName,
-            lastName: profResult.teacher.user.lastName,
-            employeeNo: profResult.teacher.employeeNo,
-            profileImageUrl: profResult.teacher.profileImageUrl,
-          });
-        }
-      } catch {
-        setError("Unable to reach the server");
-      } finally {
-        setIsLoading(false);
-        doneProgress();
+      if (attRes.status === 403 || attRes.status === 401 || profRes.status === 403 || profRes.status === 401) {
+        router.replace("/dashboard");
+        return;
       }
-    }
 
-    loadData();
+      const attResult = await attRes.json();
+      const profResult = await profRes.json();
+
+      if (!attRes.ok) {
+        setError(attResult.error ?? "Unable to load classes");
+        return;
+      }
+
+      const loadedClasses: ClassItem[] = attResult.classes ?? [];
+      setClasses(loadedClasses);
+
+      // Smart-default: if classId is provided in URL, preselect it; otherwise find the class currently in session.
+      const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+      const urlClassId = urlParams?.get("classId");
+      const matchedClass = urlClassId ? loadedClasses.find((c) => c.id === urlClassId) : null;
+      const initialClassId = matchedClass?.id ?? findCurrentClassId(loadedClasses) ?? "";
+
+      if (matchedClass) {
+        setSelectedProgram(matchedClass.program.id);
+        setSelectedSemester(String(matchedClass.semester));
+      }
+      setSelectedClassId(initialClassId);
+      await loadExistingSession(initialClassId, currentDateISO);
+
+      if (profRes.ok && profResult.teacher) {
+        setTeacherInfo({
+          firstName: profResult.teacher.user.firstName,
+          lastName: profResult.teacher.user.lastName,
+          employeeNo: profResult.teacher.employeeNo,
+          profileImageUrl: profResult.teacher.profileImageUrl,
+        });
+      }
+    } catch {
+      setError("Unable to reach the server");
+    } finally {
+      setIsLoading(false);
+      doneProgress();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router]);
+  }, [router, currentDateISO]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
+
+  // Midnight rollover listener: checks every 15s if the campus date has changed
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const freshISO = campusTodayISO();
+      if (freshISO !== currentDateISO) {
+        setCurrentDateISO(freshISO);
+      }
+    }, 15_000);
+    return () => clearInterval(timer);
+  }, [currentDateISO]);
 
   useEffect(() => {
     if (!submittedAt || isLocked) return;
@@ -375,28 +413,36 @@ export default function TeacherAttendancePage() {
     classId: string,
     deltaFor: (student: Student) => { present: number; total: number },
   ) {
+    const targetClass = classes.find((c) => c.id === classId);
+    if (!targetClass) return;
+
     setClasses((prev) =>
-      prev.map((c) =>
-        c.id !== classId
-          ? c
-          : {
-              ...c,
-              hasTodaySession: true,
-              program: {
-                ...c.program,
-                students: c.program.students.map((s) => {
-                  const delta = deltaFor(s);
-                  return {
-                    ...s,
-                    attendance: {
-                      present: s.attendance.present + delta.present,
-                      total: s.attendance.total + delta.total,
-                    },
-                  };
-                }),
-              },
-            },
-      ),
+      prev.map((c) => {
+        const isSameSubject =
+          c.subject.code === targetClass.subject.code &&
+          c.program.id === targetClass.program.id &&
+          c.semester === targetClass.semester;
+
+        if (!isSameSubject) return c;
+
+        return {
+          ...c,
+          hasTodaySession: c.id === classId ? true : c.hasTodaySession,
+          program: {
+            ...c.program,
+            students: c.program.students.map((s) => {
+              const delta = deltaFor(s);
+              return {
+                ...s,
+                attendance: {
+                  present: Math.max(0, s.attendance.present + delta.present),
+                  total: Math.max(0, s.attendance.total + delta.total),
+                },
+              };
+            }),
+          },
+        };
+      }),
     );
   }
 
@@ -430,45 +476,51 @@ export default function TeacherAttendancePage() {
   }
 
   function selectClass(classId: string) {
+    if (!classId) return;
     setSelectedClassId(classId);
     const target = classes.find((c) => c.id === classId);
     if (target) {
-      setSelectedProgram(target.program.id);
-      setSelectedSemester(String(target.semester));
+      if (selectedProgram !== "ALL" && target.program.id !== selectedProgram) {
+        setSelectedProgram("ALL");
+      }
+      if (selectedSemester !== "ALL" && target.semester !== Number(selectedSemester)) {
+        setSelectedSemester("ALL");
+      }
     }
-    setMessage("");
     setError("");
     void loadExistingSession(classId);
-  }
-
-  function selectSubject(subjectKey: string) {
-    const [progId, semStr, base] = subjectKey.split("|");
-    if (!progId || !semStr || !base) return;
-    const candidates = filteredClasses.filter(
-      (c) =>
-        c.program.id === progId &&
-        c.semester === Number(semStr) &&
-        c.subject.code === base,
-    );
-    if (candidates.length === 0) return;
-    selectClass(findCurrentClassId(candidates) || candidates[0].id);
   }
 
   function resetFilters() {
     setSelectedProgram("ALL");
     setSelectedSemester("ALL");
-    syncSelectedClassWith(filterClassesFor(classes, "ALL", "ALL"));
   }
 
   function handleProgramChange(value: string) {
     setSelectedProgram(value);
     setSelectedSemester("ALL");
-    syncSelectedClassWith(filterClassesFor(classes, value, "ALL"));
+    const nextFiltered = filterClassesFor(classes, value, "ALL");
+    if (selectedClassId && !nextFiltered.some((c) => c.id === selectedClassId)) {
+      const next = findCurrentClassId(nextFiltered) || nextFiltered[0]?.id || "";
+      if (next) {
+        setSelectedClassId(next);
+        setError("");
+        void loadExistingSession(next);
+      }
+    }
   }
 
   function handleSemesterChange(value: string) {
     setSelectedSemester(value);
-    syncSelectedClassWith(filterClassesFor(classes, selectedProgram, value));
+    const nextFiltered = filterClassesFor(classes, selectedProgram, value);
+    if (selectedClassId && !nextFiltered.some((c) => c.id === selectedClassId)) {
+      const next = findCurrentClassId(nextFiltered) || nextFiltered[0]?.id || "";
+      if (next) {
+        setSelectedClassId(next);
+        setError("");
+        void loadExistingSession(next);
+      }
+    }
   }
 
   function selectAll() {
@@ -494,7 +546,7 @@ export default function TeacherAttendancePage() {
     });
   }
 
-  async function loadExistingSession(classId: string) {
+  async function loadExistingSession(classId: string, forDate: string = currentDateISO) {
     const resetToIdle = () => {
       setSessionStatus("idle");
       setSubmittedAt(null);
@@ -506,7 +558,7 @@ export default function TeacherAttendancePage() {
       return;
     }
     try {
-      const res = await fetch(`/api/attendance?classId=${classId}&date=${todayISO}`);
+      const res = await fetch(`/api/attendance?classId=${classId}&date=${forDate}`);
       if (!res.ok) {
         resetToIdle();
         return;
@@ -539,7 +591,6 @@ export default function TeacherAttendancePage() {
   async function submitAttendance() {
     if (!selectedClass) return;
     setError("");
-    setMessage("");
     setIsSubmitting(true);
 
     try {
@@ -580,7 +631,7 @@ export default function TeacherAttendancePage() {
       savedMarksRef.current = new Set(presentStudentIds);
       const total = selectedClass.program.students.length;
       const present = presentStudentIds.size;
-      setMessage(
+      toast.success(
         wasEditing
           ? `Attendance updated: ${present} Present, ${total - present} Absent.`
           : `Attendance successfully recorded: ${present} Present, ${total - present} Absent.`,
@@ -640,7 +691,7 @@ export default function TeacherAttendancePage() {
           ? "Subject Records & Analytics"
           : "Daily Roll Call Checklist"
       }
-      teacherName={teacherInfo ? `${teacherInfo.firstName} ${teacherInfo.lastName}` : "Faculty Member"}
+      teacherName={teacherInfo ? `${teacherInfo.firstName} ${teacherInfo.lastName}` : "Teacher"}
       employeeNo={teacherInfo?.employeeNo}
       avatarUrl={teacherInfo?.profileImageUrl}
     >
@@ -649,122 +700,86 @@ export default function TeacherAttendancePage() {
           <TabsList className="h-10 bg-muted/60 p-1">
             <TabsTrigger
               value="mark"
-              className="gap-2 px-4 py-2 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-xs"
+              className="gap-2 px-3.5 py-1.5 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-xs"
             >
               <IconCalendarEvent className="size-4" aria-hidden="true" />
-              Take Today&apos;s Attendance
+              Today&apos;s Attendance
             </TabsTrigger>
             <TabsTrigger
               value="records"
-              className="gap-2 px-4 py-2 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-xs"
+              className="gap-2 px-3.5 py-1.5 text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-xs"
             >
               <IconClipboardList className="size-4" aria-hidden="true" />
-              Subject Records &amp; Analytics
+              Subject Records
             </TabsTrigger>
           </TabsList>
         </div>
 
         <TabsContent value="mark" className="space-y-6">
-          {/* ── 1. Today's Scheduled Classes (Quick Switcher) ── */}
-          {todaysScheduledClasses.length > 0 && (
-            <section className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <IconCalendarCheck size={16} className="text-primary" />
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Today&apos;s Routine ({displayDayName}) — Quick Class Switcher
-                  </h3>
+          {/* ── 1. Unified Class Switcher & Selection Controls ── */}
+          <section className="rounded-xl border border-border/80 bg-card p-4 sm:p-5 shadow-xs space-y-4">
+            {/* If today has scheduled classes: sleek, compact routine chip carousel */}
+            {todaysScheduledClasses.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <IconCalendarCheck size={16} className="text-primary" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Today&apos;s Routine ({displayDayName})
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-muted-foreground">
+                    {todaysScheduledClasses.length} lecture{todaysScheduledClasses.length !== 1 ? "s" : ""}
+                  </span>
                 </div>
-                <span className="text-xs font-semibold text-muted-foreground">
-                  {todaysScheduledClasses.length} lecture{todaysScheduledClasses.length !== 1 ? "s" : ""}
-                </span>
-              </div>
 
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                {todaysScheduledClasses.map((cls) => {
-                  const isSelected = cls.id === selectedClassId;
-                  const isDone = cls.hasTodaySession;
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                  {todaysScheduledClasses.map((cls) => {
+                    const isSelected = cls.id === selectedClassId;
+                    const isDone = cls.hasTodaySession;
 
-                  return (
-                    <button
-                      key={cls.id}
-                      type="button"
-                      onClick={() => selectClass(cls.id)}
-                      className={`group relative flex flex-col justify-between p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
-                        isSelected
-                          ? "border-primary bg-primary/5 ring-2 ring-primary/20 shadow-xs"
-                          : "border-border/70 bg-card hover:border-primary/40 hover:bg-muted/10"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-foreground">
-                          <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-                            {formatTime(cls.startTime)}
-                          </span>
-                          <span className="text-muted-foreground text-[10px]">to {formatTime(cls.endTime)}</span>
-                        </div>
-
+                    return (
+                      <button
+                        key={cls.id}
+                        type="button"
+                        onClick={() => selectClass(cls.id)}
+                        className={`group shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-left text-xs transition-all cursor-pointer ${
+                          isSelected
+                            ? "border-primary bg-primary/10 ring-2 ring-primary/20 font-bold shadow-2xs"
+                            : "border-border/70 bg-muted/40 hover:border-primary/40 hover:bg-muted/70 font-medium"
+                        }`}
+                      >
+                        <span className="font-mono text-[11px] font-bold text-foreground">
+                          {formatTime(cls.startTime)}
+                        </span>
+                        <span className="text-muted-foreground">•</span>
+                        <span className="truncate max-w-32.5 sm:max-w-50">
+                          {cls.program.code} S{cls.semester} · {cls.subject.name}
+                        </span>
                         {isDone ? (
-                          <Badge
-                            variant="outline"
-                            className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 text-[10px] font-semibold gap-1"
+                          <span
+                            className="flex size-4 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white"
+                            title="Attendance recorded today"
                           >
-                            <IconCircleCheck size={11} /> Recorded
-                          </Badge>
-                        ) : (
-                          <Badge
-                            variant="outline"
-                            className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30 text-[10px] font-semibold gap-1"
-                          >
-                            <IconClock size={11} /> Pending
-                          </Badge>
-                        )}
-                      </div>
-
-                      <div className="mt-2 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono text-[10px] font-bold text-muted-foreground">
-                            {cls.subject.code}
+                            <IconCheck size={10} strokeWidth={3.5} />
                           </span>
-                          <h4 className="text-xs font-bold text-foreground truncate group-hover:text-primary transition-colors">
-                            {cls.subject.name}
-                          </h4>
-                        </div>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                          {cls.program.code} • Sem {cls.semester} ({cls.program.students.length} students)
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-
-          {/* ── 2. Manual Class Selector & Filter Bar ── */}
-          <section className="rounded-xl border border-border/80 bg-card shadow-xs">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 p-4 sm:p-5">
-              <div className="flex items-center gap-3">
-                <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <IconCalendarEvent size={18} aria-hidden="true" />
-                </span>
-                <div>
-                  <h2 className="text-sm font-bold text-foreground">Class Selection</h2>
-                  <p className="text-xs text-muted-foreground">
-                    Filter by program and semester to open any teaching roster.
-                  </p>
+                        ) : (
+                          <span
+                            className="flex size-4 shrink-0 items-center justify-center text-amber-500"
+                            title="Pending attendance"
+                          >
+                            <IconClock size={13} />
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-              <span
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-1 text-xs font-semibold text-primary"
-                title="Attendance is recorded for today only"
-              >
-                <IconCalendarEvent size={14} aria-hidden="true" />
-                {todayLabel}
-              </span>
-            </div>
+            )}
 
-            <div className="grid grid-cols-1 items-end gap-3.5 p-4 sm:p-5 sm:grid-cols-2 lg:grid-cols-[0.9fr_0.9fr_1.7fr_auto]">
+            {/* Filter Controls Row */}
+            <div className="grid grid-cols-1 items-end gap-3 pt-1 sm:grid-cols-2 lg:grid-cols-[0.85fr_0.85fr_1.8fr_auto_auto]">
               <div className="grid gap-1.5">
                 <Label htmlFor="att-filter-program" className="text-xs font-semibold">Program</Label>
                 <Select
@@ -808,102 +823,129 @@ export default function TeacherAttendancePage() {
               </div>
 
               <div className="grid gap-1.5">
-                <Label htmlFor="att-filter-subject" className="text-xs font-semibold">Subject / Roster</Label>
+                <Label htmlFor="att-filter-subject" className="text-xs font-semibold">Subject / Class</Label>
                 <Select
-                  value={selectedSubjectKey || undefined}
-                  onValueChange={selectSubject}
-                  disabled={isLoading || filteredClasses.length === 0}
+                  value={selectedClassId || undefined}
+                  onValueChange={selectClass}
+                  disabled={isLoading || classes.length === 0}
                 >
                   <SelectTrigger id="att-filter-subject" className="w-full text-xs">
-                    <SelectValue placeholder="No matching classes found" />
+                    <SelectValue placeholder="Select class..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {subjectOptions.map((opt) => (
-                      <SelectItem key={opt.key} value={opt.key}>
-                        {opt.label}
-                        {opt.hasPractical ? " · practical" : ""}
+                    {todaysScheduledClasses.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-1.5">
+                          Today&apos;s Schedule ({todaysScheduledClasses.length})
+                        </SelectLabel>
+                        {todaysScheduledClasses.map((cls) => (
+                          <SelectItem key={cls.id} value={cls.id} className="text-xs">
+                            <span className="font-semibold text-primary">{formatTime(cls.startTime)}</span>
+                            {" · "}
+                            <span>[{cls.program.code} S{cls.semester}] {cls.subject.name} ({cls.subject.code})</span>
+                            {cls.hasTodaySession ? " ✓" : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+
+                    {otherSubjectOptions.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-1.5">
+                          All Assigned Subjects
+                        </SelectLabel>
+                        {otherSubjectOptions.map((opt) => (
+                          <SelectItem key={opt.classId} value={opt.classId} className="text-xs">
+                            [{opt.programCode} · Sem {opt.semester}] {opt.subjectName} ({opt.subjectCode})
+                            {opt.hasPractical ? " · Practical" : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+
+                    {!isSelectedInList && selectedClass && (
+                      <SelectItem value={selectedClass.id} className="text-xs">
+                        [{selectedClass.program.code} · Sem {selectedClass.semester}] {selectedClass.subject.name}
                       </SelectItem>
-                    ))}
+                    )}
                   </SelectContent>
                 </Select>
               </div>
 
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={resetFilters}
-                disabled={selectedProgram === "ALL" && selectedSemester === "ALL"}
-                title="Reset filters"
-                className="h-9 px-3"
-              >
-                <IconFilterOff size={15} aria-hidden="true" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={resetFilters}
+                  disabled={selectedProgram === "ALL" && selectedSemester === "ALL"}
+                  title="Reset filters"
+                  className="h-9 px-3"
+                >
+                  <IconFilterOff size={15} aria-hidden="true" />
+                </Button>
+              </div>
+
+              <div className="hidden lg:flex items-center justify-end pb-0.5">
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary/60 px-3 py-1.5 text-xs font-semibold text-foreground/80"
+                  title="Campus Date"
+                >
+                  <IconCalendarEvent size={14} className="text-primary" />
+                  {todayLabel}
+                </span>
+              </div>
             </div>
           </section>
 
-          {/* ── 3. Turnout Metrics Summary ── */}
+          {/* ── 2. Turnout Metrics Summary ── */}
           <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <article className="flex min-w-0 flex-col justify-between rounded-xl border border-border/70 bg-card p-4 shadow-xs">
+            <article className="flex min-w-0 flex-col justify-between rounded-xl border border-border/70 bg-card p-3.5 sm:p-4 shadow-xs">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Enrolled
-                </span>
+                <span className="text-xs font-bold text-muted-foreground">Enrolled</span>
                 <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <IconUsers size={16} aria-hidden="true" />
                 </span>
               </div>
-              <strong className="mt-2 text-2xl font-extrabold text-foreground sm:text-3xl">
+              <strong className="mt-1 text-2xl font-extrabold text-foreground sm:text-3xl tabular-nums">
                 {totalStudents}
               </strong>
-              <p className="text-[11px] text-muted-foreground">
-                In {selectedClass?.program.code ?? "class"}
-              </p>
             </article>
 
-            <article className="flex min-w-0 flex-col justify-between rounded-xl border border-border/70 bg-card p-4 shadow-xs">
+            <article className="flex min-w-0 flex-col justify-between rounded-xl border border-border/70 bg-card p-3.5 sm:p-4 shadow-xs">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Present
-                </span>
+                <span className="text-xs font-bold text-muted-foreground">Present</span>
                 <span className="flex size-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                   <IconCircleCheck size={16} aria-hidden="true" />
                 </span>
               </div>
-              <strong className="mt-2 text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 sm:text-3xl">
+              <strong className="mt-1 text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 sm:text-3xl tabular-nums">
                 {presentCount}
               </strong>
-              <p className="text-[11px] text-muted-foreground">Marked present</p>
             </article>
 
-            <article className="flex min-w-0 flex-col justify-between rounded-xl border border-border/70 bg-card p-4 shadow-xs">
+            <article className="flex min-w-0 flex-col justify-between rounded-xl border border-border/70 bg-card p-3.5 sm:p-4 shadow-xs">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Absent
-                </span>
+                <span className="text-xs font-bold text-muted-foreground">Absent</span>
                 <span className="flex size-7 items-center justify-center rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400">
                   <IconCircleX size={16} aria-hidden="true" />
                 </span>
               </div>
-              <strong className="mt-2 text-2xl font-extrabold text-rose-600 dark:text-rose-400 sm:text-3xl">
+              <strong className="mt-1 text-2xl font-extrabold text-rose-600 dark:text-rose-400 sm:text-3xl tabular-nums">
                 {absentCount}
               </strong>
-              <p className="text-[11px] text-muted-foreground">Absentees</p>
             </article>
 
-            <article className="flex min-w-0 flex-col justify-between rounded-xl border border-border/70 bg-card p-4 shadow-xs">
+            <article className="flex min-w-0 flex-col justify-between rounded-xl border border-border/70 bg-card p-3.5 sm:p-4 shadow-xs">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Turnout Rate
-                </span>
+                <span className="text-xs font-bold text-muted-foreground">Turnout</span>
                 <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <IconTrendingUp size={16} aria-hidden="true" />
                 </span>
               </div>
-              <strong className="mt-2 text-2xl font-extrabold text-foreground sm:text-3xl">
+              <strong className="mt-1 text-2xl font-extrabold text-foreground sm:text-3xl tabular-nums">
                 {attendanceRate}%
               </strong>
-              <p className="text-[11px] text-muted-foreground">Session turnout</p>
             </article>
           </section>
 
@@ -917,26 +959,22 @@ export default function TeacherAttendancePage() {
               <span>{error}</span>
             </div>
           )}
-          {message && (
-            <div
-              role="status"
-              className="flex items-start gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm font-medium text-emerald-700 dark:text-emerald-300"
-            >
-              <IconCircleCheck size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
-              <span>{message}</span>
-            </div>
-          )}
 
-          {/* ── 4. Student Roll Call & Roster Card ── */}
+          {/* ── 3. Student Roll Call & Roster Card ── */}
           <section className="rounded-xl border border-border/80 bg-card shadow-xs">
             {/* Header with Title, Search, Status Tabs & Batch Actions */}
             <div className="flex flex-col gap-3.5 border-b border-border/70 p-4 sm:p-5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <h2 className="text-base font-bold text-foreground">Student Roll Call</h2>
-                  <p className="text-xs text-muted-foreground">
-                    {selectedClass ? `${selectedClass.subject.code}: ${selectedClass.subject.name}` : "Select a class"}
-                  </p>
+                <div className="flex items-center gap-2">
+                  <IconUsers className="size-4 text-primary" />
+                  <h2 className="text-sm sm:text-base font-bold text-foreground">
+                    Roll Call
+                    {selectedClass ? (
+                      <span className="font-normal text-muted-foreground text-xs ml-2">
+                        {selectedClass.subject.code} · {selectedClass.program.code} S{selectedClass.semester}
+                      </span>
+                    ) : null}
+                  </h2>
                 </div>
 
                 {/* Status Filter Tabs (All / Present / Absent) */}
@@ -944,9 +982,9 @@ export default function TeacherAttendancePage() {
                   <button
                     type="button"
                     onClick={() => setStatusFilter("ALL")}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                       statusFilter === "ALL"
-                        ? "bg-background text-foreground shadow-2xs"
+                        ? "bg-background text-foreground shadow-2xs font-bold"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
@@ -955,9 +993,9 @@ export default function TeacherAttendancePage() {
                   <button
                     type="button"
                     onClick={() => setStatusFilter("PRESENT")}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                       statusFilter === "PRESENT"
-                        ? "bg-emerald-600 text-white shadow-2xs"
+                        ? "bg-emerald-600 text-white shadow-2xs font-bold"
                         : "text-emerald-600 dark:text-emerald-400 hover:text-emerald-700"
                     }`}
                   >
@@ -966,9 +1004,9 @@ export default function TeacherAttendancePage() {
                   <button
                     type="button"
                     onClick={() => setStatusFilter("ABSENT")}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                       statusFilter === "ABSENT"
-                        ? "bg-rose-600 text-white shadow-2xs"
+                        ? "bg-rose-600 text-white shadow-2xs font-bold"
                         : "text-rose-600 dark:text-rose-400 hover:text-rose-700"
                     }`}
                   >
@@ -979,18 +1017,18 @@ export default function TeacherAttendancePage() {
 
               {/* Search & Batch Tools */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-                <div className="relative w-full sm:w-72">
+                <div className="relative w-full sm:w-64">
                   <IconSearch className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" aria-hidden="true" />
                   <Input
                     type="search"
-                    placeholder="Search student by name or roll..."
+                    placeholder="Search name or roll..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="h-9 pl-8 text-xs"
+                    className="h-8.5 pl-8 text-xs"
                   />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <Button
                     type="button"
                     variant="outline"
@@ -1000,7 +1038,7 @@ export default function TeacherAttendancePage() {
                     className="h-8 gap-1.5 text-xs font-semibold"
                   >
                     <IconCircleCheck size={14} className="text-emerald-600" aria-hidden="true" />
-                    Mark All Present
+                    Mark All
                   </Button>
 
                   <Button
@@ -1010,7 +1048,7 @@ export default function TeacherAttendancePage() {
                     onClick={invertSelection}
                     disabled={!selectedClass || totalStudents === 0 || isLocked || sessionStatus === "submitted"}
                     className="h-8 gap-1.5 text-xs font-semibold"
-                    title="Invert present/absent selections"
+                    title="Invert selections"
                   >
                     <IconArrowsShuffle size={14} aria-hidden="true" />
                     Invert
@@ -1025,7 +1063,7 @@ export default function TeacherAttendancePage() {
                     className="h-8 gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
                   >
                     <IconCircleX size={14} aria-hidden="true" />
-                    Clear All
+                    Clear
                   </Button>
                 </div>
               </div>
@@ -1037,7 +1075,7 @@ export default function TeacherAttendancePage() {
                 {[1, 2, 3, 4, 5, 6].map((i) => (
                   <div
                     key={i}
-                    className="flex flex-row items-stretch overflow-hidden rounded-xl border border-border/60 bg-card min-h-[4.5rem]"
+                    className="flex flex-row items-stretch overflow-hidden rounded-xl border border-border/60 bg-card min-h-18"
                   >
                     <Skeleton className="w-16 sm:w-20 shrink-0 rounded-none border-r border-border/60" />
                     <div className="flex flex-1 flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:px-4 sm:py-3 gap-3">
@@ -1071,10 +1109,6 @@ export default function TeacherAttendancePage() {
                   const isPresent = presentStudentIds.has(student.id);
                   const inactive = isAccountInactive(student);
                   const readOnly = inactive || isLocked || sessionStatus === "submitted";
-                  const studentAttendanceRate =
-                    student.attendance.total > 0
-                      ? Math.round((student.attendance.present / student.attendance.total) * 100)
-                      : 100;
 
                   return (
                     <div
@@ -1093,7 +1127,7 @@ export default function TeacherAttendancePage() {
                           toggleStudent(student.id);
                         }
                       }}
-                      className={`group flex flex-row items-stretch overflow-hidden rounded-xl border transition-all min-h-[4.5rem] sm:min-h-[4.75rem] ${
+                      className={`group flex flex-row items-stretch overflow-hidden rounded-xl border transition-all min-h-17 sm:min-h-18 ${
                         isPresent
                           ? "border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-500/10"
                           : "border-border/70 bg-card hover:border-border hover:bg-muted/15"
@@ -1101,7 +1135,7 @@ export default function TeacherAttendancePage() {
                     >
                       {/* Left: Flush Tiling Roll Number Gutter */}
                       <div
-                        className={`flex w-16 sm:w-20 shrink-0 self-stretch items-center justify-center border-r font-mono text-2xl sm:text-3xl font-black tabular-nums transition-colors select-none ${
+                        className={`flex w-14 sm:w-18 shrink-0 self-stretch items-center justify-center border-r font-mono text-xl sm:text-2xl font-black tabular-nums transition-colors select-none ${
                           isPresent
                             ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
                             : "border-border/70 bg-muted/60 text-foreground"
@@ -1111,10 +1145,10 @@ export default function TeacherAttendancePage() {
                       </div>
 
                       {/* Main Body: Avatar, Info, Progress & Action Controls */}
-                      <div className="flex flex-1 flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:px-4 sm:py-3 min-w-0">
+                      <div className="flex flex-1 flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 sm:px-4 sm:py-2.5 min-w-0">
                         {/* Student Avatar & Identity */}
-                        <div className="flex items-center gap-3.5 min-w-0">
-                          <Avatar className="size-11 rounded-xl shrink-0">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Avatar className="size-10 rounded-xl shrink-0">
                             {student.profileImageUrl ? (
                               <AvatarImage src={student.profileImageUrl} alt="" className="object-cover" />
                             ) : null}
@@ -1126,33 +1160,25 @@ export default function TeacherAttendancePage() {
 
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-sm sm:text-base text-foreground truncate">
+                              <span className="font-bold text-sm text-foreground truncate">
                                 {student.user.firstName} {student.user.lastName}
                               </span>
                               {inactive && (
-                                <Badge variant="outline" className="text-[10px] bg-muted text-muted-foreground">
+                                <Badge variant="outline" className="text-[10px] bg-muted text-muted-foreground py-0">
                                   Inactive
                                 </Badge>
                               )}
                             </div>
-                            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                              <span className="font-mono">{student.enrollmentNumber}</span>
-                              <span className="lg:hidden font-medium">
-                                · {student.attendance.present}/{student.attendance.total} ({studentAttendanceRate}%)
-                              </span>
-                              {studentAttendanceRate < 75 && (
-                                <span className="text-amber-600 dark:text-amber-400 font-semibold text-[11px]">
-                                  · At-Risk (&lt;75%)
-                                </span>
-                              )}
-                            </div>
+                            <span className="font-mono text-xs text-muted-foreground">
+                              {student.enrollmentNumber}
+                            </span>
                           </div>
                         </div>
 
                         {/* Right: Cumulative Attendance Meter + Dual [P] / [A] Action Buttons */}
-                        <div className="flex items-center justify-between sm:justify-end gap-5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50">
-                          {/* Subject Attendance Meter */}
-                          <div className="hidden lg:flex items-center shrink-0">
+                        <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50">
+                          {/* Subject Cumulative Attendance Meter */}
+                          <div className="flex items-center shrink-0">
                             <AttendanceMeter
                               present={student.attendance.present}
                               total={student.attendance.total}
@@ -1168,28 +1194,30 @@ export default function TeacherAttendancePage() {
                               type="button"
                               disabled={readOnly}
                               onClick={() => markStudentPresent(student.id)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                 isPresent
                                   ? "bg-emerald-600 text-white shadow-xs"
                                   : "text-muted-foreground hover:text-foreground hover:bg-background/80"
                               } ${readOnly ? "cursor-not-allowed opacity-70" : ""}`}
+                              title="Mark Present"
                             >
-                              <IconCircleCheck size={15} />
-                              <span>Present</span>
+                              <IconCircleCheck size={14} />
+                              <span className="hidden sm:inline">Present</span>
                             </button>
 
                             <button
                               type="button"
                               disabled={readOnly}
                               onClick={() => markStudentAbsent(student.id)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                 !isPresent && !inactive
                                   ? "bg-rose-600 text-white shadow-xs"
                                   : "text-muted-foreground hover:text-foreground hover:bg-background/80"
                               } ${readOnly ? "cursor-not-allowed opacity-70" : ""}`}
+                              title="Mark Absent"
                             >
-                              <IconCircleX size={15} />
-                              <span>Absent</span>
+                              <IconCircleX size={14} />
+                              <span className="hidden sm:inline">Absent</span>
                             </button>
                           </div>
                         </div>
@@ -1223,7 +1251,7 @@ export default function TeacherAttendancePage() {
                 {!isLocked && sessionStatus !== "idle" && editWindowEndsAt && remainingLabel && (
                   <Badge
                     variant="outline"
-                    className="border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200 gap-1 text-[11px] font-semibold py-0.5"
+                    className="border-transparent bg-amber-500/15 text-amber-800 dark:text-amber-200 gap-1 text-[11px] font-semibold py-0.5"
                   >
                     <IconClock size={12} />
                     Editable for {remainingLabel}
@@ -1254,7 +1282,6 @@ export default function TeacherAttendancePage() {
                   onClick={() => {
                     if (sessionStatus === "submitted" && !isLocked) {
                       setSessionStatus("editing");
-                      setMessage("");
                       return;
                     }
                     void submitAttendance();

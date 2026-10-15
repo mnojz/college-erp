@@ -444,7 +444,7 @@ export function PersonProfileModal({
                   {student?.user.email ?? teacher?.user.email}
                 </p>
                 <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 sm:justify-start">
-                  <Badge variant="secondary">{kind === "student" ? "Student" : "Faculty"}</Badge>
+                  <Badge variant="secondary">{kind === "student" ? "Student" : "Teacher"}</Badge>
                   <AccountStatusBadge status={student?.user.status ?? teacher?.user.status ?? ""} />
                   {student && <Badge variant="outline">{student.program ? `${student.program.code} · Sem ${student.currentSemester ?? "—"}` : "No program"}</Badge>}
                   {teacher && <Badge variant="outline">{teacher.employeeNo}</Badge>}

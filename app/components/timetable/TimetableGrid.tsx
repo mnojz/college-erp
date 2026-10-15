@@ -111,7 +111,7 @@ export function TimetableGrid({
     [
       `${b.subject.code} · ${b.subject.name}`,
       b.group ? `Group ${b.group}` : "",
-      b.subjectTeacherName ? `Faculty: ${b.subjectTeacherName}` : "",
+      b.subjectTeacherName ? `Teacher: ${b.subjectTeacherName}` : "",
       b.type === "Practical" ? "Type: Practical / Lab" : "Type: Lecture",
       `Time: ${formatTime(b.startTime)} – ${formatTime(b.endTime)}`,
       b.conflict ? "⚠ WARNING: Overlapping class slots" : "",
@@ -187,7 +187,7 @@ export function TimetableGrid({
                   {isToday && (
                     <Badge
                       variant="outline"
-                      className="text-[9px] font-extrabold px-1 py-0 bg-primary/15 text-primary border-primary/30"
+                      className="text-[9px] font-extrabold px-1 py-0 bg-primary/15 text-primary border-transparent"
                     >
                       TODAY
                     </Badge>

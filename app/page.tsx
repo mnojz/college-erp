@@ -82,7 +82,7 @@ const stakeholderData = {
       "Live attendance meter with early exam eligibility advisories",
       "Interactive weekly lecture routines and venue timetable changes",
       "Official semester grade reports and continuous GPA tracking",
-      "Instant access to departmental syllabuses and faculty handouts",
+      "Instant access to departmental syllabuses and teacher handouts",
     ],
     highlightSnippet: {
       tag: "Active Semester IV",
@@ -91,10 +91,10 @@ const stakeholderData = {
     },
   },
   faculty: {
-    role: "Teaching Faculty",
+    role: "Teachers",
     title: "Frictionless Roll Call & Academic Delivery",
     description: "Spend less time on manual bookkeeping and more time inspiring students with modern academic tools.",
-    badge: "Faculty Workspace",
+    badge: "Teacher Workspace",
     accentColor: "text-emerald-500",
     stats: {
       primary: "< 30s",
@@ -110,7 +110,7 @@ const stakeholderData = {
     ],
     highlightSnippet: {
       tag: "Department of Computer Science",
-      title: "Faculty Instructional Terminal",
+      title: "Teacher Workspace",
       detail: "Daily sessions logged and verified for Spring Term 2026",
     },
   },
@@ -155,7 +155,7 @@ function HomeContent() {
       <InteractiveBackground />
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <div
-          className="animate-pan-grid absolute inset-0 opacity-30 dark:opacity-20 [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]"
+          className="animate-pan-grid absolute inset-0 opacity-30 dark:opacity-20 mask-[radial-gradient(ellipse_at_center,black,transparent_75%)]"
           style={{
             backgroundImage:
               "linear-gradient(to right, var(--border) 1px, transparent 1px), linear-gradient(to bottom, var(--border) 1px, transparent 1px)",
@@ -163,22 +163,14 @@ function HomeContent() {
             backgroundPosition: "0 0",
           }}
         />
-        <div className="animate-drift-a absolute -top-40 left-1/2 -translate-x-1/2 size-[42rem] rounded-full bg-primary/12 dark:bg-primary/20 blur-3xl" />
-        <div className="animate-drift-b absolute top-96 -left-20 size-[32rem] rounded-full bg-sky-500/10 dark:bg-sky-400/15 blur-3xl [animation-delay:-4s]" />
-        <div className="animate-drift-c absolute top-[60rem] -right-20 size-[34rem] rounded-full bg-purple-500/10 dark:bg-purple-400/15 blur-3xl [animation-delay:-9s]" />
+        <div className="animate-drift-a absolute -top-40 left-1/2 -translate-x-1/2 size-168 rounded-full bg-primary/12 dark:bg-primary/20 blur-3xl" />
+        <div className="animate-drift-b absolute top-96 -left-20 size-128 rounded-full bg-sky-500/10 dark:bg-sky-400/15 blur-3xl [animation-delay:-4s]" />
+        <div className="animate-drift-c absolute top-240 -right-20 size-136 rounded-full bg-purple-500/10 dark:bg-purple-400/15 blur-3xl [animation-delay:-9s]" />
       </div>
 
       {/* ── 1. Hero Section: Grand Centered Editorial Marquee ───────────────── */}
       <section className="relative px-4 pt-12 pb-16 sm:px-6 sm:pt-18 sm:pb-24 lg:pt-24 lg:pb-32">
         <div className="mx-auto max-w-5xl text-center space-y-6">
-          {/* Institutional Badge Pill */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-border/80 bg-card/80 backdrop-blur-md text-xs font-semibold text-foreground shadow-xs">
-            <span className="flex size-2 rounded-full bg-primary animate-pulse" />
-            <span className="text-muted-foreground font-medium">Next-Generation Academic Portal</span>
-            <span className="text-border">|</span>
-            <span className="text-primary font-bold">Far Western University</span>
-          </div>
-
           {/* Master Headline */}
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight text-foreground leading-[1.08] max-w-4xl mx-auto">
             Where Academic Ambition Meets{" "}
@@ -189,7 +181,7 @@ function HomeContent() {
 
           {/* Subtitle Description */}
           <p className="max-w-2xl mx-auto text-base sm:text-lg lg:text-xl text-muted-foreground leading-relaxed font-normal">
-            A unified digital campus platform harmonizing student schedules, faculty roll calls,
+            A unified digital campus platform harmonizing student schedules, teacher roll calls,
             curriculum roadmaps, and administrative governance in one intuitive workspace.
           </p>
 
@@ -234,7 +226,7 @@ function HomeContent() {
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-muted/50 hover:bg-muted border border-border/60 transition-colors cursor-pointer text-foreground"
             >
               <IconSchool size={14} className="text-emerald-500" />
-              Faculty Workspace
+              Teacher Workspace
             </button>
             <button
               type="button"
@@ -356,7 +348,7 @@ function HomeContent() {
                     : "bg-card text-muted-foreground hover:text-foreground border border-border/70"
                 }`}
               >
-                For Faculty
+                For Teachers
               </button>
               <button
                 type="button"
@@ -397,7 +389,7 @@ function HomeContent() {
                   <ul className="space-y-3 pt-1">
                     {currentStakeholder.capabilities.map((item) => (
                       <li key={item} className="flex items-start gap-3 text-xs sm:text-sm text-foreground">
-                        <span className="size-5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 border border-emerald-500/30">
+                        <span className="size-5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
                           <IconCheck size={12} />
                         </span>
                         <span>{item}</span>
@@ -526,7 +518,7 @@ function HomeContent() {
           <div className="absolute top-0 right-0 -mr-20 -mt-20 size-56 rounded-full bg-primary/20 blur-3xl pointer-events-none" />
           <div className="absolute bottom-0 left-0 -ml-20 -mb-20 size-56 rounded-full bg-sky-500/15 blur-3xl pointer-events-none" />
 
-          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-primary/10 border border-primary/25 text-primary text-xs font-semibold">
+          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
             <IconSparkles size={14} />
             Institutional Single Sign-On
           </div>

@@ -147,14 +147,14 @@ const scheduleByDay: Record<DayKey, LectureSession[]> = {
       title: "Seminar & Departmental Forum",
       code: "CS-409",
       room: "Main Auditorium",
-      instructor: "Department Faculty",
+      instructor: "Department Teachers",
       status: "Upcoming",
     },
     {
       time: "01:00 - 02:30 PM",
-      title: "Faculty Office & Mentorship Hours",
+      title: "Teacher Office & Mentorship Hours",
       code: "OFFICE",
-      room: "Faculty Lounge",
+      room: "Teachers' Lounge",
       instructor: "Academic Advisors",
       status: "Upcoming",
     },
@@ -164,21 +164,21 @@ const scheduleByDay: Record<DayKey, LectureSession[]> = {
 const liveNotices = [
   {
     tag: "EXAM NOTICE",
-    tagColor: "bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30",
+    tagColor: "bg-rose-500/15 text-rose-600 dark:text-rose-400",
     title: "Spring 2026 Semester Final Examination Routine Published",
     date: "Today, 10:30 AM",
     hasDownload: true,
   },
   {
     tag: "SYLLABUS",
-    tagColor: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30",
+    tagColor: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
     title: "Updated Curriculum Syllabuses for B.Sc. CSIT & BIT Approved",
     date: "Yesterday",
     hasDownload: false,
   },
   {
     tag: "ACADEMIC",
-    tagColor: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
+    tagColor: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
     title: "Capstone Project Synopsis & Guide Allocation List Announced",
     date: "Oct 12",
     hasDownload: true,
@@ -190,8 +190,7 @@ export function HeroCommandCenter() {
   const [activeSessionIdx, setActiveSessionIdx] = useState(0);
 
   const shellRef = useRef<HTMLDivElement>(null);
-  const [tilt, setTilt] = useState({ rotateX: 0, rotateY: 0, mouseX: 0, mouseY: 0 });
-  const [isHovered, setIsHovered] = useState(false);
+  const spotlightRef = useRef<HTMLDivElement>(null);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!shellRef.current) return;
@@ -200,15 +199,32 @@ export function HeroCommandCenter() {
     const y = e.clientY - rect.top;
     const centerX = rect.width / 2;
     const centerY = rect.height / 2;
-    const rotateX = ((y - centerY) / centerY) * -2.8;
-    const rotateY = ((x - centerX) / centerX) * 2.8;
-    setTilt({ rotateX, rotateY, mouseX: x, mouseY: y });
+    const rotateX = ((y - centerY) / centerY) * -2.4;
+    const rotateY = ((x - centerX) / centerX) * 2.4;
+    shellRef.current.style.transform = `perspective(1200px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.006, 1.006, 1.006)`;
+
+    if (spotlightRef.current) {
+      spotlightRef.current.style.background = `radial-gradient(650px circle at ${x}px ${y}px, color-mix(in oklab, var(--primary) 12%, transparent), transparent 75%)`;
+    }
   };
 
-  const handleMouseEnter = () => setIsHovered(true);
+  const handleMouseEnter = () => {
+    if (shellRef.current) {
+      shellRef.current.style.transition = "transform 0.1s ease-out";
+    }
+    if (spotlightRef.current) {
+      spotlightRef.current.style.opacity = "1";
+    }
+  };
+
   const handleMouseLeave = () => {
-    setIsHovered(false);
-    setTilt({ rotateX: 0, rotateY: 0, mouseX: 0, mouseY: 0 });
+    if (shellRef.current) {
+      shellRef.current.style.transition = "transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)";
+      shellRef.current.style.transform = "perspective(1200px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)";
+    }
+    if (spotlightRef.current) {
+      spotlightRef.current.style.opacity = "0";
+    }
   };
 
   const days: DayKey[] = ["Mon", "Tue", "Wed", "Thu", "Fri"];
@@ -222,29 +238,19 @@ export function HeroCommandCenter() {
         className="pointer-events-none absolute -inset-4 rounded-3xl bg-linear-to-b from-primary/15 via-sky-500/10 to-transparent blur-3xl opacity-70"
       />
 
-      {/* Main Glass Shell with Interactive 3D Perspective Tilt */}
+      {/* Main Glass Shell with Interactive 3D Perspective Tilt (zero React re-renders) */}
       <div
         ref={shellRef}
         onMouseMove={handleMouseMove}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        style={{
-          transform: isHovered
-            ? `perspective(1200px) rotateX(${tilt.rotateX}deg) rotateY(${tilt.rotateY}deg) scale3d(1.008, 1.008, 1.008)`
-            : "perspective(1200px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)",
-          transition: isHovered ? "transform 0.12s ease-out" : "transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)",
-        }}
         className="relative rounded-3xl border border-border/80 bg-card/90 backdrop-blur-xl shadow-2xl overflow-hidden will-change-transform"
       >
         {/* Dynamic Interactive Cursor Spotlight on the Command Shell */}
-        {isHovered && (
-          <div
-            className="pointer-events-none absolute -inset-px transition-opacity duration-300 z-20"
-            style={{
-              background: `radial-gradient(650px circle at ${tilt.mouseX}px ${tilt.mouseY}px, color-mix(in oklab, var(--primary) 12%, transparent), transparent 75%)`,
-            }}
-          />
-        )}
+        <div
+          ref={spotlightRef}
+          className="pointer-events-none absolute -inset-px opacity-0 transition-opacity duration-300 z-20"
+        />
         {/* Top Operational Bar */}
         <div className="flex flex-wrap items-center justify-between border-b border-border/70 px-4 py-3 sm:px-6 bg-muted/30 gap-3">
           <div className="flex items-center gap-3">
@@ -266,7 +272,7 @@ export function HeroCommandCenter() {
           </div>
 
           <div className="flex items-center gap-2.5">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
               <span className="relative flex size-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex rounded-full size-2 bg-emerald-500" />
@@ -360,13 +366,13 @@ export function HeroCommandCenter() {
                       {/* Status Badges */}
                       <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-1">
                         {lecture.status === "In Progress" && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
                             <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
                             Live Session
                           </span>
                         )}
                         {lecture.status === "Up Next" && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-500/15 text-blue-600 dark:text-blue-400">
                             Up Next
                           </span>
                         )}
@@ -429,7 +435,7 @@ export function HeroCommandCenter() {
                 <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
                   91.8%
                 </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
                   Eligible
                 </span>
               </div>
@@ -458,7 +464,7 @@ export function HeroCommandCenter() {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span
-                        className={`text-[9px] font-bold px-2 py-0.5 rounded-md border uppercase tracking-wider ${notice.tagColor}`}
+                        className={`text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${notice.tagColor}`}
                       >
                         {notice.tag}
                       </span>
@@ -505,7 +511,7 @@ export function HeroCommandCenter() {
                   <div className="text-2xl font-black text-foreground tracking-tight">
                     3.84 <span className="text-xs font-semibold text-muted-foreground">/ 4.00</span>
                   </div>
-                  <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                  <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/15 text-[10px] font-bold text-amber-600 dark:text-amber-400">
                     <IconAward size={12} />
                     Dean&apos;s Honor List
                   </div>

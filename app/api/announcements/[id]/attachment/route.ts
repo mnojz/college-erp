@@ -80,13 +80,44 @@ export async function GET(request: Request, ctx: RouteContext) {
     const safeName = announcement.attachmentFileName.replace(/["\\\r\n]/g, "_");
     const asciiFallback = safeName.replace(/[^\x20-\x7E]/g, "_");
 
-    return new NextResponse(new Uint8Array(announcement.attachmentData), {
+    const fileBytes = new Uint8Array(announcement.attachmentData);
+    const totalBytes = fileBytes.byteLength;
+    const rangeHeader = request.headers.get("range");
+
+    if (rangeHeader && rangeHeader.startsWith("bytes=")) {
+      const parts = rangeHeader.replace(/bytes=/, "").split("-");
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : totalBytes - 1;
+
+      if (!isNaN(start) && start < totalBytes) {
+        const chunkEnd = Math.min(end, totalBytes - 1);
+        const chunkSize = chunkEnd - start + 1;
+        const chunk = fileBytes.subarray(start, chunkEnd + 1);
+
+        return new NextResponse(chunk, {
+          status: 206,
+          headers: {
+            "Content-Range": `bytes ${start}-${chunkEnd}/${totalBytes}`,
+            "Accept-Ranges": "bytes",
+            "Content-Length": String(chunkSize),
+            "Content-Type": contentType,
+            "Access-Control-Allow-Origin": "*",
+            "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(safeName)}`,
+            "Cache-Control": "public, max-age=3600",
+          },
+        });
+      }
+    }
+
+    return new NextResponse(fileBytes, {
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Content-Length": String(announcement.attachmentData.byteLength),
+        "Content-Length": String(totalBytes),
+        "Accept-Ranges": "bytes",
+        "Access-Control-Allow-Origin": "*",
         "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(safeName)}`,
-        "Cache-Control": "public, max-age=60",
+        "Cache-Control": "public, max-age=3600",
       },
     });
   } catch (error) {

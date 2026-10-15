@@ -5,29 +5,40 @@ import { notifyUsers, studentUserIdsForSemester } from "@/app/lib/notify";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-/** Build a plain-text routine body for the auto-created announcement. */
+/** Build a formatted markdown routine table body for the auto-created announcement. */
 function routineBody(
   title: string,
   programName: string,
   semester: number,
   entries: { date: Date; subject: { code: string; name: string } | null }[],
 ): string {
+  const sorted = [...entries].sort((a, b) => a.date.getTime() - b.date.getTime());
+  const tableRows = sorted.map((e) => {
+    const weekday = e.date.toLocaleDateString("en-GB", {
+      weekday: "short",
+      timeZone: "UTC",
+    });
+    const date = e.date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+    const subject = e.subject ? `${e.subject.code} — ${e.subject.name}` : "TBA";
+    return `| ${weekday} | ${date} | ${subject} |`;
+  });
+
   const lines = [
     `${title}`,
     `${programName} — Semester ${semester}`,
     "",
-    "Exam Routine:",
-    ...entries.map((e, i) => {
-      const date = e.date.toLocaleDateString("en-GB", {
-        weekday: "short",
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        timeZone: "UTC",
-      });
-      const subject = e.subject ? `${e.subject.code} — ${e.subject.name}` : "TBA";
-      return `${i + 1}. ${date}: ${subject}`;
-    }),
+    "The official examination schedule has been published for all registered candidates:",
+    "",
+    "| Day | Date | Subject |",
+    "| :--- | :--- | :--- |",
+    ...tableRows,
+    "",
+    "Please check your reporting time and bring your valid Admit Card and College ID to the examination hall.",
   ];
   return lines.join("\n");
 }

@@ -3,14 +3,16 @@
 import type { StudyMaterialDto } from "@/app/lib/materials-shared";
 import {
   formatBytes,
-  formatDate,
   MATERIAL_TYPE_STYLE,
   materialTypeLabel,
 } from "@/app/lib/materials-shared";
-import { IconFileText, IconStar, IconStarFilled } from "@tabler/icons-react";
+import { IconDownload, IconStar, IconStarFilled } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+
+import { getFileIconInfo } from "@/app/components/materials/material-file-icon";
 
 type MaterialCardProps = {
   material: StudyMaterialDto;
@@ -29,92 +31,114 @@ function startDownload(id: string) {
 
 export function MaterialCard({ material, onToggleBookmark, onOpenDetails }: MaterialCardProps) {
   const style = MATERIAL_TYPE_STYLE[material.materialType] ?? MATERIAL_TYPE_STYLE.OTHER;
+  const fileInfo = getFileIconInfo(material.fileName);
 
   return (
-    <Card className="flex h-full flex-col">
-      <CardContent className="flex flex-1 flex-col p-4">
-        <div className="mb-3 flex items-start justify-between gap-2">
-          <span
-            className="flex size-10 items-center justify-center rounded-lg text-sm font-bold"
-            style={{ background: style.bg, color: style.color }}
-          >
-            {style.monogram}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => onToggleBookmark(material.id)}
-            aria-label={material.bookmarked ? "Remove bookmark" : "Bookmark this material"}
-            title={material.bookmarked ? "Remove bookmark" : "Bookmark"}
-            className={material.bookmarked ? "text-[var(--ctp-yellow)]" : "text-muted-foreground"}
-          >
-            {material.bookmarked ? (
-              <IconStarFilled size={16} aria-hidden="true" />
-            ) : (
-              <IconStar size={16} aria-hidden="true" />
-            )}
-          </Button>
-        </div>
-
-        <div className="mb-1 flex flex-wrap gap-1.5">
-          <Badge
-            variant="outline"
-            className="border-transparent"
-            style={{ background: style.bg, color: style.color }}
-          >
-            {materialTypeLabel(material.materialType)}
-          </Badge>
-        </div>
-
-        <h3
-          className="mb-2 cursor-pointer text-base font-semibold hover:text-primary"
-          onClick={() => onOpenDetails(material)}
-        >
-          {material.title}
-        </h3>
-
-        <div className="mb-2 flex flex-wrap gap-1.5">
-          {material.subject ? (
-            <Badge variant="secondary" className="bg-sky-500/10 text-sky-700 dark:text-sky-300">
-              {material.subject.code}
+    <Card
+      onClick={() => onOpenDetails(material)}
+      className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-border/80 bg-card p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md cursor-pointer"
+    >
+      <div className="flex flex-col gap-2">
+        {/* Top Row: Category badge & Subject on left, Bookmark & Download on right */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-1.5 flex-wrap">
+            <Badge
+              variant="outline"
+              className="border-transparent text-[11px] font-semibold py-0.5 px-2"
+              style={{ background: style.bg, color: style.color }}
+            >
+              {materialTypeLabel(material.materialType)}
             </Badge>
-          ) : (
-            <Badge variant="secondary">General</Badge>
-          )}
-          {material.topic && <Badge variant="outline">{material.topic}</Badge>}
-          {material.semester != null && <Badge variant="outline">Sem {material.semester}</Badge>}
+
+            {material.subject && (
+              <span className="text-xs font-semibold text-foreground/80 truncate">
+                {material.subject.code}
+                {material.semester != null && (
+                  <span className="font-normal text-muted-foreground"> · Sem {material.semester}</span>
+                )}
+              </span>
+            )}
+          </div>
+
+          <div
+            className="flex shrink-0 items-center gap-0.5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => onToggleBookmark(material.id)}
+              aria-label={material.bookmarked ? "Remove bookmark" : "Bookmark this material"}
+              title={material.bookmarked ? "Remove bookmark" : "Bookmark"}
+              className={cn(
+                "size-7 cursor-pointer",
+                material.bookmarked ? "text-amber-500" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {material.bookmarked ? (
+                <IconStarFilled size={15} aria-hidden="true" />
+              ) : (
+                <IconStar size={15} aria-hidden="true" />
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="size-7 text-muted-foreground hover:text-foreground cursor-pointer"
+              onClick={() => startDownload(material.id)}
+              title="Download file"
+              aria-label={`Download ${material.title}`}
+            >
+              <IconDownload size={14} aria-hidden="true" />
+            </Button>
+          </div>
         </div>
 
-        {material.description && (
-          <p className="mb-2 line-clamp-2 text-sm text-muted-foreground">{material.description}</p>
-        )}
-
-        <p className="mb-3 text-xs text-muted-foreground">
-          {material.uploader.name}
-          <span className="mx-1">·</span>
-          {material.program ? material.program.code : material.departmentName ?? "College-wide"}
-          {material.subject && (
-            <>
-              <span className="mx-1">·</span>
-              {material.subject.name}
-            </>
+        {/* Title */}
+        <div>
+          <h3
+            className="text-sm font-semibold leading-snug tracking-tight text-foreground transition-colors group-hover:text-primary line-clamp-1"
+            title={material.title}
+          >
+            {material.title}
+          </h3>
+          {material.description && (
+            <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">
+              {material.description}
+            </p>
           )}
-        </p>
+        </div>
+      </div>
 
-        <div className="mt-auto flex items-center justify-between gap-2 border-t pt-3">
-          <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground" title={material.fileName}>
-            <IconFileText size={13} className="shrink-0" aria-hidden="true" />
-            <span className="truncate">{material.fileName}</span>
-            <small className="shrink-0">
-              {formatBytes(material.fileSize)} · {formatDate(material.createdAt)}
-            </small>
+      {/* Bottom Row: File Attachment Chip (tiled icon, bigger visibility, no date) */}
+      <div className="mt-2.5 flex items-stretch justify-between overflow-hidden rounded-xl border border-border/70 bg-muted/20 text-xs transition-colors group-hover:bg-muted/40 group-hover:border-border">
+        <div className="flex items-center min-w-0 flex-1">
+          <div
+            className={cn(
+              "flex w-12 shrink-0 items-center justify-center self-stretch border-r transition-colors",
+              fileInfo.bg
+            )}
+          >
+            <fileInfo.Icon size={26} className={fileInfo.color} strokeWidth={1.8} aria-hidden="true" />
+          </div>
+          <div className="flex flex-col justify-center min-w-0 px-3 py-2">
+            <span className="truncate font-semibold text-foreground/90 text-xs" title={material.fileName}>
+              {material.fileName}
+            </span>
+            <span className="text-[11px] text-muted-foreground font-mono">
+              {formatBytes(material.fileSize)}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center pr-3 shrink-0">
+          <span className="text-[11px] text-muted-foreground truncate max-w-[100px]">
+            {material.uploader.name}
           </span>
-          <Button type="button" variant="outline" size="sm" onClick={() => startDownload(material.id)}>
-            Download
-          </Button>
         </div>
-      </CardContent>
+      </div>
     </Card>
   );
 }

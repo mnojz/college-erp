@@ -1,6 +1,7 @@
 "use client";
 
 import { DashboardShell } from "@/app/components/layout/DashboardShell";
+import { type SidebarSection } from "@/app/components/layout/DashboardSidebar";
 import {
   IconBell,
   IconCalendarCheck,
@@ -11,8 +12,8 @@ import {
 } from "@tabler/icons-react";
 
 type TeacherShellProps = {
-  title: string;
-  subtitle: string;
+  title?: string;
+  subtitle?: string;
   active?: string;
   teacherName?: string;
   employeeNo?: string;
@@ -22,13 +23,23 @@ type TeacherShellProps = {
   children: React.ReactNode;
 };
 
-const teacherLinks = [
-  ["Overview", "/dashboard", IconDashboard],
-  ["Attendance", "/teacher/attendance", IconCalendarCheck],
-  ["Class Schedule", "/teacher/schedule", IconCalendarClock],
-  ["Exam Marks", "/teacher/exams", IconClipboardCheck],
-  ["Announcements", "/teacher/announcements", IconBell],
-  ["My Uploads", "/teacher/materials", IconUpload],
+const teacherSections: readonly SidebarSection[] = [
+  {
+    title: "Main",
+    items: [
+      ["Overview", "/dashboard", IconDashboard],
+      ["Announcements", "/teacher/announcements", IconBell],
+    ],
+  },
+  {
+    title: "Teaching Hub",
+    items: [
+      ["Attendance", "/teacher/attendance", IconCalendarCheck],
+      ["Class Schedule", "/teacher/schedule", IconCalendarClock],
+      ["Exam Marks", "/teacher/exams", IconClipboardCheck],
+      ["My Uploads", "/teacher/materials", IconUpload],
+    ],
+  },
 ] as const;
 
 export function TeacherShell({
@@ -45,7 +56,7 @@ export function TeacherShell({
     <DashboardShell
       navProps={{
         brandTitle: "College-ERP",
-        brandSubtitle: "Faculty Portal",
+        brandSubtitle: "",
         brandHomeHref: "/dashboard",
         // Pass through only when the page provides identity; otherwise the
         // shared UserIdentityProvider fills name/subtitle/avatar so wrapper
@@ -54,7 +65,7 @@ export function TeacherShell({
         userSubtitle: employeeNo ? `Emp ID: ${employeeNo}` : undefined,
         avatarUrl,
       }}
-      sidebarItems={teacherLinks}
+      sidebarItems={teacherSections}
       activeHref={active}
       title={title}
       subtitle={subtitle}

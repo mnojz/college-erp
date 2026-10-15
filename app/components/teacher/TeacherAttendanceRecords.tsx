@@ -1147,29 +1147,13 @@ export function TeacherAttendanceRecords() {
                             <span className="text-muted-foreground font-normal"> / {student.total}</span>
                           </TableCell>
 
-                          {/* Attendance Progress & Threshold Badge */}
+                          {/* Attendance Progress */}
                           <TableCell>
                             <div className="space-y-1.5">
                               <div className="flex items-center justify-between text-xs">
                                 <span className="font-bold tabular-nums">
                                   {student.percentage}%
                                 </span>
-                                <Badge
-                                  variant="outline"
-                                  className={`text-[10px] font-semibold py-0 ${
-                                    isGood
-                                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                                      : isAtRisk
-                                        ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-                                        : "bg-muted text-muted-foreground"
-                                  }`}
-                                >
-                                  {isGood
-                                    ? "Eligible (≥75%)"
-                                    : isAtRisk
-                                      ? "Shortage (<75%)"
-                                      : "No Sessions"}
-                                </Badge>
                               </div>
                               <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                                 <div
@@ -1319,10 +1303,10 @@ export function TeacherAttendanceRecords() {
                           <TableCell className="text-center font-extrabold tabular-nums text-xs">
                             <Badge
                               variant="outline"
-                              className={`text-[10px] ${
+                              className={`text-[10px] border-transparent ${
                                 rate >= 75
-                                  ? "border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
-                                  : "border-amber-500/30 text-amber-700 dark:text-amber-300"
+                                  ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                                  : "bg-amber-500/15 text-amber-700 dark:text-amber-300"
                               }`}
                             >
                               {rate}%
@@ -1450,18 +1434,6 @@ export function TeacherAttendanceRecords() {
                         {studentModalData.stats.presentSessions} of {studentModalData.stats.totalSessions} sessions
                       </p>
                     </div>
-                    <Badge
-                      variant="outline"
-                      className={`font-semibold text-xs px-2.5 py-1 ${
-                        studentModalData.stats.percentage >= 75
-                          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                          : "border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300"
-                      }`}
-                    >
-                      {studentModalData.stats.percentage >= 75
-                        ? "Eligible (≥75%)"
-                        : "Shortage (<75%)"}
-                    </Badge>
                   </div>
                 </div>
 
@@ -1526,14 +1498,14 @@ export function TeacherAttendanceRecords() {
                             {group.absentCount === 0 ? (
                               <Badge
                                 variant="outline"
-                                className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-[11px] font-semibold"
+                                className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-transparent text-[11px] font-semibold"
                               >
                                 <IconCheck className="size-3 mr-1" /> All Present
                               </Badge>
                             ) : group.presentCount === 0 ? (
                               <Badge
                                 variant="outline"
-                                className="bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30 text-[11px] font-semibold"
+                                className="bg-rose-500/15 text-rose-700 dark:text-rose-400 border-transparent text-[11px] font-semibold"
                               >
                                 <IconX className="size-3 mr-1" /> All Absent
                               </Badge>
@@ -1541,13 +1513,13 @@ export function TeacherAttendanceRecords() {
                               <div className="flex items-center gap-1.5">
                                 <Badge
                                   variant="outline"
-                                  className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-[10px] font-semibold"
+                                  className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-transparent text-[10px] font-semibold"
                                 >
                                   {group.presentCount} Present
                                 </Badge>
                                 <Badge
                                   variant="outline"
-                                  className="bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30 text-[10px] font-semibold"
+                                  className="bg-rose-500/15 text-rose-700 dark:text-rose-400 border-transparent text-[10px] font-semibold"
                                 >
                                   {group.absentCount} Absent
                                 </Badge>
@@ -1601,7 +1573,7 @@ export function TeacherAttendanceRecords() {
 
                               <div className="shrink-0 flex items-center">
                                 {h.status === "PRESENT" ? (
-                                  <Badge className="bg-emerald-600/15 text-emerald-700 hover:bg-emerald-600/25 border-emerald-500/30 dark:text-emerald-400 text-xs font-bold px-2.5 py-1">
+                                  <Badge className="bg-emerald-600/15 text-emerald-700 hover:bg-emerald-600/25 border-transparent dark:text-emerald-400 text-xs font-bold px-2.5 py-1">
                                     <IconCheck className="size-3.5 mr-1" />
                                     Present
                                   </Badge>
@@ -1785,7 +1757,7 @@ export function TeacherAttendanceRecords() {
                             </TableCell>
                             <TableCell className="text-right pr-4">
                               {rec.status === "PRESENT" ? (
-                                <Badge className="bg-emerald-600/15 text-emerald-700 hover:bg-emerald-600/25 border-emerald-500/30 dark:text-emerald-400 text-[10px] font-bold">
+                                <Badge className="bg-emerald-600/15 text-emerald-700 hover:bg-emerald-600/25 border-transparent dark:text-emerald-400 text-[10px] font-bold">
                                   <IconCheck className="size-3 mr-1" />
                                   Present
                                 </Badge>

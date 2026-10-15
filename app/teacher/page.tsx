@@ -251,7 +251,7 @@ export default function TeacherOverviewPage() {
   // Metrics
   let totalStudents = 0;
   let totalSessionsLogged = 0;
-  let departmentName = "Department Faculty";
+  let departmentName = "Academic Department";
 
   if (classes.length > 0) {
     const studentIdSet = new Set<string>();
@@ -262,7 +262,7 @@ export default function TeacherOverviewPage() {
       }
     }
     totalStudents = studentIdSet.size;
-    departmentName = classes[0]?.program.departmentName || "Engineering Faculty";
+    departmentName = classes[0]?.program.departmentName || "Engineering Department";
   }
 
   if (error) {
@@ -284,7 +284,7 @@ export default function TeacherOverviewPage() {
 
   if (loading || !data) {
     return (
-      <TeacherShell active="/dashboard" title="Faculty Overview" subtitle="Teacher Portal">
+      <TeacherShell active="/dashboard">
         <div className="space-y-6">
           <Skeleton className="h-32 w-full rounded-2xl" />
           <MetricGridSkeleton count={4} />
@@ -330,14 +330,12 @@ export default function TeacherOverviewPage() {
   return (
     <TeacherShell
       active="/dashboard"
-      title="Faculty Overview"
-      subtitle="Teacher Portal"
       teacherName={fullName}
       employeeNo={data.employeeNo}
       avatarUrl={data.profileImageUrl}
     >
       <div className="space-y-6">
-        {/* ── 1. Faculty Header Banner (Clean, Focused, No Fluff) ── */}
+        {/* ── 1. Teacher Header Banner (Clean, Focused, No Fluff) ── */}
         <section className="relative overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-br from-card via-card to-primary/5 p-5 sm:p-6 shadow-xs">
           <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-5">
             {/* Identity & Metadata */}
@@ -571,7 +569,7 @@ export default function TeacherOverviewPage() {
                       >
                         <div className="flex items-start gap-3 min-w-0">
                           {/* Time Slot Badge */}
-                          <div className="flex flex-col items-center justify-center px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary border border-primary/20 shrink-0 min-w-[82px] text-center">
+                          <div className="flex flex-col items-center justify-center px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary shrink-0 min-w-[82px] text-center">
                             <span className="text-xs font-bold leading-tight font-mono">
                               {formatTime(cls.startTime)}
                             </span>
@@ -695,7 +693,7 @@ export default function TeacherOverviewPage() {
                       Pending Marks Entry
                     </CardTitle>
                   </div>
-                  <Badge variant="outline" className="border-amber-600/40 text-amber-800 dark:text-amber-200 text-[10px] font-bold">
+                  <Badge variant="outline" className="border-transparent bg-amber-500/15 text-amber-800 dark:text-amber-200 text-[10px] font-bold">
                     {pendingExams.length} Pending
                   </Badge>
                 </CardHeader>

@@ -1,6 +1,7 @@
 "use client";
 
 import { DashboardShell } from "@/app/components/layout/DashboardShell";
+import { type SidebarSection } from "@/app/components/layout/DashboardSidebar";
 import {
   IconDashboard,
   IconSchool,
@@ -13,16 +14,31 @@ import {
   IconCertificate,
 } from "@tabler/icons-react";
 
-const adminLinks = [
-  ["Overview", "/dashboard", IconDashboard],
-  ["Department", "/admin/setup", IconSchool],
-  ["Curriculum", "/admin/curriculum", IconBooks],
-  ["Syllabus", "/admin/syllabus", IconFileDescription],
-  ["Class Scheduling", "/admin/teaching", IconCalendarClock],
-  ["People", "/admin/people", IconUsersGroup],
-  ["Profile Reviews", "/admin/profile-reviews", IconUserCheck],
-  ["Examinations", "/admin/exams", IconCertificate],
-  ["Announcements", "/admin/announcements", IconBell],
+const adminSections: readonly SidebarSection[] = [
+  {
+    title: "Main",
+    items: [
+      ["Overview", "/dashboard", IconDashboard],
+      ["Announcements", "/admin/announcements", IconBell],
+    ],
+  },
+  {
+    title: "Academic Setup",
+    items: [
+      ["Department", "/admin/setup", IconSchool],
+      ["Curriculum", "/admin/curriculum", IconBooks],
+      ["Syllabus", "/admin/syllabus", IconFileDescription],
+      ["Class Scheduling", "/admin/teaching", IconCalendarClock],
+      ["Examinations", "/admin/exams", IconCertificate],
+    ],
+  },
+  {
+    title: "User Management",
+    items: [
+      ["People", "/admin/people", IconUsersGroup],
+      ["Profile Reviews", "/admin/profile-reviews", IconUserCheck],
+    ],
+  },
 ] as const;
 
 export function AdminShell({
@@ -45,7 +61,7 @@ export function AdminShell({
         // No identity props: the shared UserIdentityProvider supplies the
         // admin's real name (and avatar, once one is uploaded) on every page.
       }}
-      sidebarItems={adminLinks}
+      sidebarItems={adminSections}
       activeHref={active}
       title={title}
       subtitle={subtitle}

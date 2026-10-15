@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { StudentShell } from "@/app/components/student/StudentShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -20,7 +21,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { IconDownload, IconLoader2, IconReport } from "@tabler/icons-react";
+import {
+  IconChevronRight,
+  IconDownload,
+  IconLoader2,
+  IconReport,
+  IconSchool,
+} from "@tabler/icons-react";
 import { MarkRow } from "@/app/lib/grading";
 import { MarksheetPrint } from "@/app/components/student/MarksheetPrint";
 
@@ -39,12 +46,29 @@ type Payload = {
   student: {
     name: string;
     registrationId: string | null;
-    program: { name: string; code: string } | null;
+    program: { name: string; code: string; durationYears?: number } | null;
     semester: number | null;
   };
   marksheet: Marksheet[];
   latestGpa: number | null;
 };
+
+const SEMESTER_LABELS: Record<number, string> = {
+  1: "First Sem Exam",
+  2: "Second Sem Exam",
+  3: "Third Sem Exam",
+  4: "Fourth Sem Exam",
+  5: "Fifth Sem Exam",
+  6: "Sixth Sem Exam",
+  7: "Seventh Sem Exam",
+  8: "Eighth Sem Exam",
+  9: "Ninth Sem Exam",
+  10: "Tenth Sem Exam",
+};
+
+function getSemesterTitle(sem: number): string {
+  return SEMESTER_LABELS[sem] ?? `Semester ${sem} Exam`;
+}
 
 const TYPE_LABEL: Record<string, string> = {
   END_SEMESTER: "End-Semester",
@@ -262,7 +286,7 @@ function MarksheetCard({
                           className={`inline-block min-w-8 rounded px-1.5 py-0.5 text-xs font-bold tabular-nums ${
                             row.thGrade === "F"
                               ? "bg-destructive/15 text-destructive"
-                              : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                              : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
                           }`}
                         >
                           {row.thGrade}
@@ -278,7 +302,7 @@ function MarksheetCard({
                           className={`inline-block min-w-8 rounded px-1.5 py-0.5 text-xs font-bold tabular-nums ${
                             row.prGrade === "F"
                               ? "bg-destructive/15 text-destructive"
-                              : "bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300"
+                              : "bg-violet-500/15 text-violet-700 dark:text-violet-400"
                           }`}
                         >
                           {row.prGrade}
@@ -424,6 +448,8 @@ export default function StudentResultsPage() {
   const router = useRouter();
   const [data, setData] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedSemester, setSelectedSemester] = useState<number>(1);
+  const [typeFilter, setTypeFilter] = useState<"ALL" | "END_SEMESTER" | "MID_TERM">("ALL");
 
   useEffect(() => {
     async function load() {
@@ -434,7 +460,19 @@ export default function StudentResultsPage() {
           return;
         }
         if (!res.ok) return;
-        setData(await res.json());
+        const json: Payload = await res.json();
+        setData(json);
+
+        // Auto-select semester: prefer current semester if it has marksheets,
+        // or the semester with the most recent marksheets, or semester 1.
+        const semsWithMarks = [...new Set(json.marksheet.map((m) => m.semester))];
+        if (json.student.semester && semsWithMarks.includes(json.student.semester)) {
+          setSelectedSemester(json.student.semester);
+        } else if (semsWithMarks.length > 0) {
+          setSelectedSemester(Math.min(...semsWithMarks));
+        } else if (json.student.semester) {
+          setSelectedSemester(json.student.semester);
+        }
       } catch {
         /* ignore */
       } finally {
@@ -444,37 +482,283 @@ export default function StudentResultsPage() {
     load();
   }, [router]);
 
+  // Determine total semesters in the program (minimum 8 for standard 4-year undergraduate)
+  const totalSemesters = useMemo(() => {
+    const dur = data?.student.program?.durationYears ?? 4;
+    const base = dur * 2;
+    const maxInMarks = data?.marksheet.length
+      ? Math.max(...data.marksheet.map((m) => m.semester))
+      : 0;
+    return Math.max(base, maxInMarks, 8);
+  }, [data]);
+
+  const semesterList = useMemo(() => {
+    const list: number[] = [];
+    for (let i = 1; i <= totalSemesters; i++) {
+      list.push(i);
+    }
+    return list;
+  }, [totalSemesters]);
+
+  // Group marksheets by semester
+  const marksheetsBySemester = useMemo(() => {
+    const map = new Map<number, Marksheet[]>();
+    for (const sheet of data?.marksheet ?? []) {
+      const arr = map.get(sheet.semester) ?? [];
+      arr.push(sheet);
+      map.set(sheet.semester, arr);
+    }
+    return map;
+  }, [data]);
+
+  const selectedSemMarksheets = marksheetsBySemester.get(selectedSemester) ?? [];
+
+  const visibleMarkSheets = useMemo(() => {
+    if (typeFilter === "ALL") return selectedSemMarksheets;
+    return selectedSemMarksheets.filter((m) => m.type === typeFilter);
+  }, [selectedSemMarksheets, typeFilter]);
+
+  // GPA for a semester (prefer END_SEMESTER GPA, or first valid GPA)
+  const getSemesterGpa = (sem: number): number | null => {
+    const sheets = marksheetsBySemester.get(sem) ?? [];
+    const endSem = sheets.find((s) => s.type === "END_SEMESTER" && s.gpa !== null);
+    if (endSem?.gpa) return endSem.gpa;
+    const anyWithGpa = sheets.find((s) => s.gpa !== null);
+    return anyWithGpa?.gpa ?? null;
+  };
+
   return (
-    <StudentShell title="My Results" subtitle="Published exam marksheets and GPA" active="/student/results">
+    <StudentShell
+      title="Exam Results"
+      subtitle="Published marksheets and GPA records"
+      active="/student/results"
+    >
       {loading ? (
-        <div className="grid gap-4">
-          <Skeleton className="h-24 w-full rounded-xl" />
-          <Skeleton className="h-64 w-full rounded-xl" />
+        <div className="space-y-5">
+          <Skeleton className="h-14 w-full rounded-2xl" />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="lg:col-span-4">
+              <Skeleton className="h-96 w-full rounded-2xl" />
+            </div>
+            <div className="lg:col-span-8">
+              <Skeleton className="h-96 w-full rounded-2xl" />
+            </div>
+          </div>
         </div>
-      ) : !data || data.marksheet.length === 0 ? (
+      ) : !data ? (
         <Card className="rounded-xl border-dashed">
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
-            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <span className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
               <IconReport size={26} />
             </span>
             <div>
-              <h3 className="text-base font-semibold">No results published yet</h3>
+              <h3 className="text-base font-semibold">Unable to load results</h3>
               <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-                Your marksheets will appear here once your college publishes an exam result.
+                Please refresh the page or try again in a few moments.
               </p>
             </div>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-5">
-          {data.marksheet.map((sheet) => (
-            <MarksheetCard
-              key={sheet.id}
-              sheet={sheet}
-              studentName={data.student.name}
-              registrationId={data.student.registrationId}
-            />
-          ))}
+        <div className="space-y-6">
+          {/* ── Main Layout: 12-col Master-Detail Grid ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* ── Left Column (4 cols): Semesters List ── */}
+            <div className="lg:col-span-4 space-y-4">
+              <Card className="rounded-2xl border border-border/70 shadow-xs overflow-hidden bg-card">
+                <CardHeader className="p-4 sm:px-5 pb-3 border-b border-border/50 bg-muted/20">
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex size-7.5 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <IconSchool size={16} />
+                    </span>
+                    <div>
+                      <CardTitle className="text-sm font-semibold">Exam Semesters</CardTitle>
+                      <p className="text-[11px] text-muted-foreground truncate">
+                        {data.student.program?.name ?? "Academic Program"}
+                      </p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-2 sm:p-2.5 space-y-1.5">
+                  {semesterList.map((sem) => {
+                    const count = marksheetsBySemester.get(sem)?.length ?? 0;
+                    const isSelected = selectedSemester === sem;
+                    const isCurrent = data.student.semester === sem;
+                    const gpa = getSemesterGpa(sem);
+
+                    return (
+                      <button
+                        key={sem}
+                        type="button"
+                        onClick={() => {
+                          setSelectedSemester(sem);
+                          setTypeFilter("ALL");
+                        }}
+                        className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                          isSelected
+                            ? "bg-primary/10 border-primary/50 text-foreground shadow-2xs ring-1 ring-primary/20"
+                            : "bg-card hover:bg-muted/50 border-border/60 text-foreground"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span
+                            className={`flex size-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
+                              isSelected
+                                ? "bg-primary text-primary-foreground"
+                                : count > 0
+                                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {sem}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`text-xs font-semibold truncate ${
+                                  isSelected ? "text-primary font-bold" : "text-foreground"
+                                }`}
+                              >
+                                {getSemesterTitle(sem)}
+                              </span>
+                              {isCurrent && (
+                                <Badge
+                                  variant="outline"
+                                  className="border-transparent bg-primary/10 text-primary text-[10px] px-1.5 py-0 font-medium"
+                                >
+                                  Current
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                              {count > 0
+                                ? `${count} Marksheet${count > 1 ? "s" : ""} Published`
+                                : "No results published"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 flex items-center gap-1.5 ml-2">
+                          {gpa !== null && count > 0 && (
+                            <Badge
+                              variant="outline"
+                              className={`text-[11px] font-mono font-bold border-transparent ${
+                                isSelected
+                                  ? "bg-primary/20 text-primary"
+                                  : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                              }`}
+                            >
+                              {gpa.toFixed(2)} GPA
+                            </Badge>
+                          )}
+                          <IconChevronRight
+                            size={15}
+                            className={
+                              isSelected ? "text-primary" : "text-muted-foreground/50"
+                            }
+                          />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* ── Right Column (8 cols): Selected Semester Marksheets ── */}
+            <div className="lg:col-span-8 space-y-4">
+              {/* Semester Details Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-border/70 bg-card shadow-xs">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="flex size-6 items-center justify-center rounded-md bg-primary/15 text-primary">
+                      <IconReport size={14} />
+                    </span>
+                    <h2 className="text-base sm:text-lg font-bold tracking-tight text-foreground">
+                      {getSemesterTitle(selectedSemester)}
+                    </h2>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {data.student.program?.name} · Semester {selectedSemester}
+                    {selectedSemMarksheets.length > 0
+                      ? ` · ${selectedSemMarksheets.length} published marksheet${
+                          selectedSemMarksheets.length > 1 ? "s" : ""
+                        }`
+                      : ""}
+                  </p>
+                </div>
+
+                {/* Filter toggle if multiple marksheets exist for this semester */}
+                {selectedSemMarksheets.length > 1 && (
+                  <div className="inline-flex rounded-lg border border-border/70 p-0.5 bg-muted/40 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setTypeFilter("ALL")}
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors ${
+                        typeFilter === "ALL"
+                          ? "bg-background text-foreground shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      All ({selectedSemMarksheets.length})
+                    </button>
+                    {selectedSemMarksheets.some((m) => m.type === "END_SEMESTER") && (
+                      <button
+                        type="button"
+                        onClick={() => setTypeFilter("END_SEMESTER")}
+                        className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors ${
+                          typeFilter === "END_SEMESTER"
+                            ? "bg-background text-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        End-Semester
+                      </button>
+                    )}
+                    {selectedSemMarksheets.some((m) => m.type === "MID_TERM") && (
+                      <button
+                        type="button"
+                        onClick={() => setTypeFilter("MID_TERM")}
+                        className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors ${
+                          typeFilter === "MID_TERM"
+                            ? "bg-background text-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        Mid-Term
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Marksheets or Empty State */}
+              {visibleMarkSheets.length === 0 ? (
+                <Card className="rounded-xl border-dashed p-12 text-center bg-card/60">
+                  <span className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground mx-auto">
+                    <IconReport size={24} />
+                  </span>
+                  <h3 className="mt-3 text-sm font-semibold text-foreground">
+                    No results published for {getSemesterTitle(selectedSemester)}
+                  </h3>
+                  <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
+                    Exam marksheets for this semester have not been announced by the college examination board yet.
+                  </p>
+                </Card>
+              ) : (
+                <div className="space-y-5">
+                  {visibleMarkSheets.map((sheet) => (
+                    <MarksheetCard
+                      key={sheet.id}
+                      sheet={sheet}
+                      studentName={data.student.name}
+                      registrationId={data.student.registrationId}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </StudentShell>

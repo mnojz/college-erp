@@ -2,33 +2,32 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  IconBook2,
+  IconCheck,
+  IconChevronRight,
+  IconFileText,
+  IconFolder,
+  IconSearch,
+  IconSparkles,
+  IconStar,
+  IconStarFilled,
+  IconX,
+} from "@tabler/icons-react";
 import { StudentShell } from "@/app/components/student/StudentShell";
 import { MaterialCard } from "@/app/components/materials/MaterialCard";
-import { AdminModal } from "@/app/components/admin/AdminModal";
+import { MaterialPreviewModal } from "@/app/components/materials/MaterialPreviewModal";
 import {
-  formatBytes,
-  formatDate,
   MATERIAL_TYPES,
-  materialTypeLabel,
-  readRecentMaterialIds,
   rememberRecentMaterial,
-  VISIBILITY_LABELS,
   type ProgramsMeta,
   type StudyMaterialDto,
 } from "@/app/lib/materials-shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 type Profile = {
   enrollmentNumber: string;
@@ -48,34 +47,23 @@ type Subject = {
   semester: number;
 };
 
-type TabKey = "MY_SUBJECTS" | "ALL" | "RECENT" | "BOOKMARKED";
-
-const TABS: { key: TabKey; label: string }[] = [
-  { key: "MY_SUBJECTS", label: "My Subjects" },
-  { key: "ALL", label: "All Materials" },
-  { key: "RECENT", label: "Recent" },
-  { key: "BOOKMARKED", label: "Bookmarked" },
-];
-
-const EMPTY_FILTERS = {
-  q: "",
-  programId: "",
-  semester: "",
-  subjectId: "",
-  topic: "",
-  type: "",
-  uploaderId: "",
-};
+type SelectionMode = "MY_SUBJECTS" | "ALL" | "BOOKMARKED" | "SUBJECT";
 
 export default function StudentNotesPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [materials, setMaterials] = useState<StudyMaterialDto[]>([]);
-  const [meta, setMeta] = useState<ProgramsMeta>({ departments: [], programs: [], subjects: [], teachers: [] });
+  const [meta, setMeta] = useState<ProgramsMeta>({
+    departments: [],
+    programs: [],
+    subjects: [],
+    teachers: [],
+  });
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [activeTab, setActiveTab] = useState<TabKey>("MY_SUBJECTS");
-  const [filters, setFilters] = useState({ ...EMPTY_FILTERS });
-  const [recentIds, setRecentIds] = useState<string[]>([]);
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>("MY_SUBJECTS");
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<string>("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
   const [details, setDetails] = useState<StudyMaterialDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -111,15 +99,15 @@ export default function StudentNotesPage() {
           teachers: metaData.teachers ?? [],
         });
         setSubjects(subjectsData.subjects ?? []);
-        setRecentIds(readRecentMaterialIds());
 
+        // Check if navigated with a specific subjectId
         const subjectParam = new URLSearchParams(window.location.search).get("subjectId");
         if (
           subjectParam &&
           (subjectsData.subjects ?? []).some((s: { id: string }) => s.id === subjectParam)
         ) {
-          setFilters({ ...EMPTY_FILTERS, subjectId: subjectParam });
-          setActiveTab("ALL");
+          setSelectedSubjectId(subjectParam);
+          setSelectionMode("SUBJECT");
         }
       } catch {
         setError("Unable to reach the server");
@@ -136,7 +124,9 @@ export default function StudentNotesPage() {
   const mySubjectIds = useMemo(() => {
     if (!myProgramId || !mySemester) return new Set<string>();
     return new Set(
-      subjects.filter((s) => s.programId === myProgramId && s.semester === mySemester).map((s) => s.id),
+      subjects
+        .filter((s) => s.programId === myProgramId && s.semester === mySemester)
+        .map((s) => s.id),
     );
   }, [subjects, myProgramId, mySemester]);
 
@@ -148,23 +138,69 @@ export default function StudentNotesPage() {
     return false;
   }
 
-  const filtered = useMemo(() => {
-    const q = filters.q.trim().toLowerCase();
-    const topicQ = filters.topic.trim().toLowerCase();
+  // Enrolled subjects for student's current semester
+  const enrolledSubjects = useMemo(() => {
+    if (!myProgramId || !mySemester) return [];
+    return subjects
+      .filter((s) => s.programId === myProgramId && s.semester === mySemester)
+      .sort((a, b) => a.code.localeCompare(b.code));
+  }, [subjects, myProgramId, mySemester]);
 
-    let list: StudyMaterialDto[];
-    if (activeTab === "MY_SUBJECTS") {
-      list = materials.filter(matchesMySubjects);
-    } else if (activeTab === "BOOKMARKED") {
-      list = materials.filter((m) => m.bookmarked);
-    } else if (activeTab === "RECENT") {
-      const byId = new Map(materials.map((m) => [m.id, m]));
-      list = recentIds.map((id) => byId.get(id)).filter((m): m is StudyMaterialDto => Boolean(m));
-      return list;
-    } else {
-      list = materials;
+  // Count materials per subject
+  const subjectMaterialCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const m of materials) {
+      const sId = m.subject?.id ?? m.subjectId;
+      if (sId) {
+        map.set(sId, (map.get(sId) ?? 0) + 1);
+      }
+    }
+    return map;
+  }, [materials]);
+
+  // Counts for quick collections
+  const mySubjectsCount = useMemo(
+    () => materials.filter(matchesMySubjects).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [materials, mySubjectIds, myProgramId, mySemester],
+  );
+  const bookmarkedCount = useMemo(
+    () => materials.filter((m) => m.bookmarked).length,
+    [materials],
+  );
+
+  // Active collection base materials
+  const collectionMaterials = useMemo(() => {
+    if (selectionMode === "SUBJECT" && selectedSubjectId) {
+      return materials.filter(
+        (m) => (m.subject?.id ?? m.subjectId) === selectedSubjectId,
+      );
+    }
+    if (selectionMode === "MY_SUBJECTS") {
+      return materials.filter(matchesMySubjects);
+    }
+    if (selectionMode === "BOOKMARKED") {
+      return materials.filter((m) => m.bookmarked);
+    }
+    return materials;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectionMode, selectedSubjectId, materials, mySubjectIds, myProgramId, mySemester]);
+
+  // Available types inside the active collection for the type pills
+  const availableTypes = useMemo(() => {
+    const typesInCollection = new Set(collectionMaterials.map((m) => m.materialType));
+    return MATERIAL_TYPES.filter((t) => typesInCollection.has(t.value as any));
+  }, [collectionMaterials]);
+
+  // Final filtered list with type filter and search query applied
+  const filteredMaterials = useMemo(() => {
+    let list = collectionMaterials;
+
+    if (selectedType !== "ALL") {
+      list = list.filter((m) => m.materialType === selectedType);
     }
 
+    const q = searchQuery.trim().toLowerCase();
     if (q) {
       list = list.filter((m) => {
         const haystack = [
@@ -173,9 +209,7 @@ export default function StudentNotesPage() {
           m.topic ?? "",
           m.subject?.name ?? "",
           m.subject?.code ?? "",
-          m.program?.name ?? "",
-          m.program?.code ?? "",
-          m.departmentName ?? "",
+          m.fileName,
           m.uploader.name,
         ]
           .join(" ")
@@ -183,23 +217,20 @@ export default function StudentNotesPage() {
         return haystack.includes(q);
       });
     }
-    if (filters.programId) list = list.filter((m) => m.program?.id === filters.programId);
-    if (filters.semester) list = list.filter((m) => String(m.semester ?? "") === filters.semester);
-    if (filters.subjectId) list = list.filter((m) => m.subject?.id === filters.subjectId);
-    if (filters.type) list = list.filter((m) => m.materialType === filters.type);
-    if (filters.uploaderId) list = list.filter((m) => m.uploader.id === filters.uploaderId);
-    if (topicQ) list = list.filter((m) => (m.topic ?? "").toLowerCase().includes(topicQ));
 
     return list;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [materials, activeTab, filters, recentIds, mySubjectIds, myProgramId, mySemester]);
+  }, [collectionMaterials, selectedType, searchQuery]);
 
   async function toggleBookmark(id: string) {
     const previous = materials.find((m) => m.id === id)?.bookmarked ?? false;
     setMaterials((list) =>
       list.map((m) =>
         m.id === id
-          ? { ...m, bookmarked: !previous, bookmarkCount: Math.max(0, m.bookmarkCount + (previous ? -1 : 1)) }
+          ? {
+              ...m,
+              bookmarked: !previous,
+              bookmarkCount: Math.max(0, m.bookmarkCount + (previous ? -1 : 1)),
+            }
           : m,
       ),
     );
@@ -209,70 +240,84 @@ export default function StudentNotesPage() {
       const data = await res.json();
       const confirmed = Boolean(data.bookmarked);
       setMaterials((list) =>
-        list.map((m) =>
-          m.id === id
-            ? { ...m, bookmarked: confirmed }
-            : m,
-        ),
+        list.map((m) => (m.id === id ? { ...m, bookmarked: confirmed } : m)),
       );
     } catch {
-      setMaterials((list) => list.map((m) => (m.id === id ? { ...m, bookmarked: previous } : m)));
+      setMaterials((list) =>
+        list.map((m) => (m.id === id ? { ...m, bookmarked: previous } : m)),
+      );
     }
   }
 
   function openDetails(m: StudyMaterialDto) {
     rememberRecentMaterial(m.id);
-    setRecentIds(readRecentMaterialIds());
     setDetails(m);
   }
 
-  function downloadMaterial(id: string) {
-    rememberRecentMaterial(id);
-    setRecentIds(readRecentMaterialIds());
-    const link = document.createElement("a");
-    link.href = `/api/materials/${id}/file`;
-    link.rel = "noopener";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  }
+  const selectedSubject = useMemo(
+    () => subjects.find((s) => s.id === selectedSubjectId) ?? null,
+    [subjects, selectedSubjectId],
+  );
 
-  function updateFilter(key: keyof typeof EMPTY_FILTERS, value: string) {
-    setFilters((f) => ({
-      ...EMPTY_FILTERS,
-      ...f,
-      [key]: value,
-      ...(key === "programId" ? { subjectId: "" } : {}),
-    }));
-  }
+  // Active view header title and subtitle
+  const viewMeta = useMemo(() => {
+    if (selectionMode === "SUBJECT" && selectedSubject) {
+      return {
+        title: `${selectedSubject.code}: ${selectedSubject.name}`,
+        subtitle: `Enrolled Course · Semester ${selectedSubject.semester}`,
+      };
+    }
+    if (selectionMode === "MY_SUBJECTS") {
+      return {
+        title: "Current Term Notes",
+        subtitle: `${profile?.program?.name ?? "Academic Program"} · Semester ${mySemester ?? "—"}`,
+      };
+    }
+    if (selectionMode === "BOOKMARKED") {
+      return {
+        title: "Bookmarked Materials",
+        subtitle: "Saved notes and references kept for quick access",
+      };
+    }
+    return {
+      title: "All Institution Notes",
+      subtitle: "Browse study materials and handouts across all programs",
+    };
+  }, [selectionMode, selectedSubject, profile, mySemester]);
 
   if (error) {
     return (
-      <StudentShell title="Notes & Study Material" active="/student/notes">
-        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+      <StudentShell title="Notes" active="/student/notes">
+        <p className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive font-medium">
           {error}
         </p>
       </StudentShell>
     );
   }
+
   if (loading || !profile) {
     return (
-      <StudentShell title="Notes & Study Material" active="/student/notes">
-        <Skeleton className="h-48 w-full" />
+      <StudentShell title="Notes" active="/student/notes">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="lg:col-span-4">
+            <Skeleton className="h-120 w-full rounded-2xl" />
+          </div>
+          <div className="lg:col-span-8 space-y-4">
+            <Skeleton className="h-20 w-full rounded-xl" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-36 w-full rounded-xl" />
+              ))}
+            </div>
+          </div>
+        </div>
       </StudentShell>
     );
   }
 
   const fullName = `${profile.user.firstName} ${profile.user.lastName}`;
-  // Roll numbers are integers now; StudentShell takes a display string.
-  const studentId = profile.rollNumber != null ? String(profile.rollNumber) : profile.enrollmentNumber;
-
-  const myProgramFilteredPrograms = meta.programs;
-  const subjectOptions = filters.programId
-    ? meta.subjects.filter((s) => s.programId === filters.programId)
-    : meta.subjects;
-
-  const activeFiltersCount = Object.values(filters).filter((v) => v.trim() !== "").length;
+  const studentId =
+    profile.rollNumber != null ? String(profile.rollNumber) : profile.enrollmentNumber;
 
   return (
     <StudentShell
@@ -280,213 +325,401 @@ export default function StudentNotesPage() {
       name={fullName}
       studentId={studentId}
       avatarUrl={profile.profileImageUrl}
-      title="Notes & Study Material"
-      subtitle="College Study Library"
+      title="Notes"
+      subtitle="Study materials and lecture notes"
     >
-      <div className="flex flex-col gap-5">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Card>
-            <CardContent className="p-5">
-              <p className="text-xs font-medium text-muted-foreground">Available Materials</p>
-              <p className="mt-1 text-3xl font-bold">{materials.length}</p>
-              <small className="text-xs text-muted-foreground">Visible across the college</small>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-5">
-              <p className="text-xs font-medium text-muted-foreground">For My Subjects</p>
-              <p className="mt-1 text-3xl font-bold">{materials.filter(matchesMySubjects).length}</p>
-              <small className="text-xs text-muted-foreground">
-                {profile.program ? `${profile.program.code}${mySemester ? ` · Semester ${mySemester}` : ""}` : "Set your program"}
-              </small>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-5">
-              <p className="text-xs font-medium text-muted-foreground">Bookmarked</p>
-              <p className="mt-1 text-3xl font-bold">{materials.filter((m) => m.bookmarked).length}</p>
-              <small className="text-xs text-muted-foreground">Saved for quick access</small>
-            </CardContent>
-          </Card>
-        </div>
+      <div className="space-y-6">
+        {/* ── 12-Column Master-Detail Layout ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* ════ LEFT COLUMN (4 cols): Subject Directory & Collections ════ */}
+          <div className="lg:col-span-4 space-y-4">
+            <Card className="rounded-2xl border border-border/70 shadow-xs overflow-hidden bg-card">
+              {/* Header */}
+              <CardHeader className="p-4 sm:px-5 pb-3 border-b border-border/50 bg-muted/20">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex size-7.5 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <IconFolder size={16} />
+                  </span>
+                  <div>
+                    <CardTitle className="text-sm font-semibold">Course Materials</CardTitle>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      {profile.program?.name} · Sem {mySemester ?? "—"}
+                    </p>
+                  </div>
+                </div>
+              </CardHeader>
 
-        <Card>
-          <CardContent className="flex flex-col gap-4 p-4">
-            <div className="relative min-w-0">
-              <Input
-                type="search"
-                value={filters.q}
-                onChange={(e) => updateFilter("q", e.target.value)}
-                placeholder="Search by title, subject, topic…"
-                aria-label="Search study materials"
-              />
-            </div>
-
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)}>
-              <TabsList className="flex w-full flex-wrap sm:w-auto">
-                {TABS.map((tab) => (
-                  <TabsTrigger key={tab.key} value={tab.key}>
-                    {tab.label}
-                    {tab.key === "BOOKMARKED" && materials.some((m) => m.bookmarked) && (
-                      <span className="ml-1 rounded-full bg-muted px-1.5 text-xs">
-                        {materials.filter((m) => m.bookmarked).length}
+              <CardContent className="p-2 sm:p-2.5 space-y-3">
+                {/* ── Section 1: Quick Collections ── */}
+                <div className="space-y-1">
+                  {/* My Subjects */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectionMode("MY_SUBJECTS");
+                      setSelectedSubjectId(null);
+                      setSelectedType("ALL");
+                    }}
+                    className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      selectionMode === "MY_SUBJECTS"
+                        ? "bg-primary/10 border-primary/50 text-foreground shadow-2xs ring-1 ring-primary/20"
+                        : "bg-card hover:bg-muted/50 border-border/60 text-foreground"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span
+                        className={`flex size-7 shrink-0 items-center justify-center rounded-lg text-xs ${
+                          selectionMode === "MY_SUBJECTS"
+                            ? "bg-primary text-primary-foreground font-bold"
+                            : "bg-primary/10 text-primary"
+                        }`}
+                      >
+                        <IconBook2 size={14} />
                       </span>
-                    )}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
+                      <span
+                        className={`text-xs font-semibold truncate ${
+                          selectionMode === "MY_SUBJECTS" ? "text-primary font-bold" : ""
+                        }`}
+                      >
+                        My Subjects
+                      </span>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={`text-[11px] font-bold border-transparent px-2 py-0.5 ${
+                        selectionMode === "MY_SUBJECTS"
+                          ? "bg-primary/20 text-primary"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {mySubjectsCount}
+                    </Badge>
+                  </button>
 
-            {activeTab === "MY_SUBJECTS" && (
-              <p className="text-sm text-muted-foreground">
-                Showing materials automatically matched to{" "}
-                <strong className="text-foreground">
-                  {profile.program?.name ?? "your program"}
-                  {mySemester ? ` · Semester ${mySemester}` : ""}
-                </strong>
-                . Switch to <em>All Materials</em> to discover notes beyond your curriculum.
-              </p>
+                  {/* All Materials */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectionMode("ALL");
+                      setSelectedSubjectId(null);
+                      setSelectedType("ALL");
+                    }}
+                    className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      selectionMode === "ALL"
+                        ? "bg-primary/10 border-primary/50 text-foreground shadow-2xs ring-1 ring-primary/20"
+                        : "bg-card hover:bg-muted/50 border-border/60 text-foreground"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span
+                        className={`flex size-7 shrink-0 items-center justify-center rounded-lg text-xs ${
+                          selectionMode === "ALL"
+                            ? "bg-primary text-primary-foreground font-bold"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        <IconFolder size={14} />
+                      </span>
+                      <span
+                        className={`text-xs font-semibold truncate ${
+                          selectionMode === "ALL" ? "text-primary font-bold" : ""
+                        }`}
+                      >
+                        All Materials
+                      </span>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={`text-[11px] font-bold border-transparent px-2 py-0.5 ${
+                        selectionMode === "ALL"
+                          ? "bg-primary/20 text-primary"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {materials.length}
+                    </Badge>
+                  </button>
+
+                  {/* Bookmarked */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectionMode("BOOKMARKED");
+                      setSelectedSubjectId(null);
+                      setSelectedType("ALL");
+                    }}
+                    className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      selectionMode === "BOOKMARKED"
+                        ? "bg-primary/10 border-primary/50 text-foreground shadow-2xs ring-1 ring-primary/20"
+                        : "bg-card hover:bg-muted/50 border-border/60 text-foreground"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span
+                        className={`flex size-7 shrink-0 items-center justify-center rounded-lg text-xs ${
+                          selectionMode === "BOOKMARKED"
+                            ? "bg-amber-500 text-white font-bold"
+                            : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                        }`}
+                      >
+                        <IconStarFilled size={13} />
+                      </span>
+                      <span
+                        className={`text-xs font-semibold truncate ${
+                          selectionMode === "BOOKMARKED" ? "text-primary font-bold" : ""
+                        }`}
+                      >
+                        Bookmarked
+                      </span>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={`text-[11px] font-bold border-transparent px-2 py-0.5 ${
+                        selectionMode === "BOOKMARKED"
+                          ? "bg-amber-500/20 text-amber-700 dark:text-amber-300"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {bookmarkedCount}
+                    </Badge>
+                  </button>
+                </div>
+
+                {/* ── Section 2: Enrolled Courses List ── */}
+                {enrolledSubjects.length > 0 && (
+                  <div className="pt-2 border-t border-border/50">
+                    <div className="flex items-center justify-between px-2 pb-2">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Enrolled Courses
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] font-bold border-transparent bg-primary/10 text-primary px-1.5 py-0"
+                      >
+                        Sem {mySemester}
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-1">
+                      {enrolledSubjects.map((sub) => {
+                        const count = subjectMaterialCounts.get(sub.id) ?? 0;
+                        const isSelected =
+                          selectionMode === "SUBJECT" && selectedSubjectId === sub.id;
+
+                        return (
+                          <button
+                            key={sub.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectionMode("SUBJECT");
+                              setSelectedSubjectId(sub.id);
+                              setSelectedType("ALL");
+                            }}
+                            className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                              isSelected
+                                ? "bg-primary/10 border-primary/50 text-foreground shadow-2xs ring-1 ring-primary/20"
+                                : "bg-card hover:bg-muted/50 border-border/60 text-foreground"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0 pr-1">
+                              <span
+                                className={`font-mono text-[11px] font-bold px-1.5 py-0.5 rounded border-transparent shrink-0 ${
+                                  isSelected
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-muted text-muted-foreground"
+                                }`}
+                              >
+                                {sub.code}
+                              </span>
+                              <span
+                                className={`text-xs font-semibold truncate ${
+                                  isSelected ? "text-primary font-bold" : "text-foreground"
+                                }`}
+                                title={sub.name}
+                              >
+                                {sub.name}
+                              </span>
+                            </div>
+
+                            <div className="shrink-0 flex items-center gap-1.5">
+                              {count > 0 && (
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[10px] font-bold border-transparent px-1.5 py-0 ${
+                                    isSelected
+                                      ? "bg-primary/20 text-primary"
+                                      : "bg-muted text-muted-foreground"
+                                  }`}
+                                >
+                                  {count}
+                                </Badge>
+                              )}
+                              <IconChevronRight
+                                size={14}
+                                className={
+                                  isSelected ? "text-primary" : "text-muted-foreground/40"
+                                }
+                              />
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* ════ RIGHT COLUMN (8 cols): Active Notes & Unified Filter ════ */}
+          <div className="lg:col-span-8 space-y-4">
+            {/* Header + Search Bar Card */}
+            <Card className="rounded-xl border border-border/70 p-4 shadow-xs bg-card space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold tracking-tight text-foreground">
+                    {viewMeta.title}
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">{viewMeta.subtitle}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant="outline"
+                    className="border-transparent bg-muted/60 text-foreground font-semibold text-xs px-2.5 py-1"
+                  >
+                    {filteredMaterials.length}{" "}
+                    {filteredMaterials.length === 1 ? "Material" : "Materials"}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Single Streamlined Search & Filter Row */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+                {/* Search Input */}
+                <div className="relative flex-1 min-w-52">
+                  <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search within titles, topics, instructor..."
+                    className="pl-9 pr-8 text-xs sm:text-sm h-9.5 rounded-lg"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      <IconX size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Material Type Filter Pills */}
+              {availableTypes.length > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-border/50">
+                  <span className="text-[11px] font-semibold text-muted-foreground mr-1">
+                    Type:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedType("ALL")}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                      selectedType === "ALL"
+                        ? "bg-primary text-primary-foreground shadow-2xs"
+                        : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    All Types
+                  </button>
+                  {availableTypes.map((t) => (
+                    <button
+                      key={t.value}
+                      type="button"
+                      onClick={() => setSelectedType(t.value)}
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                        selectedType === t.value
+                          ? "bg-primary text-primary-foreground shadow-2xs"
+                          : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                  {(selectedType !== "ALL" || searchQuery) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedType("ALL");
+                        setSearchQuery("");
+                      }}
+                      className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2 ml-1 cursor-pointer"
+                    >
+                      Reset filter
+                    </button>
+                  )}
+                </div>
+              )}
+            </Card>
+
+            {/* Notes Grid or Empty State */}
+            {filteredMaterials.length === 0 ? (
+              <Card className="rounded-xl border-dashed p-12 text-center bg-card/60">
+                <span className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground mx-auto">
+                  <IconFileText size={24} />
+                </span>
+                <h3 className="mt-3 text-sm font-semibold text-foreground">
+                  {searchQuery
+                    ? "No materials match your search"
+                    : selectionMode === "BOOKMARKED"
+                    ? "No bookmarked materials yet"
+                    : selectionMode === "SUBJECT"
+                    ? `No notes published for ${selectedSubject?.name ?? "this subject"}`
+                    : "No materials found in this collection"}
+                </h3>
+                <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">
+                  {searchQuery
+                    ? `Try searching with different keywords or clearing the active type filter.`
+                    : selectionMode === "BOOKMARKED"
+                    ? "Click the star icon on any material card to save it here for fast revision."
+                    : "Teachers have not uploaded materials for this course yet. Check All Materials to explore the general library."}
+                </p>
+                {(searchQuery || selectedType !== "ALL") && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-4 text-xs font-medium"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setSelectedType("ALL");
+                    }}
+                  >
+                    Clear Search &amp; Filters
+                  </Button>
+                )}
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {filteredMaterials.map((m) => (
+                  <MaterialCard
+                    key={m.id}
+                    material={m}
+                    onToggleBookmark={toggleBookmark}
+                    onOpenDetails={openDetails}
+                  />
+                ))}
+              </div>
             )}
-          </CardContent>
-        </Card>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Select value={filters.programId || undefined} onValueChange={(value) => updateFilter("programId", value)}>
-            <SelectTrigger className="w-full sm:w-48" aria-label="Program filter">
-              <SelectValue placeholder="All Programs" />
-            </SelectTrigger>
-            <SelectContent>
-              {myProgramFilteredPrograms.map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.code} — {p.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={filters.semester || undefined} onValueChange={(value) => updateFilter("semester", value)}>
-            <SelectTrigger className="w-full sm:w-40" aria-label="Semester filter">
-              <SelectValue placeholder="All Semesters" />
-            </SelectTrigger>
-            <SelectContent>
-              {[...new Set(materials.map((m) => m.semester).filter((s): s is number => s != null))]
-                .sort((a, b) => a - b)
-                .map((s) => (
-                  <SelectItem key={s} value={String(s)}>Semester {s}</SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={filters.subjectId || undefined} onValueChange={(value) => updateFilter("subjectId", value)}>
-            <SelectTrigger className="w-full sm:w-48" aria-label="Subject filter">
-              <SelectValue placeholder="All Subjects" />
-            </SelectTrigger>
-            <SelectContent>
-              {subjectOptions.map((s) => (
-                <SelectItem key={s.id} value={s.id}>{s.code} — {s.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={filters.type || undefined} onValueChange={(value) => updateFilter("type", value)}>
-            <SelectTrigger className="w-full sm:w-40" aria-label="Material type filter">
-              <SelectValue placeholder="All Types" />
-            </SelectTrigger>
-            <SelectContent>
-              {MATERIAL_TYPES.map((t) => (
-                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={filters.uploaderId || undefined} onValueChange={(value) => updateFilter("uploaderId", value)}>
-            <SelectTrigger className="w-full sm:w-44" aria-label="Teacher filter">
-              <SelectValue placeholder="All Teachers" />
-            </SelectTrigger>
-            <SelectContent>
-              {meta.teachers.map((t) => (
-                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {activeFiltersCount > 0 && (
-            <Button type="button" variant="ghost" onClick={() => setFilters({ ...EMPTY_FILTERS })}>
-              Reset ({activeFiltersCount})
-            </Button>
-          )}
+          </div>
         </div>
-
-        <p className="text-sm text-muted-foreground">
-          Showing <strong className="text-foreground">{filtered.length}</strong> of {materials.length} materials
-        </p>
-
-        {filtered.length === 0 ? (
-          <div className="rounded-md border bg-muted/40 px-4 py-12 text-center">
-            <h3 className="mb-1 text-sm font-semibold">
-              {activeTab === "MY_SUBJECTS" ? "No materials matched to your subjects yet" : "Nothing here yet"}
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              {activeTab === "MY_SUBJECTS"
-                ? "Teachers haven't published material for your current program/semester so far. Browse All Materials to explore the full library."
-                : activeTab === "RECENT"
-                  ? "Materials you open or download will appear here."
-                  : activeTab === "BOOKMARKED"
-                    ? "Bookmark materials with the star button to keep them one click away."
-                    : "Try adjusting your search or filters."}
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {filtered.map((m) => (
-              <MaterialCard
-                key={m.id}
-                material={m}
-                onToggleBookmark={toggleBookmark}
-                onOpenDetails={openDetails}
-              />
-            ))}
-          </div>
-        )}
       </div>
 
+      {/* Material Preview Dialog */}
       {details && (
-        <AdminModal title="Study Material" onClose={() => setDetails(null)}>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap gap-1.5">
-              <Badge variant="outline">{materialTypeLabel(details.materialType)}</Badge>
-              {details.subject && <Badge variant="secondary">{details.subject.code}</Badge>}
-              {details.topic && <Badge variant="outline">{details.topic}</Badge>}
-            </div>
-            <h3 className="text-lg font-semibold">{details.title}</h3>
-            {details.description && <p className="text-sm text-muted-foreground">{details.description}</p>}
-            <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-              <dt className="text-muted-foreground">Subject</dt>
-              <dd>{details.subject ? details.subject.name : "General"}</dd>
-              <dt className="text-muted-foreground">Teacher</dt>
-              <dd>{details.uploader.name}</dd>
-              <dt className="text-muted-foreground">Department / Program</dt>
-              <dd>
-                {details.departmentName ?? "—"}
-                {details.program ? ` · ${details.program.name}` : ""}
-              </dd>
-              <dt className="text-muted-foreground">Semester</dt>
-              <dd>{details.semester ?? "—"}</dd>
-              <dt className="text-muted-foreground">Visibility</dt>
-              <dd>{VISIBILITY_LABELS[details.visibility] ?? details.visibility}</dd>
-              <dt className="text-muted-foreground">File</dt>
-              <dd>{details.fileName} ({formatBytes(details.fileSize)})</dd>
-              <dt className="text-muted-foreground">Uploaded</dt>
-              <dd>{formatDate(details.createdAt)}</dd>
-            </dl>
-            <div className="flex flex-col-reverse justify-end gap-2 sm:flex-row">
-              <Button variant="ghost" type="button" onClick={() => setDetails(null)}>
-                Close
-              </Button>
-              <Button type="button" onClick={() => downloadMaterial(details.id)}>
-                Download
-              </Button>
-            </div>
-          </div>
-        </AdminModal>
+        <MaterialPreviewModal material={details} onClose={() => setDetails(null)} />
       )}
     </StudentShell>
   );

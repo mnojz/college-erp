@@ -1,5 +1,32 @@
 <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="32" height="32" rx="7" fill="#18181B"/>
-  <path d="M16 10.7c-1.9-1.85-4.9-2.4-8.2-1.8v12.4c3.3-.6 6.3-.05 8.2 1.8 1.9-1.85 4.9-2.4 8.2-1.8V8.9c-3.3-.6-6.3-.05-8.2 1.8Z" stroke="#FAFAFA" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M16 10.7v12.4" stroke="#FAFAFA" stroke-width="1.9" stroke-linecap="round"/>
+  <defs>
+    <linearGradient id="bg-grad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1E3A8A"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="cap-grad" x1="5" y1="5" x2="27" y2="15" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#BFDBFE"/>
+    </linearGradient>
+    <linearGradient id="book-grad" x1="5" y1="17" x2="27" y2="25" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#60A5FA"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded Icon Tile -->
+  <rect width="32" height="32" rx="8" fill="url(#bg-grad)"/>
+
+  <!-- Cap Diamond Top -->
+  <path d="M16 5.5L27 10.5L16 15.5L5 10.5L16 5.5Z" fill="url(#cap-grad)"/>
+  <path d="M16 15.5L27 10.5L25.2 11.8L16 16.3L6.8 11.8L5 10.5L16 15.5Z" fill="#1D4ED8" fill-opacity="0.45"/>
+
+  <!-- Tassel -->
+  <path d="M22.8 11.5V15.5M22.8 15.5L21.5 18.2H24.1L22.8 15.5Z" fill="#F59E0B" stroke="#F59E0B" stroke-width="0.8" stroke-linejoin="round"/>
+
+  <!-- Open Book Pages -->
+  <path d="M14.5 17.5C10.5 15.8 6.5 16.3 5 17.2V22.8C6.5 21.9 10.5 21.4 14.5 23.2V17.5Z" fill="url(#book-grad)"/>
+  <path d="M17.5 17.5C21.5 15.8 25.5 16.3 27 17.2V22.8C25.5 21.9 21.5 21.4 17.5 23.2V17.5Z" fill="url(#book-grad)" fill-opacity="0.85"/>
+
+  <!-- Bookmark Ribbon -->
+  <path d="M14.8 18H17.2V25.5L16 24.3L14.8 25.5V18Z" fill="#FCD34D"/>
 </svg>

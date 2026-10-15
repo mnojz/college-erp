@@ -21,8 +21,8 @@
   --accent: hsl(216 44% 90%);
   --accent-foreground: hsl(222 55% 30%);
   --destructive: hsl(0 68% 45%);
-  --border: hsl(220 17% 86%);
-  --input: hsl(220 17% 86%);
+  --border: hsl(220 14% 92%);
+  --input: hsl(220 14% 92%);
   --ring: hsl(218 77% 53%);
   --chart-1: hsl(222 68% 43%);
   --chart-2: hsl(169 48% 34%);
@@ -35,7 +35,7 @@
   --sidebar-primary-foreground: hsl(224 34% 16%);
   --sidebar-accent: hsl(220 20% 89%);
   --sidebar-accent-foreground: hsl(224 34% 16%);
-  --sidebar-border: hsl(220 17% 86%);
+  --sidebar-border: hsl(220 14% 92%);
   --sidebar-ring: hsl(218 77% 53%);
   --radius: 0.375rem;
 
@@ -264,7 +264,7 @@
 
   html.has-custom-cursor,
   html.has-custom-cursor * {
-    cursor: none !important;
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Ccircle cx='6' cy='6' r='3.5' fill='%2338bdf8'/%3E%3Ccircle cx='6' cy='6' r='2' fill='%23ffffff'/%3E%3C/svg%3E") 6 6, auto !important;
   }
 
   body {
@@ -353,4 +353,69 @@ the compact, professional shape language of the shared components. */
 
 :where([data-slot="card"], [data-slot="dialog-content"], [data-slot="sheet-content"]) {
   border-radius: min(0.5rem, 8px);
+}
+
+/* ── Sonner Toast Countdown Progress Bar ──────────────────────── */
+[data-sonner-toast] {
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+[data-sonner-toast]:not([data-type="loading"]):not([data-promise="true"])::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: currentColor;
+  opacity: 0.35;
+  transform-origin: left center;
+  animation: sonner-countdown var(--toast-duration, 4000ms) linear forwards;
+}
+
+[data-sonner-toast][data-type="success"]::after {
+  background: #10b981;
+  opacity: 0.85;
+}
+
+[data-sonner-toast][data-type="error"]::after {
+  background: #f43f5e;
+  opacity: 0.85;
+}
+
+[data-sonner-toast][data-type="warning"]::after {
+  background: #f59e0b;
+  opacity: 0.85;
+}
+
+[data-sonner-toast][data-type="info"]::after {
+  background: #0ea5e9;
+  opacity: 0.85;
+}
+
+/* Pause countdown progress bar on hover */
+[data-sonner-toast]:hover::after,
+[data-sonner-toaster]:hover [data-sonner-toast]::after {
+  animation-play-state: paused !important;
+}
+
+@keyframes sonner-countdown {
+  0% {
+    transform: scaleX(1);
+  }
+  100% {
+    transform: scaleX(0);
+  }
+}
+
+/* Academic doodle pattern filters */
+.academic-doodle-pattern {
+  /* Light mode: deeper contrast and slightly darker slate/navy strokes */
+  filter: brightness(0.85) contrast(1.15);
+}
+
+.dark .academic-doodle-pattern {
+  /* Dark mode: converts dark slate strokes to a luminous light desaturated blue */
+  filter: invert(1) hue-rotate(185deg) brightness(1.45) saturate(0.85);
 }

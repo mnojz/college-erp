@@ -8,6 +8,7 @@ import {
   IconCalendar,
   IconCalendarCheck,
   IconCheck,
+  IconChevronDown,
   IconChevronLeft,
   IconChevronRight,
   IconCircleCheck,
@@ -20,6 +21,7 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { StudentShell } from "@/app/components/student/StudentShell";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -76,27 +78,6 @@ type AttendanceRecord = {
   };
 };
 
-/** Calculate smart forecast for 75% attendance */
-function calculateForecast(present: number, total: number) {
-  if (total === 0) return { status: "neutral", text: "No sessions conducted yet" };
-  const pct = (present / total) * 100;
-  if (pct >= 75) {
-    const buffer = Math.floor((4 * present - 3 * total) / 3);
-    if (buffer === 0) {
-      return { status: "borderline", text: "On the 75% threshold — maintain regular attendance" };
-    }
-    return {
-      status: "safe",
-      text: `Can miss up to ${buffer} class${buffer > 1 ? "es" : ""} and stay above 75%`,
-    };
-  } else {
-    const needed = Math.ceil(3 * total - 4 * present);
-    return {
-      status: "needed",
-      text: `Attend next ${needed} consecutive class${needed > 1 ? "es" : ""} to reach 75%`,
-    };
-  }
-}
 
 export default function StudentAttendancePage() {
   const router = useRouter();
@@ -112,6 +93,7 @@ export default function StudentAttendancePage() {
   const [statusFilter, setStatusFilter] = useState<"ALL" | "PRESENT" | "ABSENT">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     async function loadData() {
@@ -291,6 +273,36 @@ export default function StudentAttendancePage() {
     return groupedByDate.slice(start, start + datesPerPage);
   }, [groupedByDate, currentPage]);
 
+  const allVisibleExpanded =
+    paginatedDateGroups.length > 0 &&
+    paginatedDateGroups.every((g) => expandedDates.has(g.dateKey));
+
+  function toggleDateExpanded(dateKey: string) {
+    setExpandedDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(dateKey)) {
+        next.delete(dateKey);
+      } else {
+        next.add(dateKey);
+      }
+      return next;
+    });
+  }
+
+  function toggleExpandAll() {
+    if (allVisibleExpanded) {
+      setExpandedDates(new Set());
+    } else {
+      setExpandedDates((prev) => {
+        const next = new Set(prev);
+        for (const g of paginatedDateGroups) {
+          next.add(g.dateKey);
+        }
+        return next;
+      });
+    }
+  }
+
   if (error) {
     return (
       <StudentShell title="My Attendance Records" active="/student/attendance">
@@ -303,14 +315,13 @@ export default function StudentAttendancePage() {
 
   if (loading || !profile) {
     return (
-      <StudentShell title="My Attendance Records" active="/student/attendance">
+      <StudentShell title="Attendance" subtitle="Subject-wise attendance and exam eligibility" active="/student/attendance">
         <div className="space-y-4">
-          <Skeleton className="h-28 w-full rounded-2xl" />
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Skeleton className="h-18 w-full rounded-xl" />
-            <Skeleton className="h-18 w-full rounded-xl" />
-            <Skeleton className="h-18 w-full rounded-xl" />
-            <Skeleton className="h-18 w-full rounded-xl" />
+            <Skeleton className="h-20 w-full rounded-xl" />
+            <Skeleton className="h-20 w-full rounded-xl" />
+            <Skeleton className="h-20 w-full rounded-xl" />
+            <Skeleton className="h-20 w-full rounded-xl" />
           </div>
           <Skeleton className="h-64 w-full rounded-2xl" />
         </div>
@@ -328,133 +339,67 @@ export default function StudentAttendancePage() {
       name={fullName}
       studentId={studentId}
       avatarUrl={profile.profileImageUrl}
-      title="Attendance & Engagement"
-      subtitle="Track your subject-wise attendance and individual exam qualification"
+      title="Attendance"
+      subtitle="Subject-wise attendance and exam eligibility"
     >
       <div className="space-y-5">
-        {/* ── Compact Academic Hero Banner ── */}
-        <Card className="rounded-2xl border border-border/70 shadow-xs bg-linear-to-r from-primary/10 via-primary/5 to-background p-4 sm:p-5 overflow-hidden">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="flex size-6 items-center justify-center rounded-md bg-primary/15 text-primary">
-                  <IconCalendarCheck size={14} />
-                </span>
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Semester {profile.currentSemester ?? "—"} Attendance
-                </span>
-              </div>
-              <h1 className="mt-1 text-lg sm:text-xl font-bold tracking-tight text-foreground">
-                {profile.program?.name ?? "Academic Program"}
-              </h1>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Exam eligibility is evaluated per subject. You must maintain at least <strong>75% in each subject</strong> to be qualified for its semester final exam.
-              </p>
-            </div>
-
-            {/* Per-Subject Eligibility Status Pill */}
-            <div className="shrink-0">
-              {subjectStats.length === 0 || totalSessions === 0 ? (
-                <Badge variant="outline" className="px-3 py-1.5 text-xs text-muted-foreground font-semibold">
-                  No sessions recorded yet
-                </Badge>
-              ) : atRiskSubjects.length > 0 ? (
-                <div className="inline-flex items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3.5 py-1.5 text-amber-700 dark:text-amber-300 font-bold text-xs shadow-xs">
-                  <IconAlertTriangle size={16} className="text-amber-500 shrink-0" />
-                  <span>
-                    {atRiskSubjects.length} of {subjectStats.length} Subject{atRiskSubjects.length > 1 ? "s" : ""} Below 75%
-                  </span>
-                </div>
-              ) : (
-                <div className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3.5 py-1.5 text-emerald-700 dark:text-emerald-300 font-bold text-xs shadow-xs">
-                  <IconCircleCheck size={16} className="text-emerald-500 shrink-0" />
-                  <span>All Subjects Qualified ({qualifiedSubjects.length}/{subjectStats.length})</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </Card>
-
-        {/* ── Compact Metric Stat Strip (Space-Efficient) ── */}
+        {/* ── Metric Stat Strip ── */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {/* Stat 1: Subject Eligibility */}
-          <Card className="rounded-xl border border-border/70 p-3 shadow-xs bg-card">
+          <Card className="rounded-xl border border-border/70 p-3.5 sm:p-4 shadow-xs bg-card">
             <div className="flex items-center justify-between text-muted-foreground">
-              <span className="text-[11px] font-medium">Exam Qualified</span>
+              <span className="text-xs sm:text-sm font-medium">Exam Qualified</span>
               {atRiskSubjects.length === 0 ? (
-                <IconCircleCheck size={15} className="text-emerald-500" />
+                <IconCircleCheck size={16} className="text-emerald-500" />
               ) : (
-                <IconAlertTriangle size={15} className="text-amber-500" />
+                <IconAlertTriangle size={16} className="text-amber-500" />
               )}
             </div>
-            <div className="mt-1 flex items-baseline gap-1.5">
-              <span className="text-xl font-bold tracking-tight text-foreground">
+            <div className="mt-2 flex items-baseline gap-1.5">
+              <span className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
                 {qualifiedSubjects.length}
               </span>
-              <span className="text-xs text-muted-foreground font-medium">
-                / {subjectStats.length} subjects
+              <span className="text-xs sm:text-sm text-muted-foreground font-medium">
+                / {subjectStats.length}
               </span>
             </div>
-            <p className="mt-1 text-[11px] text-muted-foreground truncate">
-              {atRiskSubjects.length === 0
-                ? "All courses above 75%"
-                : `${atRiskSubjects.length} course${atRiskSubjects.length > 1 ? "s" : ""} at risk (<75%)`}
-            </p>
           </Card>
 
           {/* Stat 2: Overall Average */}
-          <Card className="rounded-xl border border-border/70 p-3 shadow-xs bg-card">
+          <Card className="rounded-xl border border-border/70 p-3.5 sm:p-4 shadow-xs bg-card">
             <div className="flex items-center justify-between text-muted-foreground">
-              <span className="text-[11px] font-medium">Overall Rate</span>
-              <IconTrendingUp size={15} className="text-primary" />
+              <span className="text-xs sm:text-sm font-medium">Overall Rate</span>
+              <IconTrendingUp size={16} className="text-primary" />
             </div>
-            <div className="mt-1 text-xl font-bold tracking-tight text-foreground">
+            <div className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
               {overallPercentage.toFixed(1)}%
-            </div>
-            <div className="mt-1.5 h-1 w-full rounded-full bg-muted overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  overallPercentage >= 75
-                    ? "bg-emerald-500"
-                    : overallPercentage >= 60
-                    ? "bg-amber-500"
-                    : "bg-destructive"
-                }`}
-                style={{ width: `${Math.min(100, overallPercentage)}%` }}
-              />
             </div>
           </Card>
 
           {/* Stat 3: Total Attended */}
-          <Card className="rounded-xl border border-border/70 p-3 shadow-xs bg-card">
+          <Card className="rounded-xl border border-border/70 p-3.5 sm:p-4 shadow-xs bg-card">
             <div className="flex items-center justify-between text-muted-foreground">
-              <span className="text-[11px] font-medium">Classes Attended</span>
+              <span className="text-xs sm:text-sm font-medium">Classes Attended</span>
               <span className="flex size-5 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                 <IconCheck size={13} />
               </span>
             </div>
-            <div className="mt-1 text-xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
+            <div className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
               {presentSessions}
             </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Out of {totalSessions} total sessions
-            </p>
           </Card>
 
           {/* Stat 4: Total Missed */}
-          <Card className="rounded-xl border border-border/70 p-3 shadow-xs bg-card">
+          <Card className="rounded-xl border border-border/70 p-3.5 sm:p-4 shadow-xs bg-card">
             <div className="flex items-center justify-between text-muted-foreground">
-              <span className="text-[11px] font-medium">Classes Missed</span>
+              <span className="text-xs sm:text-sm font-medium">Classes Missed</span>
               <span className="flex size-5 items-center justify-center rounded-md bg-destructive/10 text-destructive">
                 <IconX size={13} />
               </span>
             </div>
-            <div className="mt-1 text-xl font-bold tracking-tight text-destructive">
+            <div className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-destructive">
               {absentSessions}
             </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Absences recorded
-            </p>
           </Card>
         </div>
 
@@ -481,11 +426,6 @@ export default function StudentAttendancePage() {
                 Daily Logs ({groupedByDate.length} Days)
               </TabsTrigger>
             </TabsList>
-
-            <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <IconInfoCircle size={13} className="text-primary shrink-0" />
-              Teacher recorded attendance updates in real time
-            </span>
           </div>
 
           {/* ════ TAB 1: SUBJECT BREAKDOWN (Compact Table Layout) ════ */}
@@ -506,24 +446,21 @@ export default function StudentAttendancePage() {
                       <TableRow>
                         <TableHead className="text-xs font-bold uppercase tracking-wider py-2.5">Subject</TableHead>
                         <TableHead className="text-xs font-bold uppercase tracking-wider text-center py-2.5 w-32">Classes</TableHead>
-                        <TableHead className="text-xs font-bold uppercase tracking-wider py-2.5 w-48">Attendance Rate</TableHead>
-                        <TableHead className="text-xs font-bold uppercase tracking-wider py-2.5 w-40">Exam Status</TableHead>
-                        <TableHead className="text-xs font-bold uppercase tracking-wider py-2.5 min-w-44">Target / Buffer</TableHead>
-                        <TableHead className="text-xs font-bold uppercase tracking-wider text-right pr-4 py-2.5 w-24">Action</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-wider py-2.5 w-60">Attendance Rate</TableHead>
+                        <TableHead className="text-xs font-bold uppercase tracking-wider text-right pr-4 py-2.5 w-28">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {subjectStats.map((sub) => {
                         const pct = sub.total > 0 ? (sub.present / sub.total) * 100 : 0;
                         const isGood = sub.total > 0 && pct >= 75;
-                        const forecast = calculateForecast(sub.present, sub.total);
 
                         return (
                           <TableRow key={sub.code} className="hover:bg-muted/30 transition-colors">
                             {/* Subject Code & Name */}
                             <TableCell className="py-2.5">
                               <div className="flex items-center gap-2">
-                                <Badge variant="outline" className="font-mono text-xs font-bold bg-muted/60 shrink-0">
+                                <Badge variant="outline" className="font-mono text-xs font-bold bg-muted/60 shrink-0 border-transparent">
                                   {sub.code}
                                 </Badge>
                                 <span className="text-xs font-semibold text-foreground line-clamp-1" title={sub.name}>
@@ -555,7 +492,6 @@ export default function StudentAttendancePage() {
                                   >
                                     {sub.total > 0 ? `${pct.toFixed(1)}%` : "—"}
                                   </span>
-                                  <span className="text-[10px] text-muted-foreground">req 75%</span>
                                 </div>
                                 <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
                                   <div
@@ -572,46 +508,6 @@ export default function StudentAttendancePage() {
                                   />
                                 </div>
                               </div>
-                            </TableCell>
-
-                            {/* Exam Eligibility Badge */}
-                            <TableCell className="py-2.5">
-                              {sub.total === 0 ? (
-                                <Badge variant="outline" className="text-[11px] text-muted-foreground font-medium">
-                                  No classes yet
-                                </Badge>
-                              ) : isGood ? (
-                                <Badge
-                                  variant="outline"
-                                  className="border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-[11px] font-semibold gap-1 py-0.5"
-                                >
-                                  <IconCircleCheck size={12} className="text-emerald-500" />
-                                  Qualified (≥75%)
-                                </Badge>
-                              ) : (
-                                <Badge
-                                  variant="outline"
-                                  className="border-amber-500/40 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 text-[11px] font-semibold gap-1 py-0.5"
-                                >
-                                  <IconAlertTriangle size={12} className="text-amber-500" />
-                                  Not Qualified (&lt;75%)
-                                </Badge>
-                              )}
-                            </TableCell>
-
-                            {/* Target / Buffer Forecast */}
-                            <TableCell className="py-2.5">
-                              <span
-                                className={`text-[11px] font-medium ${
-                                  forecast.status === "safe"
-                                    ? "text-emerald-700 dark:text-emerald-400"
-                                    : forecast.status === "needed"
-                                    ? "text-amber-700 dark:text-amber-400"
-                                    : "text-muted-foreground"
-                                }`}
-                              >
-                                {forecast.text}
-                              </span>
                             </TableCell>
 
                             {/* View Logs Button */}
@@ -725,6 +621,19 @@ export default function StudentAttendancePage() {
                       Absent
                     </button>
                   </div>
+
+                  {paginatedDateGroups.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={toggleExpandAll}
+                      className="h-8.5 px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground shrink-0 hidden sm:inline-flex"
+                      title={allVisibleExpanded ? "Collapse all visible daily logs" : "Expand all visible daily logs"}
+                    >
+                      {allVisibleExpanded ? "Collapse All" : "Expand All"}
+                    </Button>
+                  )}
                 </div>
               </div>
             </Card>
@@ -758,6 +667,7 @@ export default function StudentAttendancePage() {
                 {paginatedDateGroups.map((group) => {
                   const allPresent = group.absentCount === 0;
                   const allAbsent = group.presentCount === 0;
+                  const isExpanded = expandedDates.has(group.dateKey);
 
                   return (
                     <Card
@@ -765,23 +675,34 @@ export default function StudentAttendancePage() {
                       className="rounded-xl border border-border/70 shadow-xs overflow-hidden bg-card"
                     >
                       {/* Date Group Header */}
-                      <div className="flex items-center justify-between px-4 py-2.5 bg-muted/30 border-b border-border/60">
-                        <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleDateExpanded(group.dateKey)}
+                        aria-expanded={isExpanded}
+                        className={cn(
+                          "w-full flex items-center justify-between px-4 py-2.5 bg-muted/30 hover:bg-muted/50 transition-colors text-left cursor-pointer select-none",
+                          isExpanded && "border-b border-border/60"
+                        )}
+                      >
+                        <div className="flex items-center gap-2 min-w-0 pr-2">
                           <IconCalendar size={14} className="text-primary shrink-0" />
                           <span className="text-xs font-bold text-foreground">
                             {group.displayDate}
                           </span>
-                          <Badge variant="outline" className="text-[10px] font-semibold uppercase px-1.5 py-0 bg-background/80">
+                          <Badge variant="outline" className="text-[10px] font-semibold uppercase px-1.5 py-0 bg-background/80 shrink-0">
                             {group.weekday}
                           </Badge>
+                          <span className="text-[11px] text-muted-foreground shrink-0 hidden sm:inline">
+                            ({group.records.length} {group.records.length === 1 ? "subject" : "subjects"})
+                          </span>
                         </div>
 
-                        {/* Daily Summary Pill */}
-                        <div>
+                        {/* Daily Summary Pill & Expand Indicator */}
+                        <div className="flex items-center gap-2 shrink-0">
                           {allPresent ? (
                             <Badge
                               variant="outline"
-                              className="border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-[10px] font-bold gap-1 py-0.5"
+                              className="border-transparent bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold gap-1 py-0.5"
                             >
                               <IconCircleCheck size={11} className="text-emerald-500" />
                               All Present ({group.presentCount}/{group.records.length})
@@ -789,7 +710,7 @@ export default function StudentAttendancePage() {
                           ) : allAbsent ? (
                             <Badge
                               variant="outline"
-                              className="border-destructive/40 bg-destructive/10 text-destructive text-[10px] font-bold gap-1 py-0.5"
+                              className="border-transparent bg-destructive/15 text-destructive text-[10px] font-bold gap-1 py-0.5"
                             >
                               <IconCircleX size={11} className="text-destructive" />
                               All Absent ({group.absentCount})
@@ -805,61 +726,71 @@ export default function StudentAttendancePage() {
                               </span>
                             </div>
                           )}
+
+                          <IconChevronDown
+                            size={16}
+                            className={cn(
+                              "text-muted-foreground transition-transform duration-200",
+                              isExpanded && "rotate-180 text-foreground"
+                            )}
+                          />
                         </div>
-                      </div>
+                      </button>
 
                       {/* Subjects Taught on this Date */}
-                      <div className="divide-y divide-border/40">
-                        {group.records.map((record) => {
-                          const isPresent = record.status === "PRESENT";
+                      {isExpanded && (
+                        <div className="divide-y divide-border/40">
+                          {group.records.map((record) => {
+                            const isPresent = record.status === "PRESENT";
 
-                          return (
-                            <div
-                              key={record.id}
-                              className="flex items-center justify-between px-4 py-2.5 hover:bg-muted/20 transition-colors"
-                            >
-                              {/* Subject Info */}
-                              <div className="flex items-center gap-2.5 min-w-0 pr-3">
-                                <Badge
-                                  variant="outline"
-                                  className="font-mono text-[11px] font-bold bg-muted/50 shrink-0"
-                                >
-                                  {record.session.class.subject.code}
-                                </Badge>
-                                <span className="text-xs font-semibold text-foreground truncate">
-                                  {record.session.class.subject.name}
-                                </span>
-                                {record.note && (
-                                  <span className="text-[11px] text-muted-foreground italic truncate">
-                                    — {record.note}
+                            return (
+                              <div
+                                key={record.id}
+                                className="flex items-center justify-between px-4 py-2.5 hover:bg-muted/20 transition-colors"
+                              >
+                                {/* Subject Info */}
+                                <div className="flex items-center gap-2.5 min-w-0 pr-3">
+                                  <Badge
+                                    variant="outline"
+                                    className="font-mono text-[11px] font-bold bg-muted/50 shrink-0"
+                                  >
+                                    {record.session.class.subject.code}
+                                  </Badge>
+                                  <span className="text-xs font-semibold text-foreground truncate">
+                                    {record.session.class.subject.name}
                                   </span>
-                                )}
-                              </div>
+                                  {record.note && (
+                                    <span className="text-[11px] text-muted-foreground italic truncate">
+                                      — {record.note}
+                                    </span>
+                                  )}
+                                </div>
 
-                              {/* Present / Absent Badge */}
-                              <div className="shrink-0">
-                                {isPresent ? (
-                                  <Badge
-                                    variant="outline"
-                                    className="border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 font-bold text-[11px] gap-1 py-0.5 px-2"
-                                  >
-                                    <IconCheck size={12} className="text-emerald-500" />
-                                    PRESENT
-                                  </Badge>
-                                ) : (
-                                  <Badge
-                                    variant="outline"
-                                    className="border-destructive/40 bg-destructive/10 text-destructive font-bold text-[11px] gap-1 py-0.5 px-2"
-                                  >
-                                    <IconX size={12} className="text-destructive" />
-                                    ABSENT
-                                  </Badge>
-                                )}
+                                {/* Present / Absent Badge */}
+                                <div className="shrink-0">
+                                  {isPresent ? (
+                                    <Badge
+                                      variant="outline"
+                                      className="border-transparent bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold text-[11px] gap-1 py-0.5 px-2"
+                                    >
+                                      <IconCheck size={12} className="text-emerald-500" />
+                                      PRESENT
+                                    </Badge>
+                                  ) : (
+                                    <Badge
+                                      variant="outline"
+                                      className="border-transparent bg-destructive/15 text-destructive font-bold text-[11px] gap-1 py-0.5 px-2"
+                                    >
+                                      <IconX size={12} className="text-destructive" />
+                                      ABSENT
+                                    </Badge>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </Card>
                   );
                 })}

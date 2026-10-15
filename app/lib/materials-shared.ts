@@ -102,7 +102,7 @@ export const VISIBILITY_LABELS: Record<string, string> = {
 
 export const VISIBILITY_VALUES: readonly string[] = VISIBILITY_OPTIONS.map((v) => v.value);
 
-export const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25 MB
+export const MAX_FILE_BYTES = 100 * 1024 * 1024; // 100 MB
 
 export const BLOCKED_EXTENSIONS = [
   ".exe", ".msi", ".bat", ".cmd", ".com", ".scr", ".dll", ".vbs", ".ps1",

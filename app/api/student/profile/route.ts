@@ -73,15 +73,20 @@ const PROFILE_SELECT = {
 } as const;
 
 /**
- * Fields a student is allowed to change themselves.
- * Critical data (name, gender, registration number, nationality, category,
- * religion, program, semester, …) are intentionally NOT in this list — they
- * are only ever set by an admin, so a broken/fake form cannot corrupt them.
+ * Fields a student is allowed to change themselves (subject to admin approval).
+ * Critical academic/identity numbers (name, enrollmentNumber, registrationId,
+ * rollNumber, program, semester…) are intentionally NOT in this list — they
+ * are only ever set by an admin.
  */
 const SELF_EDITABLE = new Set([
   // profileImageUrl is intentionally NOT self-editable: profile pictures go
   // through the two-step verification flow (client gates + admin approval)
   // via the avatar server actions instead.
+  // Personal details (staged for admin approval)
+  "gender",
+  "nationality",
+  "religion",
+  "category",
   "bloodGroup",
   "phone",
   "emergencyContact",
@@ -214,7 +219,8 @@ try {
     for (const key of SELF_EDITABLE) {
       if (key.startsWith("perm") || key.startsWith("curr") || key === "currSameAsPerm") continue;
       const raw = body[key];
-      const value = typeof raw === "string" && raw.trim() !== "" ? raw.trim() : null;
+      let value = typeof raw === "string" && raw.trim() !== "" ? raw.trim() : null;
+      if (key === "gender" && value === "UNSPECIFIED") value = null;
       (studentData as Record<string, unknown>)[key] = value;
     }
 
@@ -345,6 +351,10 @@ try {
       const liveStudent = (await prisma.student.findUnique({
         where: { id: existing.id },
         select: {
+          gender: true,
+          nationality: true,
+          religion: true,
+          category: true,
           bloodGroup: true,
           phone: true,
           emergencyContact: true,

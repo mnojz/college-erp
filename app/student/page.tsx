@@ -141,6 +141,10 @@ type Profile = {
  * program, semester…) is intentionally absent — students can never edit it.
  */
 type EditFormState = {
+  gender: string;
+  nationality: string;
+  religion: string;
+  category: string;
   bloodGroup: string;
   phone: string;
   // Permanent address (structured)
@@ -241,6 +245,10 @@ export default function StudentPage() {
     setEditError("");
     setEditSuccess("");
     setEditForm({
+      gender: profile.gender ?? "",
+      nationality: profile.nationality ?? "",
+      religion: profile.religion ?? "",
+      category: profile.category ?? "",
       bloodGroup: profile.bloodGroup ?? "",
       phone: profile.phone ?? "",
       // Permanent address
@@ -269,7 +277,7 @@ export default function StudentPage() {
 
   /**
    * Save the self-service profile edits. Only student-editable fields are sent —
-   * name, gender, registration data, etc. never leave this page. Changing the
+   * name, registration data, etc. never leave this page. Changing the
    * password additionally requires the current password, which the API verifies
    * against the stored hash. The college email is NOT self-editable: it is the
    * account identity, so the field is read-only and never submitted.
@@ -293,6 +301,10 @@ export default function StudentPage() {
     setEditError("");
 
     const body: Record<string, unknown> = {
+      gender: editForm.gender,
+      nationality: editForm.nationality,
+      religion: editForm.religion,
+      category: editForm.category,
       bloodGroup: editForm.bloodGroup,
       phone: editForm.phone,
       // Permanent address
@@ -488,67 +500,55 @@ export default function StudentPage() {
       />
 
       {/* ── Quick Overview / Metric Ribbon ── */}
-      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         {/* Current Term */}
-        <Card className="p-3.5 sm:p-4 rounded-xl border border-border/70 bg-card shadow-xs">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium">
+        <Card className="p-3 sm:p-3.5 rounded-xl border border-border/70 bg-card shadow-xs">
+          <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
             <IconCalendar className="size-4 text-primary shrink-0" />
             <span>Current Term</span>
           </div>
-          <div className="mt-2 text-base sm:text-lg font-bold tracking-tight text-foreground">
+          <div className="mt-1.5 text-base sm:text-lg font-bold tracking-tight text-foreground">
             {semesterName}
-          </div>
-          <div className="text-[11px] text-muted-foreground mt-0.5 truncate">
-            {profile.program ? `${profile.program.durationYears} Years Duration` : "Academic Cycle"}
           </div>
         </Card>
 
         {/* Enrollment Status */}
-        <Card className="p-3.5 sm:p-4 rounded-xl border border-border/70 bg-card shadow-xs">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium">
+        <Card className="p-3 sm:p-3.5 rounded-xl border border-border/70 bg-card shadow-xs">
+          <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
             <IconChecklist className="size-4 text-emerald-500 shrink-0" />
             <span>Enrollment Status</span>
           </div>
-          <div className="mt-2 flex items-center gap-1.5 text-base sm:text-lg font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
-            <span className="size-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+          <div className="mt-1.5 flex items-center gap-1.5 text-base sm:text-lg font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
+            <span className="size-2 rounded-full bg-emerald-500 shrink-0" />
             {profile.user.status === "ACTIVE" ? "Enrolled" : "Inactive"}
-          </div>
-          <div className="text-[11px] text-muted-foreground mt-0.5">
-            Good Standing
           </div>
         </Card>
 
-        {/* Department / Faculty */}
-        <Card className="p-3.5 sm:p-4 rounded-xl border border-border/70 bg-card shadow-xs">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium">
+        {/* Department */}
+        <Card className="p-3 sm:p-3.5 rounded-xl border border-border/70 bg-card shadow-xs">
+          <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
             <IconBuilding className="size-4 text-blue-500 shrink-0" />
             <span>Department</span>
           </div>
-          <div className="mt-2 text-base sm:text-lg font-bold tracking-tight text-foreground truncate" title={departmentName}>
+          <div className="mt-1.5 text-base sm:text-lg font-bold tracking-tight text-foreground truncate" title={departmentName}>
             {departmentName}
-          </div>
-          <div className="text-[11px] text-muted-foreground mt-0.5 truncate">
-            {profile.program?.code ? `Code: ${profile.program.code}` : "Faculty Assigned"}
           </div>
         </Card>
 
-        {/* Blood Group / Medical */}
-        <Card className="p-3.5 sm:p-4 rounded-xl border border-border/70 bg-card shadow-xs">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium">
+        {/* Blood Group */}
+        <Card className="p-3 sm:p-3.5 rounded-xl border border-border/70 bg-card shadow-xs">
+          <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
             <IconDroplet className="size-4 text-rose-500 shrink-0" />
             <span>Blood Group</span>
           </div>
-          <div className="mt-2 flex items-center gap-1.5 text-base sm:text-lg font-bold tracking-tight text-foreground">
+          <div className="mt-1.5 flex items-center gap-1.5 text-base sm:text-lg font-bold tracking-tight text-foreground">
             {profile.bloodGroup ? (
-              <Badge variant="outline" className="border-rose-500/40 bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 font-bold px-2 py-0.5 text-xs">
+              <Badge variant="outline" className="border-transparent bg-rose-500/15 text-rose-700 dark:text-rose-400 font-bold px-2.5 py-0.5 text-sm">
                 {profile.bloodGroup}
               </Badge>
             ) : (
               <span className="text-xs text-muted-foreground/70 font-normal italic">Not specified</span>
             )}
-          </div>
-          <div className="text-[11px] text-muted-foreground mt-0.5">
-            Medical Emergency Info
           </div>
         </Card>
       </div>
@@ -564,16 +564,13 @@ export default function StudentPage() {
                 <span className="flex size-7.5 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <IconPhone size={16} />
                 </span>
-                <div>
-                  <CardTitle className="text-sm font-semibold">Contact &amp; Emergency</CardTitle>
-                  <p className="text-[11px] text-muted-foreground">Official contact details</p>
-                </div>
+                <CardTitle className="text-sm font-semibold">Contact &amp; Emergency</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="p-4 sm:p-5 space-y-4 text-sm">
               <div>
                 <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  Email Address
+                  Email
                 </span>
                 <a
                   href={`mailto:${profile.user.email}`}
@@ -586,7 +583,7 @@ export default function StudentPage() {
 
               <div>
                 <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  Phone Number
+                  Phone
                 </span>
                 {profile.phone ? (
                   <a
@@ -601,23 +598,20 @@ export default function StudentPage() {
                 )}
               </div>
 
-              {/* Emergency Contact Highlight Box */}
-              <div className="rounded-xl border border-rose-500/25 bg-rose-50/60 dark:bg-rose-950/20 p-3 text-xs">
-                <div className="flex items-center gap-1.5 font-semibold text-rose-800 dark:text-rose-300">
-                  <IconAlertCircle size={15} />
-                  <span>Emergency Contact</span>
-                </div>
+              <div>
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Emergency Contact
+                </span>
                 {profile.emergencyContact ? (
                   <a
                     href={`tel:${profile.emergencyContact}`}
-                    className="mt-1 block font-mono font-bold text-rose-900 dark:text-rose-200 hover:underline"
+                    className="mt-0.5 flex items-center gap-2 font-medium text-foreground hover:text-primary transition-colors font-mono"
                   >
-                    {profile.emergencyContact}
+                    <IconAlertCircle size={15} className="text-muted-foreground shrink-0" />
+                    <span>{profile.emergencyContact}</span>
                   </a>
                 ) : (
-                  <p className="text-rose-700/70 dark:text-rose-400/70 italic mt-1">
-                    No emergency contact assigned
-                  </p>
+                  <p className="text-xs italic text-muted-foreground/60 mt-0.5">Not provided</p>
                 )}
               </div>
             </CardContent>
@@ -630,17 +624,14 @@ export default function StudentPage() {
                 <span className="flex size-7.5 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <IconUsersGroup size={16} />
                 </span>
-                <div>
-                  <CardTitle className="text-sm font-semibold">Parent &amp; Guardian</CardTitle>
-                  <p className="text-[11px] text-muted-foreground">Family &amp; primary contact</p>
-                </div>
+                <CardTitle className="text-sm font-semibold">Parent &amp; Guardian</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="p-4 sm:p-5 space-y-3.5 text-sm">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                    Guardian Name
+                    Name
                   </span>
                   <p className="font-semibold text-foreground truncate">
                     {profile.guardianName || <span className="text-xs italic font-normal text-muted-foreground/60">Not provided</span>}
@@ -655,7 +646,7 @@ export default function StudentPage() {
 
               <div>
                 <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  Guardian Phone
+                  Phone
                 </span>
                 {profile.guardianPhone ? (
                   <a
@@ -672,7 +663,7 @@ export default function StudentPage() {
 
               <div>
                 <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  Guardian Email
+                  Email
                 </span>
                 {profile.guardianEmail ? (
                   <a
@@ -696,10 +687,7 @@ export default function StudentPage() {
                 <span className="flex size-7.5 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <IconCompass size={16} />
                 </span>
-                <div>
-                  <CardTitle className="text-sm font-semibold">Student Portal Services</CardTitle>
-                  <p className="text-[11px] text-muted-foreground">Quick academic access</p>
-                </div>
+                <CardTitle className="text-sm font-semibold">Quick Links</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="p-2 sm:p-2.5 divide-y divide-border/40">
@@ -729,7 +717,7 @@ export default function StudentPage() {
               >
                 <span className="flex items-center gap-2.5 text-foreground">
                   <IconClipboardCheck size={16} className="text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform" />
-                  Exam Registrations &amp; Schedules
+                  Exam Schedules
                 </span>
                 <IconChevronRight size={14} className="text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
               </Link>
@@ -756,10 +744,7 @@ export default function StudentPage() {
                 <span className="flex size-7.5 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <IconSchool size={16} />
                 </span>
-                <div>
-                  <CardTitle className="text-sm font-semibold">Academic &amp; Enrollment Records</CardTitle>
-                  <p className="text-[11px] text-muted-foreground">Program, department, and registration particulars</p>
-                </div>
+                <CardTitle className="text-sm font-semibold">Academic Records</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="p-5 sm:p-6">
@@ -791,11 +776,9 @@ export default function StudentPage() {
                   <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                     Current Semester
                   </span>
-                  <div className="mt-0.5 flex items-center gap-2">
-                    <Badge variant="outline" className="font-bold text-xs bg-primary/10 text-primary border-primary/30">
-                      {semesterName}
-                    </Badge>
-                  </div>
+                  <p className="font-semibold text-foreground mt-0.5">
+                    {semesterName}
+                  </p>
                 </div>
 
                 <div>
@@ -857,10 +840,7 @@ export default function StudentPage() {
                 <span className="flex size-7.5 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <IconUser size={16} />
                 </span>
-                <div>
-                  <CardTitle className="text-sm font-semibold">Personal &amp; Identity Details</CardTitle>
-                  <p className="text-[11px] text-muted-foreground">Government &amp; personal records</p>
-                </div>
+                <CardTitle className="text-sm font-semibold">Personal Details</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="p-5 sm:p-6">
@@ -887,7 +867,7 @@ export default function StudentPage() {
                   </span>
                   <div className="mt-0.5">
                     {profile.bloodGroup ? (
-                      <Badge variant="outline" className="border-rose-500/40 text-rose-700 dark:text-rose-400 font-bold text-xs">
+                      <Badge variant="outline" className="border-transparent bg-rose-500/15 text-rose-700 dark:text-rose-400 font-bold text-xs">
                         {profile.bloodGroup}
                       </Badge>
                     ) : (
@@ -933,10 +913,7 @@ export default function StudentPage() {
                 <span className="flex size-7.5 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <IconMapPin size={16} />
                 </span>
-                <div>
-                  <CardTitle className="text-sm font-semibold">Residential Addresses</CardTitle>
-                  <p className="text-[11px] text-muted-foreground">Permanent domicile and current residence</p>
-                </div>
+                <CardTitle className="text-sm font-semibold">Address</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="p-5 sm:p-6">
@@ -977,7 +954,7 @@ export default function StudentPage() {
                       Current Address
                     </span>
                     {profile.currSameAsPerm ? (
-                      <Badge variant="outline" className="border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-[10px] font-medium">
+                      <Badge variant="outline" className="border-transparent bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 text-[10px] font-medium">
                         Same as Permanent
                       </Badge>
                     ) : (
@@ -990,7 +967,7 @@ export default function StudentPage() {
                   </div>
                   {profile.currSameAsPerm ? (
                     <div className="text-xs text-muted-foreground pt-1">
-                      Current living address matches permanent domicile registered with the college.
+                      Same as permanent address
                     </div>
                   ) : (
                     <>
@@ -1020,23 +997,19 @@ export default function StudentPage() {
         <section className="mt-7">
           <header className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold tracking-tight">Announcements</h2>
-              <p className="text-sm text-muted-foreground">
-                Campus updates and notices from your teachers
-              </p>
+              <h2 className="text-lg font-semibold tracking-tight">Notice</h2>
             </div>
-            <Button asChild variant="ghost" aria-label="View all announcements">
-              <Link href="/student/announcements">
+            <Button asChild variant="ghost" aria-label="View all notices">
+              <Link href="/student/notice">
                 <IconLayoutList size={16} aria-hidden="true" />
                 View All ({announcements.length})
               </Link>
             </Button>
           </header>
 
-          {/* Latest announcements — a single responsive row of 3–4 cards.
-              The View All popup lists everything. */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {announcements.slice(0, 4).map((a) => (
+          {/* Latest announcements — 2 cards by default */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {announcements.slice(0, 2).map((a) => (
               <NoticePostCard
                 key={a.id}
                 notice={toNotice(a)}
@@ -1057,10 +1030,10 @@ export default function StudentPage() {
                 <div className="space-y-1">
                   <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
                     <IconEdit className="size-5 text-primary" aria-hidden="true" />
-                    Edit Student Profile
+                    Edit Profile
                   </DialogTitle>
                   <DialogDescription className="text-xs text-muted-foreground">
-                    Update your personal contact details, residential address, guardian records, and login security.
+                    Update contact, address, guardian, and security settings.
                   </DialogDescription>
                 </div>
                 <Badge variant="outline" className="text-[11px] font-semibold text-muted-foreground border-border/70 bg-muted/40 self-start sm:self-center shrink-0">
@@ -1124,8 +1097,74 @@ export default function StudentPage() {
                       <div>
                         <strong className="font-semibold text-foreground">Official College Identity Records</strong>
                         <p className="mt-0.5 leading-relaxed">
-                          Legal name ({profile.user.firstName} {profile.user.lastName}), gender, registration number, nationality, and academic enrollment are centrally managed by the administration.
+                          Legal name ({profile.user.firstName} {profile.user.lastName}), registration number, and academic enrollment are managed by administration. Any updates to personal, contact, or address details will be reviewed and approved by administration before taking effect.
                         </p>
+                      </div>
+                    </div>
+
+                    {/* Personal Details Grid */}
+                    <div className="rounded-xl border border-border/70 bg-card p-4 space-y-4 shadow-2xs">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <IconUser className="size-3.5 text-primary" aria-hidden="true" />
+                        Personal Information
+                      </h4>
+
+                      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="edit-gender" className="text-xs font-semibold">Gender</Label>
+                          <Select
+                            value={editForm.gender || "UNSPECIFIED"}
+                            onValueChange={(val) =>
+                              setEditForm({ ...editForm, gender: val === "UNSPECIFIED" ? "" : val })
+                            }
+                          >
+                            <SelectTrigger id="edit-gender" className="w-full h-9 text-xs">
+                              <SelectValue placeholder="Not specified" />
+                            </SelectTrigger>
+                            <SelectContent position="popper">
+                              <SelectItem value="UNSPECIFIED" className="text-xs">Not specified</SelectItem>
+                              <SelectItem value="Male" className="text-xs">Male</SelectItem>
+                              <SelectItem value="Female" className="text-xs">Female</SelectItem>
+                              <SelectItem value="Other" className="text-xs">Other</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label htmlFor="edit-nationality" className="text-xs font-semibold">Nationality</Label>
+                          <Input
+                            id="edit-nationality"
+                            type="text"
+                            placeholder="e.g. Nepali"
+                            value={editForm.nationality}
+                            onChange={(e) => setEditForm({ ...editForm, nationality: e.target.value })}
+                            className="h-9 text-xs"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label htmlFor="edit-religion" className="text-xs font-semibold">Religion</Label>
+                          <Input
+                            id="edit-religion"
+                            type="text"
+                            placeholder="e.g. Hindu"
+                            value={editForm.religion}
+                            onChange={(e) => setEditForm({ ...editForm, religion: e.target.value })}
+                            className="h-9 text-xs"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label htmlFor="edit-category" className="text-xs font-semibold">Category / Caste</Label>
+                          <Input
+                            id="edit-category"
+                            type="text"
+                            placeholder="e.g. General, Reserved"
+                            value={editForm.category}
+                            onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                            className="h-9 text-xs"
+                          />
+                        </div>
                       </div>
                     </div>
 

@@ -3,23 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  IconBook2,
   IconCalendar,
   IconCalendarClock,
-  IconCheck,
-  IconClock,
   IconCoffee,
   IconLayoutGrid,
   IconList,
-  IconSparkles,
   IconUser,
-  IconUsers,
 } from "@tabler/icons-react";
 import { StudentShell } from "@/app/components/student/StudentShell";
 import { TimetableGrid, type TimetableItem } from "@/app/components/timetable/TimetableGrid";
 import { getColorForSubject, formatTime } from "@/app/lib/timetable-layout";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
@@ -148,48 +142,6 @@ export default function StudentSchedulesPage() {
     [classes, selectedProgramId, selectedSemester],
   );
 
-  // Distinct subjects in this routine
-  const uniqueSubjects = useMemo(() => {
-    const map = new Map<
-      string,
-      { code: string; name: string; teachers: Set<string>; count: number; labs: number }
-    >();
-
-    for (const item of items) {
-      const code = item.subject.code;
-      const current = map.get(code) ?? {
-        code,
-        name: item.subject.name,
-        teachers: new Set<string>(),
-        count: 0,
-        labs: 0,
-      };
-      current.count += 1;
-      if (item.type === "Practical") current.labs += 1;
-      if (item.subjectTeacherName) current.teachers.add(item.subjectTeacherName);
-      map.set(code, current);
-    }
-
-    return Array.from(map.values()).sort((a, b) => a.code.localeCompare(b.code));
-  }, [items]);
-
-  const labCount = useMemo(
-    () => items.filter((i) => i.type === "Practical").length,
-    [items]
-  );
-
-  const isOwnRoutine =
-    !!profile?.program &&
-    profile.program.id === selectedProgramId &&
-    profile.currentSemester === Number(selectedSemester);
-
-  function resetToOwnRoutine() {
-    if (profile?.program?.id) {
-      setSelectedProgramId(profile.program.id);
-      setSelectedSemester(String(profile.currentSemester ?? 1));
-    }
-  }
-
   if (error) {
     return (
       <StudentShell title="Class Schedules & Timetable" active="/student/schedules">
@@ -204,13 +156,7 @@ export default function StudentSchedulesPage() {
     return (
       <StudentShell title="Class Schedules & Timetable" active="/student/schedules">
         <div className="space-y-4">
-          <Skeleton className="h-28 w-full rounded-2xl" />
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Skeleton className="h-18 w-full rounded-xl" />
-            <Skeleton className="h-18 w-full rounded-xl" />
-            <Skeleton className="h-18 w-full rounded-xl" />
-            <Skeleton className="h-18 w-full rounded-xl" />
-          </div>
+          <Skeleton className="h-14 w-full rounded-xl" />
           <Skeleton className="h-72 w-full rounded-2xl" />
         </div>
       </StudentShell>
@@ -230,125 +176,10 @@ export default function StudentSchedulesPage() {
       name={fullName}
       studentId={studentId}
       avatarUrl={profile.profileImageUrl}
-      title="Class Schedules & Timetable"
-      subtitle="Weekly Academic Routine & Schedule"
+      title="Class Schedule"
+      subtitle="Weekly timetable and lecture routine"
     >
       <div className="space-y-5">
-        {/* ── Academic Hero Header ── */}
-        <Card className="rounded-2xl border border-border/70 shadow-xs bg-linear-to-r from-primary/10 via-primary/5 to-background p-4 sm:p-5 overflow-hidden">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="flex size-6 items-center justify-center rounded-md bg-primary/15 text-primary">
-                  <IconCalendarClock size={14} />
-                </span>
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Official Academic Routine
-                </span>
-              </div>
-              <h1 className="mt-1 text-lg sm:text-xl font-bold tracking-tight text-foreground">
-                {selectedProgram?.name ?? "Academic Program"} — Semester {selectedSemester || "—"}
-              </h1>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Active timetable governed by campus dean and academic department.
-              </p>
-            </div>
-
-            {/* Status Badge & Quick Jump */}
-            <div className="flex items-center gap-2 shrink-0">
-              {isOwnRoutine ? (
-                <div className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-emerald-700 dark:text-emerald-300 font-bold text-xs shadow-xs">
-                  <IconCheck size={14} className="text-emerald-500" />
-                  <span>Your Active Routine</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-xs py-1 px-2.5 bg-muted/60">
-                    <IconUsers size={13} className="mr-1 text-muted-foreground" />
-                    Viewing Other Routine
-                  </Badge>
-                  {profile.program && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 text-xs font-semibold px-2.5 bg-primary/10 border-primary/30 text-primary hover:bg-primary/20"
-                      onClick={resetToOwnRoutine}
-                    >
-                      Jump to My Routine
-                    </Button>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </Card>
-
-        {/* ── Compact Metric Stat Strip ── */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {/* Card 1: Total Classes */}
-          <Card className="rounded-xl border border-border/70 p-3 shadow-xs bg-card">
-            <div className="flex items-center justify-between text-muted-foreground">
-              <span className="text-[11px] font-medium">Weekly Classes</span>
-              <span className="flex size-5 items-center justify-center rounded-md bg-primary/10 text-primary">
-                <IconClock size={13} />
-              </span>
-            </div>
-            <div className="mt-1 text-xl font-bold tracking-tight text-foreground">
-              {items.length}
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Across 5 working days
-            </p>
-          </Card>
-
-          {/* Card 2: Distinct Subjects */}
-          <Card className="rounded-xl border border-border/70 p-3 shadow-xs bg-card">
-            <div className="flex items-center justify-between text-muted-foreground">
-              <span className="text-[11px] font-medium">Scheduled Subjects</span>
-              <span className="flex size-5 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                <IconBook2 size={13} />
-              </span>
-            </div>
-            <div className="mt-1 text-xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
-              {uniqueSubjects.length}
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Course modules taught
-            </p>
-          </Card>
-
-          {/* Card 3: Practical Labs */}
-          <Card className="rounded-xl border border-border/70 p-3 shadow-xs bg-card">
-            <div className="flex items-center justify-between text-muted-foreground">
-              <span className="text-[11px] font-medium">Lab Sessions</span>
-              <span className="flex size-5 items-center justify-center rounded-md bg-primary/10 text-primary">
-                <IconSparkles size={13} />
-              </span>
-            </div>
-            <div className="mt-1 text-xl font-bold tracking-tight text-foreground">
-              {labCount}
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Practical workshops
-            </p>
-          </Card>
-
-          {/* Card 4: Break Window */}
-          <Card className="rounded-xl border border-border/70 p-3 shadow-xs bg-card">
-            <div className="flex items-center justify-between text-muted-foreground">
-              <span className="text-[11px] font-medium">Campus Recess</span>
-              <span className="flex size-5 items-center justify-center rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                <IconCoffee size={13} />
-              </span>
-            </div>
-            <div className="mt-1 text-xs sm:text-sm font-bold tracking-tight text-foreground truncate">
-              {breakPeriod ? `${formatTime(breakPeriod.start)} – ${formatTime(breakPeriod.end)}` : "None Set"}
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Daily recess interval
-            </p>
-          </Card>
-        </div>
 
         {/* ── Toolbar: Program & Semester Pickers + View Mode Toggle ── */}
         <Card className="p-3 sm:p-3.5 rounded-xl border border-border/70 shadow-xs bg-card">
@@ -492,7 +323,7 @@ export default function StudentSchedulesPage() {
                           {isToday && (
                             <Badge
                               variant="outline"
-                              className="text-[9px] font-bold px-1.5 py-0 bg-primary/15 text-primary border-primary/30"
+                              className="text-[9px] font-bold px-1.5 py-0 bg-primary/15 text-primary border-transparent"
                             >
                               TODAY
                             </Badge>
@@ -568,21 +399,6 @@ export default function StudentSchedulesPage() {
             {/* VIEW 3: TODAY'S CLASSES */}
             {viewMode === "today" && (
               <div className="space-y-3">
-                <Card className="rounded-xl border border-primary/40 shadow-xs bg-linear-to-r from-primary/10 via-primary/5 to-background p-4 overflow-hidden">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Today&apos;s Focus
-                      </span>
-                      <h2 className="text-base sm:text-lg font-bold text-foreground">
-                        {todayDayName} Classes ({todayClasses.length})
-                      </h2>
-                    </div>
-                    <Badge variant="outline" className="border-primary/40 bg-primary/15 text-primary text-xs font-bold px-2.5 py-1">
-                      {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                    </Badge>
-                  </div>
-                </Card>
 
                 {todayClasses.length === 0 ? (
                   <Card className="rounded-xl border-dashed p-10 text-center bg-card/60">

@@ -3,19 +3,15 @@ import { Button } from "@/components/ui/button";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { TeacherShell } from "@/app/components/teacher/TeacherShell";
 import { ListSkeleton } from "@/app/components/layout/PageSkeletons";
 import { AdminModal } from "@/app/components/admin/AdminModal";
 import { FileDropzone } from "@/app/components/common/FileDropzone";
-import {
-  NoticeAttachment,
-  NoticeDetailData,
-  NoticeDetailModal,
-} from "@/app/components/common/NoticeDetailModal";
-import { NoticePostCard } from "@/app/components/common/NoticePostCard";
+import { NoticeAttachment } from "@/app/components/common/NoticeDetailModal";
+import { AnnouncementsBoard } from "@/app/components/announcements/AnnouncementsBoard";
 import {
   IconAlertTriangle,
-  IconBell,
   IconPaperclip,
   IconPencil,
   IconPlus,
@@ -94,28 +90,6 @@ function attachmentMetaOf(a: AnnouncementItem): NoticeAttachment | null {
   };
 }
 
-function toNoticeDetail(a: AnnouncementItem): NoticeDetailData {
-  return {
-    id: a.id,
-    title: a.title,
-    body: a.body,
-    publishedAt: a.publishedAt,
-    createdAt: a.createdAt,
-    author: a.author,
-    scope:
-      a.teacherId && a.subject && a.program && a.semester != null
-        ? {
-            subjectName: a.subject.name,
-            subjectCode: a.subject.code,
-            programName: a.program.name,
-            programCode: a.program.code,
-            semester: a.semester,
-          }
-        : null,
-    attachment: attachmentMetaOf(a),
-  };
-}
-
 export default function TeacherAnnouncementsPage() {
   const router = useRouter();
   const [teacherInfo, setTeacherInfo] = useState<TeacherInfo | null>(null);
@@ -127,12 +101,10 @@ export default function TeacherAnnouncementsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editing, setEditing] = useState<EditingNotice | null>(null);
   const [deleting, setDeleting] = useState<AnnouncementItem | null>(null);
-  const [selectedNotice, setSelectedNotice] = useState<NoticeDetailData | null>(null);
 
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
-  const [message, setMessage] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -183,11 +155,6 @@ export default function TeacherAnnouncementsPage() {
     return [...groups.values()];
   }, [teacherInfo]);
 
-  const totalStudentsReached = useMemo(
-    () => classGroups.reduce((sum, g) => sum + g.students, 0),
-    [classGroups],
-  );
-
   const scopeKeyFor = (a: AnnouncementItem): string => {
     if (!a.subject || !a.program || a.semester == null) return "";
     return `${a.subject.id}__${a.program.id}__${a.semester}`;
@@ -237,7 +204,7 @@ export default function TeacherAnnouncementsPage() {
       await refresh();
       setForm(emptyForm);
       setShowCreateModal(false);
-      setMessage("Announcement published to your class successfully.");
+      toast.success("Announcement published to your class successfully.");
     } catch {
       setFormError("Failed to submit announcement");
     } finally {
@@ -276,7 +243,7 @@ export default function TeacherAnnouncementsPage() {
       }
       await refresh();
       setEditing(null);
-      setMessage("Announcement updated successfully.");
+      toast.success("Announcement updated successfully.");
     } catch {
       setFormError("Failed to update announcement");
     } finally {
@@ -293,13 +260,15 @@ export default function TeacherAnnouncementsPage() {
       const data = await res.json();
       if (!res.ok) {
         setFormError(data.error ?? "Failed to delete announcement");
+        toast.error(data.error ?? "Failed to delete announcement");
         return;
       }
       setAnnouncements((prev) => prev.filter((a) => a.id !== deleting.id));
       setDeleting(null);
-      setMessage("Announcement deleted successfully.");
+      toast.success("Announcement deleted successfully.");
     } catch {
       setFormError("Failed to delete announcement");
+      toast.error("Failed to delete announcement");
     } finally {
       setSaving(false);
     }
@@ -340,160 +309,139 @@ export default function TeacherAnnouncementsPage() {
         </Button>
       }
     >
-      <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs [&>span]:text-xs [&>span]:font-semibold [&>span]:uppercase [&>span]:tracking-wide [&>span]:text-muted-foreground [&>strong]:my-1 [&>strong]:text-[34px] [&>strong]:font-bold [&>strong]:leading-none [&>strong]:tracking-tight [&>small]:text-xs [&>small]:text-muted-foreground">
-          <span>Your Notices</span>
-          <strong>{announcements.filter((a) => a.authorId === userId).length}</strong>
-          <small>Announcements sent to your classes</small>
-        </article>
-        <article className="flex min-w-0 flex-col gap-1 rounded-xl border bg-card p-5 shadow-xs [&>span]:text-xs [&>span]:font-semibold [&>span]:uppercase [&>span]:tracking-wide [&>span]:text-muted-foreground [&>strong]:my-1 [&>strong]:text-[34px] [&>strong]:font-bold [&>strong]:leading-none [&>strong]:tracking-tight [&>small]:text-xs [&>small]:text-muted-foreground">
-          <span>Students Reached</span>
-          <strong>{totalStudentsReached}</strong>
-          <small>Across {classGroups.length} teaching group{classGroups.length === 1 ? "" : "s"}</small>
-        </article>
-      </section>
-
-      {message && <p className="mt-3.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2.5 text-[13px] text-emerald-600 dark:text-emerald-400">{message}</p>}
       {formError && !deleting && !showCreateModal && !editing && (
-        <p className="mt-3.5 rounded-lg border border-destructive/20 bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive">{formError}</p>
+        <p className="mb-4 rounded-lg border border-destructive/20 bg-destructive/10 px-3.5 py-2.5 text-[13px] text-destructive">{formError}</p>
       )}
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 *:h-full">
-        {announcements.length === 0 ? (
-          <div className="w-full overflow-x-auto rounded-lg border">
-            <div className="px-3 py-10 text-center text-sm text-muted-foreground">
-              <IconBell size={26} aria-hidden="true" />
-              <p>
-                No announcements yet. Click <strong>New Announcement</strong> to notify the students of a
-                subject &amp; class you teach.
-              </p>
+      <AnnouncementsBoard
+        variant="teacher"
+        items={announcements}
+        loading={loading}
+        currentUserId={userId}
+        onRefresh={refresh}
+        renderCardActions={(_notice, raw) => {
+          const isMine = raw.authorId === userId;
+          if (!isMine) return null;
+          return (
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                title="Edit Announcement"
+                aria-label="Edit Announcement"
+                onClick={() => {
+                  setFormError("");
+                  setEditing({
+                    id: raw.id,
+                    title: raw.title,
+                    body: raw.body,
+                    scopeKey: scopeKeyFor(raw) || classGroups[0]?.key || "",
+                    file: null,
+                    removeAttachment: false,
+                    existingAttachment: attachmentMetaOf(raw),
+                  });
+                }}
+              >
+                <IconPencil size={14} aria-hidden="true" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                className="border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
+                title="Delete Announcement"
+                aria-label="Delete Announcement"
+                onClick={() => {
+                  setFormError("");
+                  setDeleting(raw);
+                }}
+              >
+                <IconTrash size={14} aria-hidden="true" />
+              </Button>
             </div>
-          </div>
-        ) : (
-          announcements.map((a) => {
-            const isMine = a.authorId === userId;
-            return (
-              <NoticePostCard
-                key={a.id}
-                notice={toNoticeDetail(a)}
-                onOpen={() => setSelectedNotice(toNoticeDetail(a))}
-                actions={
-                  isMine ? (
-                    <>
-                      <Button
-                        type="button"
-                        variant="outline" size="icon-sm"
-                        title="Edit Announcement"
-                        aria-label="Edit Announcement"
-                        onClick={() => {
-                          setFormError("");
-                          setEditing({
-                            id: a.id,
-                            title: a.title,
-                            body: a.body,
-                            scopeKey: scopeKeyFor(a) || classGroups[0]?.key || "",
-                            file: null,
-                            removeAttachment: false,
-                            existingAttachment: attachmentMetaOf(a),
-                          });
-                        }}
-                      >
-                        <IconPencil size={15} aria-hidden="true" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline" size="icon-sm" className="border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
-                        title="Delete Announcement"
-                        aria-label="Delete Announcement"
-                        onClick={() => {
-                          setFormError("");
-                          setDeleting(a);
-                        }}
-                      >
-                        <IconTrash size={15} aria-hidden="true" />
-                      </Button>
-                    </>
-                  ) : undefined
-                }
-              />
-            );
-          })
-        )}
-      </div>
+          );
+        }}
+      />
 
       {/* Modal 1: Create Announcement */}
       {showCreateModal && (
         <AdminModal
-          title="Publish Class Announcement"
+          wide
+          title="New Announcement"
           onClose={() => {
             setShowCreateModal(false);
             setForm(emptyForm);
           }}
         >
-          <form className="grid gap-4" onSubmit={handleCreate}>
-            <label className="form-field">
-              Notify Subject &amp; Class
-              <select
- className="form-control"
-                value={form.scopeKey}
-                onChange={(e) => setForm({ ...form, scopeKey: e.target.value })}
-                required
-              >
-                <option value="">— Choose a class you teach —</option>
-                {classGroups.map((g) => (
-                  <option key={g.key} value={g.key}>
-                    {g.label} ({g.students} student{g.students === 1 ? "" : "s"})
-                  </option>
-                ))}
-              </select>
-              <small className="text-xs text-muted-foreground">
-                Only students of this subject &amp; class will see the notice.
-              </small>
-            </label>
+          <form className="flex flex-col gap-4" onSubmit={handleCreate}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch">
+              {/* Left Column: Title & Content */}
+              <div className="flex flex-col gap-3 min-w-0">
+                <label className="form-field">
+                  Title
+                  <input
+                    className="form-control"
+                    type="text"
+                    placeholder="Title"
+                    value={form.title}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                    required
+                  />
+                </label>
 
-            <label className="form-field">
-              Announcement Headline
-              <input
- className="form-control"
-                type="text"
-                placeholder="e.g. Assignment submission deadline extended"
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                required
-              />
-            </label>
+                <label className="form-field flex-1 flex flex-col">
+                  Content
+                  <textarea
+                    className="form-control flex-1 resize-none"
+                    placeholder="Write announcement..."
+                    value={form.body}
+                    onChange={(e) => setForm({ ...form, body: e.target.value })}
+                    rows={5}
+                    required
+                  />
+                </label>
+              </div>
 
-            <label className="form-field">
-              Full Announcement Content
-              <textarea
- className="form-control"
-                placeholder="Write the full message for your students..."
-                value={form.body}
-                onChange={(e) => setForm({ ...form, body: e.target.value })}
-                rows={6}
-                required
-              />
-            </label>
+              {/* Right Column: Class & Attachment */}
+              <div className="flex flex-col gap-3 min-w-0">
+                <label className="form-field">
+                  Class
+                  <select
+                    className="form-control"
+                    value={form.scopeKey}
+                    onChange={(e) => setForm({ ...form, scopeKey: e.target.value })}
+                    required
+                  >
+                    <option value="">Select class</option>
+                    {classGroups.map((g) => (
+                      <option key={g.key} value={g.key}>
+                        {g.label} ({g.students} students)
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-            <label className="form-field">
-              Attachment <span className="text-xs font-normal text-muted-foreground">(optional image or PDF)</span>
-              <FileDropzone
-                id="teacher-notice-create-attachment"
-                accept="image/png,image/jpeg,image/webp,image/gif,application/pdf"
-                file={form.file}
-                onFileChange={(file) => setForm({ ...form, file })}
-                label="Drag & drop an image or PDF here"
-                dropLabel="Drop the attachment here"
-                hint="or click to browse — PNG, JPEG, WEBP, GIF or PDF, up to 10 MB"
-              />
-            </label>
+                <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+                  <span className="text-xs font-medium text-foreground">Attachment</span>
+                  <FileDropzone
+                    id="teacher-notice-create-attachment"
+                    className="flex-1 min-h-[120px]"
+                    accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/ogg,video/quicktime,application/pdf"
+                    file={form.file}
+                    onFileChange={(file) => setForm({ ...form, file })}
+                    label="Upload file or drag & drop"
+                    dropLabel="Drop file here"
+                    hint="Max 25 MB (Images, Videos, PDF)"
+                  />
+                </div>
+              </div>
+            </div>
 
             {formError && <p className="m-0 text-[13px] text-destructive">{formError}</p>}
 
-            <div className="flex flex-wrap justify-end gap-2.5">
-              <Button type="submit" disabled={saving}>
-                {saving ? "Publishing…" : "Publish to Class"}
-              </Button>
+            {/* Footer Buttons */}
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/60">
               <Button
                 variant="outline"
                 type="button"
@@ -504,6 +452,9 @@ export default function TeacherAnnouncementsPage() {
               >
                 Cancel
               </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Publishing…" : "Publish"}
+              </Button>
             </div>
           </form>
         </AdminModal>
@@ -511,91 +462,107 @@ export default function TeacherAnnouncementsPage() {
 
       {/* Modal 2: Edit Announcement */}
       {editing && (
-        <AdminModal title="Edit Announcement / Notice" onClose={() => setEditing(null)}>
-          <form className="grid gap-4" onSubmit={handleUpdate}>
-            <label className="form-field">
-              Notify Subject &amp; Class
-              <select
- className="form-control"
-                value={editing.scopeKey}
-                onChange={(e) => setEditing({ ...editing, scopeKey: e.target.value })}
-                required
-              >
-                {classGroups.map((g) => (
-                  <option key={g.key} value={g.key}>
-                    {g.label} ({g.students} student{g.students === 1 ? "" : "s"})
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="form-field">
-              Announcement Headline
-              <input
- className="form-control"
-                type="text"
-                value={editing.title}
-                onChange={(e) => setEditing({ ...editing, title: e.target.value })}
-                required
-              />
-            </label>
-
-            <label className="form-field">
-              Full Announcement Content
-              <textarea
- className="form-control"
-                value={editing.body}
-                onChange={(e) => setEditing({ ...editing, body: e.target.value })}
-                rows={6}
-                required
-              />
-            </label>
-
-            <label className="form-field">
-              Attachment <span className="text-xs font-normal text-muted-foreground">(optional image or PDF)</span>
-              {editing.existingAttachment && !editing.file && (
-                <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground">
-                  <IconPaperclip size={13} aria-hidden="true" />
-                  Current: {editing.existingAttachment.fileName}
-                </span>
-              )}
-              <FileDropzone
-                id="teacher-notice-edit-attachment"
-                accept="image/png,image/jpeg,image/webp,image/gif,application/pdf"
-                file={editing.file}
-                onFileChange={(file) => setEditing({ ...editing, file, removeAttachment: false })}
-                label="Drag & drop a new image or PDF here"
-                dropLabel="Drop the attachment here"
-                hint="or click to browse — a new file replaces the current attachment"
-              />
-              {editing.existingAttachment && (
-                <span className="inline-flex cursor-pointer items-center gap-2 text-[13px] text-muted-foreground">
+        <AdminModal wide title="Edit Announcement" onClose={() => setEditing(null)}>
+          <form className="flex flex-col gap-4" onSubmit={handleUpdate}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch">
+              {/* Left Column: Title & Content */}
+              <div className="flex flex-col gap-3 min-w-0">
+                <label className="form-field">
+                  Title
                   <input
-                    type="checkbox"
-                    id="teacher-notice-remove-attachment"
- className="accent-primary"
-                    checked={editing.removeAttachment}
-                    onChange={(e) =>
-                      setEditing({
-                        ...editing,
-                        removeAttachment: e.target.checked,
-                        file: null,
-                      })
-                    }
+                    className="form-control"
+                    type="text"
+                    placeholder="Title"
+                    value={editing.title}
+                    onChange={(e) => setEditing({ ...editing, title: e.target.value })}
+                    required
                   />
-                  <label htmlFor="teacher-notice-remove-attachment">Remove attachment</label>
-                </span>
-              )}
-            </label>
+                </label>
+
+                <label className="form-field flex-1 flex flex-col">
+                  Content
+                  <textarea
+                    className="form-control flex-1 resize-none"
+                    placeholder="Write announcement..."
+                    value={editing.body}
+                    onChange={(e) => setEditing({ ...editing, body: e.target.value })}
+                    rows={5}
+                    required
+                  />
+                </label>
+              </div>
+
+              {/* Right Column: Class & Attachment */}
+              <div className="flex flex-col gap-3 min-w-0">
+                <label className="form-field">
+                  Class
+                  <select
+                    className="form-control"
+                    value={editing.scopeKey}
+                    onChange={(e) => setEditing({ ...editing, scopeKey: e.target.value })}
+                    required
+                  >
+                    <option value="">Select class</option>
+                    {classGroups.map((g) => (
+                      <option key={g.key} value={g.key}>
+                        {g.label} ({g.students} students)
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+                  <span className="text-xs font-medium text-foreground">Attachment</span>
+                  {editing.existingAttachment && !editing.file && !editing.removeAttachment && (
+                    <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-border/80 bg-muted/30 text-xs min-w-0">
+                      <span className="inline-flex items-center gap-1.5 truncate min-w-0 font-medium">
+                        <IconPaperclip size={13} className="shrink-0 text-primary" aria-hidden="true" />
+                        <span className="truncate">{editing.existingAttachment.fileName}</span>
+                      </span>
+                      <button
+                        type="button"
+                        className="text-destructive hover:underline shrink-0 text-[11px] font-semibold cursor-pointer"
+                        onClick={() => setEditing({ ...editing, removeAttachment: true })}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                  {editing.removeAttachment && (
+                    <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-destructive/30 bg-destructive/10 text-destructive text-xs">
+                      <span>Attachment will be removed</span>
+                      <button
+                        type="button"
+                        className="text-foreground hover:underline shrink-0 text-[11px] font-semibold cursor-pointer"
+                        onClick={() => setEditing({ ...editing, removeAttachment: false })}
+                      >
+                        Undo
+                      </button>
+                    </div>
+                  )}
+                  <FileDropzone
+                    id="teacher-notice-edit-attachment"
+                    className="flex-1 min-h-[110px]"
+                    accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/ogg,video/quicktime,application/pdf"
+                    file={editing.file}
+                    onFileChange={(file) => setEditing({ ...editing, file, removeAttachment: false })}
+                    label="Upload new file or drag & drop"
+                    dropLabel="Drop new attachment here"
+                    hint="Replaces existing attachment (up to 25 MB)"
+                  />
+                </div>
+              </div>
+            </div>
 
             {formError && <p className="m-0 text-[13px] text-destructive">{formError}</p>}
 
-            <div className="flex flex-wrap justify-end gap-2.5">
-              <Button type="submit" disabled={saving}>
-                {saving ? "Saving Changes…" : "Save Changes"}
-              </Button>
+            {/* Modal Footer Actions */}
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/60">
               <Button variant="outline" type="button" onClick={() => setEditing(null)}>
                 Cancel
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Saving…" : "Save Changes"}
               </Button>
             </div>
           </form>
@@ -633,11 +600,6 @@ export default function TeacherAnnouncementsPage() {
             </div>
           </div>
         </AdminModal>
-      )}
-
-      {/* Modal 4: Notice details with attachment preview */}
-      {selectedNotice && (
-        <NoticeDetailModal notice={selectedNotice} onClose={() => setSelectedNotice(null)} />
       )}
     </TeacherShell>
   );

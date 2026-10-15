@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   IconBook2,
-  IconCalendar,
   IconCheck,
   IconLayersLinked,
   IconSearch,
@@ -203,10 +202,7 @@ export function StudentCourseStructurePanel({
       {/* ── Top Toolbar: Program Selection & Degree Overview ── */}
       <Card className="rounded-xl border border-border/70 p-4 shadow-xs bg-card">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
-            <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
-              Curriculum Map:
-            </span>
+          <div className="flex items-center">
             <Select
               value={selectedId || undefined}
               onValueChange={setProgramId}
@@ -229,23 +225,19 @@ export function StudentCourseStructurePanel({
           {/* Quick Metrics Bar */}
           {selectedProgram && (
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="text-xs py-1 px-2.5 bg-muted/40 font-medium">
-                <IconCalendar size={13} className="mr-1 text-primary" />
-                {selectedProgram.durationYears} Years / {totalSemesters} Semesters
-              </Badge>
               <Badge
                 variant="outline"
-                className="text-xs py-1 px-2.5 bg-primary/10 text-primary border-primary/30 font-bold"
+                className="text-xs sm:text-sm py-1.5 px-3 bg-primary/10 text-primary border-transparent font-bold rounded-lg"
               >
-                <IconSparkles size={13} className="mr-1" />
+                <IconSparkles size={14} className="mr-1.5" />
                 {totalDegreeCredits} Total Credits
               </Badge>
               {currentSemester != null && (
                 <Badge
                   variant="outline"
-                  className="text-xs py-1 px-2.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 font-semibold"
+                  className="text-xs sm:text-sm py-1.5 px-3 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-transparent font-bold rounded-lg"
                 >
-                  <IconCheck size={13} className="mr-1 text-emerald-500" />
+                  <IconCheck size={14} className="mr-1.5 text-emerald-500" />
                   Your Semester: {currentSemester}
                 </Badge>
               )}
@@ -258,11 +250,11 @@ export function StudentCourseStructurePanel({
       <Card className="p-3 sm:p-3.5 rounded-xl border border-border/70 shadow-xs bg-card">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
           {/* Year Filter Pills */}
-          <div className="inline-flex flex-wrap rounded-lg border border-border/70 p-0.5 bg-muted/40">
+          <div className="inline-flex flex-wrap rounded-xl border border-border/70 p-1 bg-muted/40">
             <button
               type="button"
               onClick={() => setYearFilter("ALL")}
-              className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+              className={`px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-colors cursor-pointer ${
                 yearFilter === "ALL"
                   ? "bg-background text-foreground shadow-xs"
                   : "text-muted-foreground hover:text-foreground"
@@ -275,7 +267,7 @@ export function StudentCourseStructurePanel({
                 key={y.yearNo}
                 type="button"
                 onClick={() => setYearFilter(y.yearNo)}
-                className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                className={`px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-colors cursor-pointer ${
                   yearFilter === y.yearNo
                     ? "bg-primary text-primary-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
@@ -287,13 +279,13 @@ export function StudentCourseStructurePanel({
           </div>
 
           {/* Search Box */}
-          <div className="relative min-w-56">
-            <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+          <div className="relative w-full sm:w-72 lg:w-80">
+            <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input
               placeholder="Search course title or code..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 text-xs h-8.5"
+              className="pl-9 text-xs sm:text-sm h-9.5"
             />
           </div>
         </div>
@@ -381,7 +373,7 @@ export function StudentCourseStructurePanel({
                           {isCurrent && (
                             <Badge
                               variant="outline"
-                              className="text-[10px] font-bold px-1.5 py-0 bg-primary/15 text-primary border-primary/30"
+                              className="text-[10px] font-bold px-1.5 py-0 bg-primary/15 text-primary border-transparent"
                             >
                               Current
                             </Badge>
@@ -421,12 +413,26 @@ export function StudentCourseStructurePanel({
 
                             <div className="flex items-center gap-2 shrink-0">
                               {/* Theory / Practical Pill */}
-                              {course.hasPractical && (
+                              {course.hasTheory && course.hasPractical ? (
                                 <Badge
                                   variant="outline"
-                                  className="text-[10px] font-medium px-1.5 py-0 border-border/60 bg-muted/40"
+                                  className="text-[10px] font-semibold px-1.5 py-0 border-transparent bg-muted/70 text-muted-foreground"
                                 >
                                   TH+PR
+                                </Badge>
+                              ) : course.hasPractical ? (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] font-semibold px-1.5 py-0 border-transparent bg-violet-500/15 text-violet-700 dark:text-violet-400"
+                                >
+                                  PR
+                                </Badge>
+                              ) : (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] font-semibold px-1.5 py-0 border-transparent bg-blue-500/15 text-blue-700 dark:text-blue-400"
+                                >
+                                  TH
                                 </Badge>
                               )}
                               <span className="font-mono text-xs font-bold tabular-nums text-foreground w-8 text-right">

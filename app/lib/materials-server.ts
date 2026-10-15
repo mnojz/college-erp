@@ -61,7 +61,7 @@ export function serializeStudyMaterial(row: SerializedRow): StudyMaterialDto {
     program: row.program,
     uploader: row.uploader
       ? { id: row.uploader.id, name: `${row.uploader.firstName} ${row.uploader.lastName}`.trim() }
-      : { id: "", name: "Faculty" },
+      : { id: "", name: "Teacher" },
   };
 }
 

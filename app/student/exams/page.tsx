@@ -29,7 +29,7 @@ type RegistrationState =
 
 function shell(children: React.ReactNode) {
   return (
-    <StudentShell active="/student/exams" title="Exams" subtitle="Register for your exam parts">
+    <StudentShell active="/student/exams" title="Exams" subtitle="Exam sessions and registrations">
       <div className="flex flex-col gap-5">{children}</div>
     </StudentShell>
   );
@@ -69,8 +69,14 @@ function ExamCard({ exam, deadlineOpen }: { exam: ExamSession; deadlineOpen: boo
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-heading truncate font-semibold">{exam.title}</p>
-                <Badge variant="outline">{TYPE_LABEL[exam.type]}</Badge>
-                {exam.isBacklog && <Badge variant="secondary">Backlog</Badge>}
+                <Badge variant="outline" className="border-transparent bg-primary/15 text-primary">
+                  {TYPE_LABEL[exam.type]}
+                </Badge>
+                {exam.isBacklog && (
+                  <Badge variant="outline" className="border-transparent bg-amber-500/15 text-amber-700 dark:text-amber-400">
+                    Backlog
+                  </Badge>
+                )}
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
                 Semester {exam.semester}
@@ -85,7 +91,14 @@ function ExamCard({ exam, deadlineOpen }: { exam: ExamSession; deadlineOpen: boo
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Badge variant={deadlineOpen ? "default" : "secondary"} className="gap-1.5">
+            <Badge
+              variant="outline"
+              className={`gap-1.5 border-transparent ${
+                deadlineOpen
+                  ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
               <IconClock size={13} aria-hidden="true" />
               {deadlineOpen ? "Registration open" : "Registration closed"}
             </Badge>

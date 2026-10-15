@@ -15,9 +15,9 @@ export default function StudentFeesPage() {
         */}
         <PublicCatalog
           kind="fees"
-          eyebrow="Student finance"
+          eyebrow="Finance"
           title="Fee Structure"
-          description="Programmes covered by the college fee structure, and published fee amounts once available."
+          description="Program fee structures and published fee details."
         />
       </div>
     </StudentShell>

@@ -1,6 +1,7 @@
 "use client";
 
 import { DashboardShell } from "@/app/components/layout/DashboardShell";
+import { type SidebarSection } from "@/app/components/layout/DashboardSidebar";
 
 import {
   IconUser,
@@ -11,17 +12,34 @@ import {
   IconReceipt,
   IconCalendarClock,
   IconClipboardCheck,
+  IconBell,
 } from "@tabler/icons-react";
 
-const studentLinks = [
-  ["Profile", "/dashboard", IconUser],
-  ["Results", "/student/results", IconReport],
-  ["Exams", "/student/exams", IconClipboardCheck],
-  ["Attendance", "/student/attendance", IconCalendarCheck],
-  ["Academics", "/student/academics", IconBook2],
-  ["Notes", "/student/notes", IconNotebook],
-  ["Fees", "/student/fees", IconReceipt],
-  ["Schedules", "/student/schedules", IconCalendarClock],
+const studentSections: readonly SidebarSection[] = [
+  {
+    title: "Main",
+    items: [
+      ["Profile", "/dashboard", IconUser],
+      ["Notice", "/student/notice", IconBell],
+    ],
+  },
+  {
+    title: "Academics",
+    items: [
+      ["Attendance", "/student/attendance", IconCalendarCheck],
+      ["Academics", "/student/academics", IconBook2],
+      ["Schedules", "/student/schedules", IconCalendarClock],
+      ["Notes", "/student/notes", IconNotebook],
+    ],
+  },
+  {
+    title: "Records & Finance",
+    items: [
+      ["Results", "/student/results", IconReport],
+      ["Exams", "/student/exams", IconClipboardCheck],
+      ["Fees", "/student/fees", IconReceipt],
+    ],
+  },
 ] as const;
 
 export type StudentShellProps = {
@@ -47,7 +65,7 @@ export function StudentShell({
     <DashboardShell
       navProps={{
         brandTitle: "College-ERP",
-        brandSubtitle: "Student Portal",
+        brandSubtitle: "",
         brandHomeHref: "/dashboard",
         // Pass through only when the page provides identity; otherwise the
         // shared UserIdentityProvider fills name/subtitle/avatar so wrapper
@@ -56,7 +74,7 @@ export function StudentShell({
         userSubtitle: studentId ? `ID: ${studentId}` : undefined,
         avatarUrl,
       }}
-      sidebarItems={studentLinks}
+      sidebarItems={studentSections}
       activeHref={active}
       title={title}
       subtitle={subtitle}
@@ -65,4 +83,3 @@ export function StudentShell({
     </DashboardShell>
   );
 }
-

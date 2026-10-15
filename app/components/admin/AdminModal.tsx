@@ -28,7 +28,7 @@ export function AdminModal({
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className={wide ? "max-h-[90vh] overflow-y-auto sm:max-w-4xl" : "max-h-[90vh] overflow-y-auto sm:max-w-lg"}
+        className={wide ? "max-h-[90vh] overflow-y-auto sm:max-w-4xl w-full min-w-0" : "max-h-[90vh] overflow-y-auto sm:max-w-lg w-full min-w-0"}
       >
         <DialogHeader className="pr-6">
           <DialogTitle className="text-base">{title}</DialogTitle>

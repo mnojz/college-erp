@@ -312,10 +312,10 @@ export async function DELETE(request: Request) {
       await tx.user.delete({ where: { id: teacher.userId } });
     });
 
-    return NextResponse.json({ success: true, message: "Faculty account deleted successfully" });
+    return NextResponse.json({ success: true, message: "Teacher account deleted successfully" });
   } catch (error) {
     console.error("DELETE /api/teachers error:", error);
-    return NextResponse.json({ error: "Unable to delete faculty account" }, { status: 500 });
+    return NextResponse.json({ error: "Unable to delete teacher account" }, { status: 500 });
   }
 }
 

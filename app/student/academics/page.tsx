@@ -50,11 +50,10 @@ export default function StudentAcademicsPage() {
     return (
       <StudentShell
         active="/student/academics"
-        title="Academics & Curriculum"
-        subtitle="Course structure, enrolled subjects, and official syllabus"
+        title="Academics"
+        subtitle="Course structure, enrolled subjects, and syllabus"
       >
         <div className="space-y-4">
-          <Skeleton className="h-28 w-full rounded-2xl" />
           <Skeleton className="h-10 w-full rounded-xl" />
           <Skeleton className="h-72 w-full rounded-2xl" />
         </div>
@@ -72,8 +71,8 @@ export default function StudentAcademicsPage() {
       name={fullName}
       studentId={studentId}
       avatarUrl={profile.profileImageUrl}
-      title="Academics & Curriculum"
-      subtitle="Course structure, enrolled subjects, and official syllabus"
+      title="Academics"
+      subtitle="Course structure, enrolled subjects, and syllabus"
     >
       {error ? (
         <p className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive font-medium">

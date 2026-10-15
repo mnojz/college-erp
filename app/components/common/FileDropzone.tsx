@@ -12,16 +12,17 @@ type FileDropzoneProps = {
   file: File | null;
   onFileChange: (file: File | null) => void;
   disabled?: boolean;
-  /** Shown while empty and not dragging, e.g. "Drag & drop your PDF here" */
+  /** Shown while empty and not dragging */
   label?: string;
-  /** Shown while dragging a file over the zone, e.g. "Drop the PDF here" */
+  /** Shown while dragging a file over the zone */
   dropLabel?: string;
-  /** Small helper line, e.g. "or click to browse — PDF only, up to 50 MB" */
-  hint: string;
+  /** Small helper line */
+  hint?: string;
   /** Icon shown while empty (defaults to the upload icon) */
   emptyIcon?: ReactNode;
   /** Icon shown when a file is selected (defaults to the file icon) */
   fileIcon?: ReactNode;
+  className?: string;
 };
 
 export function FileDropzone({
@@ -30,11 +31,12 @@ export function FileDropzone({
   file,
   onFileChange,
   disabled = false,
-  label = "Drag & drop your file here",
-  dropLabel = "Drop the file here",
+  label = "Upload file or drag & drop",
+  dropLabel = "Drop file here",
   hint,
   emptyIcon,
   fileIcon,
+  className,
 }: FileDropzoneProps) {
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -57,10 +59,11 @@ export function FileDropzone({
   return (
     <div
       className={cn(
-        "relative flex flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed px-6 py-8 text-center transition-colors",
+        "relative flex w-full min-w-0 max-w-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border-2 border-dashed px-4 py-4 text-center transition-colors",
         dragOver ? "border-ring bg-accent/40" : "border-border hover:border-ring/60 hover:bg-muted/30",
         disabled && "cursor-not-allowed opacity-60",
-        !disabled && "cursor-pointer"
+        !disabled && "cursor-pointer",
+        className
       )}
       role="button"
       tabIndex={0}
@@ -89,17 +92,24 @@ export function FileDropzone({
         className="sr-only"
       />
       {file ? (
-        <>
-          <span className="flex size-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            {fileIcon ?? <IconFileText size={26} aria-hidden="true" />}
+        <div className="flex w-full min-w-0 max-w-full flex-col items-center gap-1 px-2">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            {fileIcon ?? <IconFileText size={20} aria-hidden="true" />}
           </span>
-          <strong className="max-w-full truncate text-sm font-semibold">{file.name}</strong>
+          <div className="w-full min-w-0 max-w-full overflow-hidden text-center">
+            <strong
+              className="block w-full min-w-0 truncate text-sm font-semibold text-foreground"
+              title={file.name}
+            >
+              {file.name}
+            </strong>
+          </div>
           <small className="text-xs text-muted-foreground">
-            {formatBytes(file.size)} · click or drop to replace
+            {formatBytes(file.size)}
           </small>
           <button
             type="button"
-            className="mt-1 inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="mt-1 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer"
             aria-label="Remove selected file"
             title="Remove file"
             onClick={(e) => {
@@ -108,18 +118,20 @@ export function FileDropzone({
             }}
             disabled={disabled}
           >
-            <IconX size={14} aria-hidden="true" />
+            <IconX size={13} aria-hidden="true" />
             Remove
           </button>
-        </>
+        </div>
       ) : (
-        <>
-          <span className="flex size-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            {emptyIcon ?? <IconUpload size={26} aria-hidden="true" />}
+        <div className="flex w-full min-w-0 max-w-full flex-col items-center gap-1 px-2">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            {emptyIcon ?? <IconUpload size={20} aria-hidden="true" />}
           </span>
-          <strong className="text-sm font-semibold">{dragOver ? dropLabel : label}</strong>
-          <small className="text-xs text-muted-foreground">{hint}</small>
-        </>
+          <strong className="block w-full min-w-0 truncate text-xs font-medium text-foreground">
+            {dragOver ? dropLabel : label}
+          </strong>
+          {hint && <small className="text-[11px] text-muted-foreground max-w-xs">{hint}</small>}
+        </div>
       )}
     </div>
   );
