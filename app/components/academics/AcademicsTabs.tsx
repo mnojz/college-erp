@@ -4,15 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   IconBook2,
-  IconCalendar,
   IconFileText,
   IconLayersLinked,
-  IconSchool,
 } from "@tabler/icons-react";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { TabSwitcher } from "@/app/components/common/TabSwitcher";
 import { StudentCourseStructurePanel } from "@/app/components/academics/StudentCourseStructurePanel";
 import { StudentSubjectsPanel } from "@/app/components/academics/StudentSubjectsPanel";
 import { StudentSyllabusPanel } from "@/app/components/academics/StudentSyllabusPanel";
@@ -76,7 +73,7 @@ export function AcademicsTabs({ profile: initialProfile }: Props) {
   if (loading && !profile) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-11 w-full rounded-xl" />
+        <Skeleton className="h-8.5 w-96 max-w-full rounded-full" />
         <Skeleton className="h-72 w-full rounded-2xl" />
       </div>
     );
@@ -87,29 +84,27 @@ export function AcademicsTabs({ profile: initialProfile }: Props) {
       {/* ── Main Tab Navigation ── */}
       <Tabs value={tab} onValueChange={handleTabChange} className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-border/60 pb-2.5">
-          <TabsList className="bg-muted/60 p-1.5 rounded-xl h-11">
-            <TabsTrigger
-              value="structure"
-              className="gap-2 px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg h-8 sm:h-8.5 data-[state=active]:bg-background data-[state=active]:shadow-xs"
-            >
-              <IconLayersLinked size={15} />
-              Course Structure
-            </TabsTrigger>
-            <TabsTrigger
-              value="subjects"
-              className="gap-2 px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg h-8 sm:h-8.5 data-[state=active]:bg-background data-[state=active]:shadow-xs"
-            >
-              <IconBook2 size={15} />
-              Enrolled Subjects
-            </TabsTrigger>
-            <TabsTrigger
-              value="syllabus"
-              className="gap-2 px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg h-8 sm:h-8.5 data-[state=active]:bg-background data-[state=active]:shadow-xs"
-            >
-              <IconFileText size={15} />
-              Official Syllabus
-            </TabsTrigger>
-          </TabsList>
+          <TabSwitcher<Tab>
+            value={tab}
+            onChange={handleTabChange}
+            tabs={[
+              {
+                id: "structure",
+                label: "Course Structure",
+                icon: IconLayersLinked,
+              },
+              {
+                id: "subjects",
+                label: "Enrolled Subjects",
+                icon: IconBook2,
+              },
+              {
+                id: "syllabus",
+                label: "Official Syllabus",
+                icon: IconFileText,
+              },
+            ]}
+          />
         </div>
 
         {/* ── TAB 1: COURSE STRUCTURE ── */}

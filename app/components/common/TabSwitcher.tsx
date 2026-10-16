@@ -29,17 +29,17 @@ export function TabSwitcher<T extends string = string>({
   size = "default",
   ariaLabel = "Tab options",
 }: TabSwitcherProps<T>) {
-  // Compact, reduced-height sizes with smooth pill rounded-full curvature
+  // Compact, reduced-height sizes with refined rounded-lg curvature
   const sizeClasses = {
-    sm: "h-6.5 px-2.5 text-[11px] gap-1 rounded-full",
-    default: "h-7 sm:h-7.5 px-3 sm:px-3.5 text-xs font-semibold gap-1.5 rounded-full",
-    lg: "h-8 sm:h-8.5 px-4 text-xs sm:text-sm font-semibold gap-2 rounded-full",
+    sm: "h-6 px-2 text-[11px] gap-1 rounded-md",
+    default: "h-6.5 sm:h-7 px-2.5 sm:px-3 text-xs font-semibold gap-1.5 rounded-lg",
+    lg: "h-7.5 sm:h-8 px-3.5 text-xs sm:text-sm font-semibold gap-2 rounded-lg",
   };
 
   const iconSizes = {
-    sm: 12,
-    default: 14,
-    lg: 16,
+    sm: 11,
+    default: 13,
+    lg: 15,
   };
 
   return (
@@ -47,7 +47,7 @@ export function TabSwitcher<T extends string = string>({
       role="tablist"
       aria-label={ariaLabel}
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border border-slate-300/80 bg-slate-200/90 p-0.5 sm:p-1 shadow-2xs select-none dark:border-white/10 dark:bg-slate-950/85",
+        "inline-flex items-center gap-0.5 sm:gap-1 rounded-xl border border-slate-300/80 bg-slate-200/90 p-0.5 shadow-2xs select-none dark:border-white/10 dark:bg-slate-950/85",
         className
       )}
     >

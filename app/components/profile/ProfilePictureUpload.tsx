@@ -4,12 +4,6 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { IconCamera, IconLoader2, IconUser, IconZoomIn } from "@tabler/icons-react";
 import { ProfileImagePreviewModal } from "@/app/components/profile/ProfileImagePreviewModal";
@@ -133,28 +127,34 @@ export function ProfilePictureUpload({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+    <div className="space-y-3">
+      {/* Header row with title & status badges */}
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <IconCamera className="size-3.5 text-primary" aria-hidden="true" />
           Profile Photo
+        </h4>
+        <div className="flex items-center gap-1.5 shrink-0">
           {isPending && (
-            <Badge className="border-0 bg-amber-500/15 text-amber-700 dark:text-amber-400 font-semibold text-xs">
+            <Badge className="border-0 bg-amber-500/15 text-amber-700 dark:text-amber-400 font-semibold text-[11px] py-0 px-2">
               Pending review
             </Badge>
           )}
           {avatarRejected && !isPending && (
-            <Badge className="border-0 bg-rose-500/15 text-rose-700 dark:text-rose-400 font-semibold text-xs">
+            <Badge className="border-0 bg-rose-500/15 text-rose-700 dark:text-rose-400 font-semibold text-[11px] py-0 px-2">
               Last photo rejected
             </Badge>
           )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-wrap items-center gap-4">
+        </div>
+      </div>
+
+      {/* Main compact row: Avatar on left, Action & short instruction on right */}
+      <div className="flex items-center gap-3.5">
         {effectiveAvatarUrl ? (
           <button
             type="button"
             onClick={() => setShowPreview(true)}
-            className="group relative size-20 rounded-xl border border-border/80 overflow-hidden cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-transform duration-200 hover:scale-[1.03] shadow-xs"
+            className="group relative size-16 shrink-0 rounded-xl border border-border/80 overflow-hidden cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-transform duration-200 hover:scale-[1.03] shadow-xs"
             title={isPending ? "Click to view temporary photo (pending review)" : "Click to view full photo"}
             aria-label="View enlarged profile photo"
           >
@@ -165,49 +165,50 @@ export function ProfilePictureUpload({
               className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center text-white backdrop-blur-[1px]">
-              <IconZoomIn className="size-5 drop-shadow-md" aria-hidden="true" />
+              <IconZoomIn className="size-4 drop-shadow-md" aria-hidden="true" />
             </div>
             {isPending && (
-              <div className="absolute bottom-0 inset-x-0 bg-black/65 backdrop-blur-xs py-0.5 text-center">
-                <span className="text-[9px] font-bold text-amber-300 tracking-wider uppercase">Pending</span>
+              <div className="absolute bottom-0 inset-x-0 bg-black/70 backdrop-blur-xs py-0.5 text-center">
+                <span className="text-[8px] font-bold text-amber-300 tracking-wider uppercase">Pending</span>
               </div>
             )}
           </button>
         ) : (
           <div
-            className="flex size-20 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground shadow-2xs border border-border/50"
+            className="flex size-16 shrink-0 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground shadow-2xs border border-border/50"
             role="img"
             aria-label="Profile photo placeholder"
           >
-            <IconUser className="size-10 text-muted-foreground/60" stroke={1.5} />
+            <IconUser className="size-8 text-muted-foreground/60" stroke={1.5} />
           </div>
         )}
-        <div className="grid gap-2">
+
+        <div className="flex flex-col gap-1 min-w-0">
           <Button
             type="button"
             variant="outline"
+            size="sm"
             disabled={busy}
             onClick={() => inputRef.current?.click()}
-            className="w-fit"
+            className="w-fit h-8 px-3 text-xs font-semibold gap-1.5 shadow-2xs"
           >
             {busy ? (
-              <IconLoader2 className="size-4 animate-spin" aria-hidden="true" />
+              <IconLoader2 className="size-3.5 animate-spin" aria-hidden="true" />
             ) : (
-              <IconCamera className="size-4" aria-hidden="true" />
+              <IconCamera className="size-3.5 text-primary" aria-hidden="true" />
             )}
-            {busy ? "Checking…" : "Upload new photo"}
+            {busy ? "Checking…" : effectiveAvatarUrl ? "Change photo" : "Upload photo"}
           </Button>
-          <p className="m-0 max-w-72 text-xs text-muted-foreground">
-            You&apos;ll crop a passport-style photo (head to chest, facing forward,
-            eyes open, neutral expression). It&apos;s checked automatically and then
-            reviewed by an administrator before going live.
+          <p className="m-0 text-xs text-muted-foreground">
+            Use passport size photo.
           </p>
           {phase && (
-            <p className="m-0 text-xs text-muted-foreground" aria-live="polite">
+            <p className="m-0 text-xs font-medium text-primary animate-pulse" aria-live="polite">
               {phase}
             </p>
           )}
         </div>
+
         <input
           ref={inputRef}
           type="file"
@@ -215,7 +216,8 @@ export function ProfilePictureUpload({
           className="hidden"
           onChange={(e) => handleFileChange(e)}
         />
-      </CardContent>
+      </div>
+
       <AvatarCropDialog
         src={cropSrc}
         onCancel={() => setCropSrc(null)}
@@ -229,6 +231,6 @@ export function ProfilePictureUpload({
         subtitle={isPending ? "Temporary photo awaiting administrator review" : "Current active profile photo"}
         badge={isPending ? "Pending Review" : undefined}
       />
-    </Card>
+    </div>
   );
 }
