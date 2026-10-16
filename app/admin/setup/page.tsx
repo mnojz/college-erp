@@ -22,7 +22,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { TabSwitcher } from "@/app/components/common/TabSwitcher";
 import {
   IconAlertTriangle,
   IconArchive,
@@ -74,6 +75,9 @@ export default function AdminSetupPage() {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [department, setDepartment] = useState<Department | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<"programs" | "progression" | "intake">("programs");
 
   // Filter & Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -317,7 +321,7 @@ export default function AdminSetupPage() {
                     <h2 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">
                       {department.name} Department
                     </h2>
-                    <Badge variant="outline" className="font-mono text-xs font-bold px-2 py-0.5 bg-primary/10 text-primary border-primary/20">
+                    <Badge className="font-mono text-xs font-bold px-2 py-0.5 bg-primary/15 text-primary border-0">
                       {department.code}
                     </Badge>
                   </div>
@@ -380,39 +384,34 @@ export default function AdminSetupPage() {
         )}
 
         {/* ── 2. Tabbed Academic Operations Hub ────────────────────────── */}
-        <Tabs defaultValue="programs" className="space-y-4">
+        <Tabs
+          value={activeTab}
+          onValueChange={(val) => setActiveTab(val as typeof activeTab)}
+          className="space-y-4"
+        >
           <div className="flex items-center justify-between border-b border-border/70 pb-3">
-            <TabsList className="h-12 p-1.5 bg-muted/60 rounded-xl border border-border/60">
-              <TabsTrigger
-                value="programs"
-                className="gap-2.5 text-sm font-semibold px-4 sm:px-5 py-2 rounded-lg h-9 data-[state=active]:bg-background data-[state=active]:shadow-xs"
-              >
-                <IconSchool size={17} />
-                <span>Degree Programs</span>
-                <Badge
-                  variant="secondary"
-                  className="text-xs px-2 py-0.5 font-bold ml-0.5 bg-muted text-foreground"
-                >
-                  {programs.length}
-                </Badge>
-              </TabsTrigger>
-
-              <TabsTrigger
-                value="progression"
-                className="gap-2.5 text-sm font-semibold px-4 sm:px-5 py-2 rounded-lg h-9 data-[state=active]:bg-background data-[state=active]:shadow-xs"
-              >
-                <IconTrendingUp size={17} />
-                <span>Cohort Progression</span>
-              </TabsTrigger>
-
-              <TabsTrigger
-                value="intake"
-                className="gap-2.5 text-sm font-semibold px-4 sm:px-5 py-2 rounded-lg h-9 data-[state=active]:bg-background data-[state=active]:shadow-xs"
-              >
-                <IconCloudUpload size={17} />
-                <span>Batch Student Intake</span>
-              </TabsTrigger>
-            </TabsList>
+            <TabSwitcher
+              value={activeTab}
+              onChange={setActiveTab}
+              tabs={[
+                {
+                  id: "programs",
+                  label: "Degree Programs",
+                  icon: IconSchool,
+                  badge: programs.length,
+                },
+                {
+                  id: "progression",
+                  label: "Cohort Progression",
+                  icon: IconTrendingUp,
+                },
+                {
+                  id: "intake",
+                  label: "Batch Student Intake",
+                  icon: IconCloudUpload,
+                },
+              ]}
+            />
           </div>
 
           {/* ════ TAB 1: DEGREE PROGRAMS ════ */}
@@ -602,7 +601,7 @@ export default function AdminSetupPage() {
 
                           {/* Semesters */}
                           <TableCell>
-                            <Badge variant="outline" className="text-xs font-semibold bg-muted/40">
+                            <Badge className="text-xs font-semibold bg-primary/15 text-primary border-0">
                               {p.durationYears * 2} Semesters
                             </Badge>
                           </TableCell>
@@ -610,11 +609,11 @@ export default function AdminSetupPage() {
                           {/* Status */}
                           <TableCell>
                             {isArchived ? (
-                              <Badge variant="outline" className="text-[10px] font-bold text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10">
+                              <Badge className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/15 border-0">
                                 Archived
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 border-emerald-500/30 bg-emerald-500/10">
+                              <Badge className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 border-0">
                                 Active
                               </Badge>
                             )}

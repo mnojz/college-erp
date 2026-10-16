@@ -12,7 +12,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import {
   IconCalendarEvent,
-  IconChecklist,
   IconTable,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
@@ -31,10 +30,15 @@ export type TableParsed = {
   routineEntries?: RoutineEntryParsed[];
 };
 
+export type ContentBlock =
+  | { type: "text"; text: string }
+  | { type: "table"; table: TableParsed };
+
 export type ParsedNotice = {
   leadText: string;
   table: TableParsed | null;
   trailingText: string;
+  blocks: ContentBlock[];
 };
 
 const LEGACY_ROUTINE_REGEX =
@@ -61,52 +65,90 @@ function deriveWeekday(dateStr: string): string {
   return "—";
 }
 
+function isTableSeparator(line: string): boolean {
+  const trimmed = line.trim();
+  return (
+    /^\s*\|?(\s*:?-{2,}:?\s*\|)+\s*:?-{2,}:?\s*\|?\s*$/.test(trimmed) ||
+    /^\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\s*$/.test(trimmed)
+  );
+}
+
+function isTableRow(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+  return trimmed.startsWith("|") && trimmed.includes("|", 1);
+}
+
+function parseRowCells(line: string): string[] {
+  let trimmed = line.trim();
+  if (trimmed.startsWith("|")) trimmed = trimmed.slice(1);
+  if (trimmed.endsWith("|")) trimmed = trimmed.slice(0, -1);
+  return trimmed.split("|").map((cell) => cell.trim());
+}
+
 /**
- * Robust notice parser: extracts markdown tables or legacy routine lists
- * from any announcement body.
+ * Robust notice parser: extracts all markdown tables and legacy routine lists
+ * sequentially into structured content blocks so table rows never spill into raw text.
  */
 export function parseNoticeBody(body: string): ParsedNotice {
-  if (!body) return { leadText: "", table: null, trailingText: "" };
+  if (!body) return { leadText: "", table: null, trailingText: "", blocks: [] };
 
   const lines = body.split("\n");
+  const blocks: ContentBlock[] = [];
+  let currentTextLines: string[] = [];
 
-  // 1. Try to find a Markdown Table
-  const tableStartIdx = lines.findIndex((l) => l.trim().startsWith("|") && l.trim().endsWith("|"));
-  if (tableStartIdx !== -1) {
-    let tableEndIdx = tableStartIdx;
-    while (
-      tableEndIdx < lines.length &&
-      lines[tableEndIdx].trim().startsWith("|") &&
-      lines[tableEndIdx].trim().endsWith("|")
-    ) {
-      tableEndIdx++;
+  function flushText() {
+    const text = currentTextLines.join("\n").trim();
+    if (text) {
+      blocks.push({ type: "text", text });
     }
+    currentTextLines = [];
+  }
 
-    const tableLines = lines.slice(tableStartIdx, tableEndIdx);
-    if (tableLines.length >= 2) {
-      const headerLine = tableLines[0];
-      const headers = headerLine
-        .split("|")
-        .slice(1, -1)
-        .map((h) => h.trim());
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
 
-      const dataLines = tableLines
-        .slice(1)
-        .filter((l) => !/^\|(\s*:?-+:?\s*\|)+$/.test(l.trim()));
+    // Check if line starts a markdown table (starts with pipe and has a separator row or row next)
+    if (
+      isTableRow(line) &&
+      i + 1 < lines.length &&
+      (isTableSeparator(lines[i + 1]) || isTableRow(lines[i + 1]))
+    ) {
+      flushText();
 
-      const rows = dataLines.map((l) =>
-        l
-          .split("|")
-          .slice(1, -1)
-          .map((c) => c.trim())
-      );
+      const tableLines: string[] = [line];
+      i++;
+      let hasSeparator = false;
+      if (i < lines.length && isTableSeparator(lines[i])) {
+        hasSeparator = true;
+        i++;
+      }
 
-      if (headers.length > 0 && rows.length > 0) {
-        const lead = lines.slice(0, tableStartIdx).join("\n").trim();
-        const trailing = lines.slice(tableEndIdx).join("\n").trim();
+      while (i < lines.length) {
+        const curLine = lines[i];
+        if (isTableSeparator(curLine)) {
+          i++;
+          continue;
+        }
+        if (isTableRow(curLine)) {
+          tableLines.push(curLine);
+          i++;
+        } else {
+          break;
+        }
+      }
 
+      const headers = parseRowCells(tableLines[0]);
+      const dataLines = tableLines.slice(1);
+      const rows = dataLines
+        .map((l) => parseRowCells(l))
+        .filter((cells) => cells.some((c) => c !== ""));
+
+      if (headers.length > 0 && (rows.length > 0 || hasSeparator)) {
         const isRoutine =
-          headers.some((h) => /day|date/i.test(h)) && headers.some((h) => /subject|course|paper/i.test(h));
+          headers.some((h) => /day|date/i.test(h)) &&
+          headers.some((h) => /subject|course|paper/i.test(h));
 
         let routineEntries: RoutineEntryParsed[] | undefined;
         if (isRoutine) {
@@ -123,74 +165,81 @@ export function parseNoticeBody(body: string): ParsedNotice {
           });
         }
 
-        return {
-          leadText: lead,
+        blocks.push({
+          type: "table",
           table: {
             isRoutine,
             headers,
             rows,
             routineEntries,
           },
-          trailingText: trailing,
-        };
+        });
+      } else {
+        currentTextLines.push(...tableLines);
       }
+      continue;
     }
+
+    // Check if line starts a legacy routine list
+    if (LEGACY_ROUTINE_REGEX.test(line)) {
+      flushText();
+
+      const routineLines: string[] = [];
+      while (
+        i < lines.length &&
+        (LEGACY_ROUTINE_REGEX.test(lines[i]) || (routineLines.length > 0 && lines[i].trim() === ""))
+      ) {
+        if (lines[i].trim() !== "") {
+          routineLines.push(lines[i]);
+        }
+        i++;
+      }
+
+      const routineEntries: RoutineEntryParsed[] = [];
+      for (const rl of routineLines) {
+        const match = rl.match(LEGACY_ROUTINE_REGEX);
+        if (match) {
+          const day = match[2] || deriveWeekday(match[3]);
+          const date = match[3];
+          const { code, name } = parseSubjectString(match[4]);
+          routineEntries.push({ day, date, code, name });
+        }
+      }
+
+      if (routineEntries.length > 0) {
+        const headers = ["Day", "Date", "Subject"];
+        const rows = routineEntries.map((e) => [
+          e.day,
+          e.date,
+          e.name ? `${e.code} — ${e.name}` : e.code,
+        ]);
+        blocks.push({
+          type: "table",
+          table: {
+            isRoutine: true,
+            headers,
+            rows,
+            routineEntries,
+          },
+        });
+      }
+      continue;
+    }
+
+    currentTextLines.push(line);
+    i++;
   }
 
-  // 2. Try to find legacy numbered routine list
-  const routineStartIdx = lines.findIndex((l) => LEGACY_ROUTINE_REGEX.test(l));
-  if (routineStartIdx !== -1) {
-    let routineEndIdx = routineStartIdx;
-    while (
-      routineEndIdx < lines.length &&
-      (LEGACY_ROUTINE_REGEX.test(lines[routineEndIdx]) || lines[routineEndIdx].trim() === "")
-    ) {
-      routineEndIdx++;
-    }
+  flushText();
 
-    const routineLines = lines.slice(routineStartIdx, routineEndIdx).filter((l) => l.trim() !== "");
-    const routineEntries: RoutineEntryParsed[] = [];
+  const firstTableBlock = blocks.find((b): b is { type: "table"; table: TableParsed } => b.type === "table");
+  const firstTextBlock = blocks.find((b): b is { type: "text"; text: string } => b.type === "text");
 
-    for (const l of routineLines) {
-      const match = l.match(LEGACY_ROUTINE_REGEX);
-      if (match) {
-        const day = match[2] || deriveWeekday(match[3]);
-        const date = match[3];
-        const { code, name } = parseSubjectString(match[4]);
-        routineEntries.push({ day, date, code, name });
-      }
-    }
-
-    if (routineEntries.length > 0) {
-      let lead = lines.slice(0, routineStartIdx).join("\n").trim();
-      lead = lead.replace(/(?:^|\n)\s*Exam Routine:?\s*$/i, "").trim();
-      const trailing = lines.slice(routineEndIdx).join("\n").trim();
-
-      const headers = ["Day", "Date", "Subject"];
-      const rows = routineEntries.map((e) => [
-        e.day,
-        e.date,
-        e.name ? `${e.code} — ${e.name}` : e.code,
-      ]);
-
-      return {
-        leadText: lead,
-        table: {
-          isRoutine: true,
-          headers,
-          rows,
-          routineEntries,
-        },
-        trailingText: trailing,
-      };
-    }
-  }
-
-  // Plain text fallback
   return {
-    leadText: body.trim(),
-    table: null,
+    leadText: firstTextBlock?.text ?? "",
+    table: firstTableBlock?.table ?? null,
     trailingText: "",
+    blocks,
   };
 }
 
@@ -233,121 +282,122 @@ export function NoticeContentRenderer({
   // Full Mode (used inside NoticeDetailModal)
   return (
     <div className="flex flex-col gap-4 text-foreground/90">
-      {/* Lead Text */}
-      {parsed.leadText && (
+      {parsed.blocks.length === 0 && (
         <div className="text-[15px] leading-relaxed whitespace-pre-line">
-          {parsed.leadText}
+          {body}
         </div>
       )}
 
-      {/* Routine / Table Section */}
-      {parsed.table && (
-        <div className="flex flex-col gap-2 my-1">
-          {parsed.table.isRoutine ? (
-            <div className="overflow-hidden rounded-xl border border-border/80 shadow-xs bg-card">
-              {/* Routine Header Bar */}
-              <div className="flex items-center justify-between border-b border-border/70 bg-muted/40 px-4 py-2.5">
-                <div className="flex items-center gap-2">
-                  <div className="flex size-6 items-center justify-center rounded-md bg-primary/10 text-primary">
-                    <IconCalendarEvent size={15} />
-                  </div>
-                  <span className="text-xs font-bold tracking-tight text-foreground uppercase">
-                    Official Exam Routine
-                  </span>
-                </div>
-                {parsed.table.routineEntries && (
-                  <Badge variant="outline" className="text-[10px] font-mono bg-background">
-                    {parsed.table.routineEntries.length} Paper{parsed.table.routineEntries.length === 1 ? "" : "s"}
-                  </Badge>
-                )}
-              </div>
-
-              {/* Table */}
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-20 border-r bg-muted/20 text-xs font-semibold text-foreground">
-                      Day
-                    </TableHead>
-                    <TableHead className="w-32 border-r bg-muted/20 text-xs font-semibold text-foreground">
-                      Date
-                    </TableHead>
-                    <TableHead className="bg-muted/20 text-xs font-semibold text-foreground">
-                      Subject / Paper
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {parsed.table.routineEntries?.map((row, idx) => (
-                    <TableRow key={idx} className="hover:bg-muted/30">
-                      <TableCell className="border-r whitespace-nowrap text-xs font-medium text-muted-foreground">
-                        {row.day}
-                      </TableCell>
-                      <TableCell className="border-r whitespace-nowrap text-xs font-medium text-foreground">
-                        {row.date}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-foreground text-xs">{row.code}</span>
-                          {row.name && (
-                            <span className="text-xs text-muted-foreground">{row.name}</span>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+      {parsed.blocks.map((block, idx) => {
+        if (block.type === "text") {
+          return (
+            <div key={idx} className="text-[15px] leading-relaxed whitespace-pre-line text-foreground/90">
+              {block.text}
             </div>
-          ) : (
-            /* General Structured Table */
-            <div className="overflow-x-auto rounded-xl border border-border/80 shadow-xs bg-card">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    {parsed.table.headers.map((h, i) => (
-                      <TableHead
-                        key={i}
-                        className={cn(
-                          "bg-muted/20 text-xs font-semibold text-foreground",
-                          i < parsed.table!.headers.length - 1 && "border-r"
-                        )}
-                      >
-                        {h}
+          );
+        }
+
+        const table = block.table;
+        return (
+          <div key={idx} className="flex flex-col gap-2 my-1">
+            {table.isRoutine ? (
+              <div className="overflow-hidden rounded-xl border border-border/80 shadow-xs bg-card">
+                {/* Routine Header Bar */}
+                <div className="flex items-center justify-between border-b border-border/70 bg-muted/40 px-4 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="flex size-6 items-center justify-center rounded-md bg-primary/10 text-primary">
+                      <IconCalendarEvent size={15} />
+                    </div>
+                    <span className="text-xs font-bold tracking-tight text-foreground uppercase">
+                      Official Exam Routine
+                    </span>
+                  </div>
+                  {table.routineEntries && (
+                    <Badge className="text-[10px] font-mono border-0 bg-primary/15 text-primary">
+                      {table.routineEntries.length} Paper{table.routineEntries.length === 1 ? "" : "s"}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Table */}
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-20 border-r bg-muted/20 text-xs font-semibold text-foreground">
+                        Day
                       </TableHead>
+                      <TableHead className="w-32 border-r bg-muted/20 text-xs font-semibold text-foreground">
+                        Date
+                      </TableHead>
+                      <TableHead className="bg-muted/20 text-xs font-semibold text-foreground">
+                        Subject / Paper
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {table.routineEntries?.map((row, rIdx) => (
+                      <TableRow key={rIdx} className="hover:bg-muted/30">
+                        <TableCell className="border-r whitespace-nowrap text-xs font-medium text-muted-foreground">
+                          {row.day}
+                        </TableCell>
+                        <TableCell className="border-r whitespace-nowrap text-xs font-medium text-foreground">
+                          {row.date}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-foreground text-xs">{row.code}</span>
+                            {row.name && (
+                              <span className="text-xs text-muted-foreground">{row.name}</span>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {parsed.table.rows.map((row, rIdx) => (
-                    <TableRow key={rIdx} className="hover:bg-muted/30">
-                      {row.map((cell, cIdx) => (
-                        <TableCell
-                          key={cIdx}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              /* General Structured Table */
+              <div className="overflow-x-auto rounded-xl border border-border/80 shadow-xs bg-card">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      {table.headers.map((h, hIdx) => (
+                        <TableHead
+                          key={hIdx}
                           className={cn(
-                            "text-xs text-foreground",
-                            cIdx < row.length - 1 && "border-r"
+                            "bg-muted/20 text-xs font-semibold text-foreground",
+                            hIdx < table.headers.length - 1 && "border-r"
                           )}
                         >
-                          {cell}
-                        </TableCell>
+                          {h}
+                        </TableHead>
                       ))}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Trailing Text */}
-      {parsed.trailingText && (
-        <div className="text-[15px] leading-relaxed whitespace-pre-line text-muted-foreground">
-          {parsed.trailingText}
-        </div>
-      )}
+                  </TableHeader>
+                  <TableBody>
+                    {table.rows.map((row, rIdx) => (
+                      <TableRow key={rIdx} className="hover:bg-muted/30">
+                        {row.map((cell, cIdx) => (
+                          <TableCell
+                            key={cIdx}
+                            className={cn(
+                              "text-xs text-foreground",
+                              cIdx < row.length - 1 && "border-r"
+                            )}
+                          >
+                            {cell}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
-

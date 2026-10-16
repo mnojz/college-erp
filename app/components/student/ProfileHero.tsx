@@ -28,6 +28,7 @@ export type ProfileHeroProps = {
   semester?: number | null;
   profileImageUrl: string | null;
   reviewStatus?: "APPROVED" | "PENDING_REVIEW" | "REJECTED";
+  avatarPending?: boolean;
   onEdit?: () => void;
 };
 
@@ -58,6 +59,7 @@ export function ProfileHero({
   semester,
   profileImageUrl,
   reviewStatus,
+  avatarPending,
   onEdit,
 }: ProfileHeroProps) {
   const [showImagePreview, setShowImagePreview] = useState(false);
@@ -82,8 +84,7 @@ export function ProfileHero({
             <AcademicDoodlePattern />
             <div className="absolute right-3 top-3 sm:right-4 sm:top-4 flex items-center gap-2">
               <Badge
-                variant="outline"
-                className="bg-background/80 backdrop-blur-md px-2.5 py-1 text-xs font-semibold shadow-xs"
+                className="border-0 bg-primary/15 text-primary backdrop-blur-md px-2.5 py-1 text-xs font-semibold shadow-xs"
               >
                 <IconSparkles size={13} className="text-primary mr-1" />
                 {batch || "Undergraduate"}
@@ -146,13 +147,18 @@ export function ProfileHero({
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">{name}</h1>
 
-            {reviewStatus === "PENDING_REVIEW" && (
-              <Badge variant="outline" className="border-transparent bg-amber-500/15 text-amber-700 dark:text-amber-400 text-xs">
+            {avatarPending && (
+              <Badge className="border-0 bg-amber-500/15 text-amber-700 dark:text-amber-400 text-xs font-semibold">
+                Photo Pending Approval
+              </Badge>
+            )}
+            {reviewStatus === "PENDING_REVIEW" && !avatarPending && (
+              <Badge className="border-0 bg-amber-500/15 text-amber-700 dark:text-amber-400 text-xs font-semibold">
                 Changes Pending Approval
               </Badge>
             )}
             {reviewStatus === "REJECTED" && (
-              <Badge variant="outline" className="border-transparent bg-rose-500/15 text-rose-700 dark:text-rose-400 text-xs">
+              <Badge className="border-0 bg-rose-500/15 text-rose-700 dark:text-rose-400 text-xs font-semibold">
                 Changes Update Required
               </Badge>
             )}

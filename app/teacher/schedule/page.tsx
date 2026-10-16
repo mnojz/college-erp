@@ -564,7 +564,7 @@ export default function TeacherSchedulePage() {
 
                           <div className="flex items-center gap-1.5">
                             {selectedDay === "ALL" && (
-                              <Badge variant="outline" className="text-[10px] font-semibold py-0 px-1.5 border-border/70 text-muted-foreground">
+                              <Badge className="text-[10px] font-semibold py-0 px-1.5 border-0 bg-primary/15 text-primary">
                                 {item.dayOfWeek.slice(0, 3)}
                               </Badge>
                             )}

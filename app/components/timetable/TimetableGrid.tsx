@@ -310,7 +310,7 @@ export function TimetableGrid({
                           {b.subject.code}
                         </span>
                         {isLab && (
-                          <Badge variant="outline" className="text-[10px] font-bold py-0 px-1 bg-muted/60">
+                          <Badge className="text-[10px] font-bold py-0 px-1 border-0 bg-purple-500/15 text-purple-700 dark:text-purple-400">
                             Lab
                           </Badge>
                         )}

@@ -201,7 +201,7 @@ export default function TeacherExamsPage() {
               </div>
               <div className="flex gap-2">
                 {detail?.examSubject.marksPublishedAt ? (
-                  <Badge variant="outline">Published</Badge>
+                  <Badge variant="success">Published</Badge>
                 ) : (
                   <>
                     <Button variant="outline" size="sm" onClick={saveMarks} disabled={saving || detailLoading}>
@@ -302,7 +302,7 @@ export default function TeacherExamsPage() {
                         <h3 className="font-semibold">
                           {item.subject.code} — {item.subject.name}
                         </h3>
-                        {item.marksPublishedAt && <Badge variant="outline">Published</Badge>}
+                        {item.marksPublishedAt && <Badge variant="success">Published</Badge>}
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {item.session.title} · {item.session.program.name} · Semester{" "}

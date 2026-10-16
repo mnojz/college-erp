@@ -355,12 +355,62 @@ the compact, professional shape language of the shared components. */
   border-radius: min(0.5rem, 8px);
 }
 
-/* ── Sonner Toast Countdown Progress Bar ──────────────────────── */
+/* ── Sonner Toast Redesign ────────────────────────────────────── */
 [data-sonner-toast] {
   position: relative !important;
   overflow: hidden !important;
+  background: var(--card) !important;
+  color: var(--card-foreground) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04) !important;
+  padding: 13px 16px !important;
+  gap: 10px !important;
 }
 
+.dark [data-sonner-toast] {
+  background: var(--card) !important;
+  color: var(--card-foreground) !important;
+  border-color: var(--border) !important;
+  box-shadow: 0 14px 34px -4px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Explicitly hide the close button since toasts auto-dismiss */
+[data-sonner-toast] [data-close-button] {
+  display: none !important;
+}
+
+[data-sonner-toast] [data-title] {
+  font-weight: 600 !important;
+  font-size: 0.8125rem !important;
+  color: var(--card-foreground) !important;
+  line-height: 1.4 !important;
+}
+
+[data-sonner-toast] [data-description] {
+  font-size: 0.75rem !important;
+  color: var(--muted-foreground) !important;
+  line-height: 1.4 !important;
+  margin-top: 2px !important;
+}
+
+/* Recessed track behind the countdown bar */
+[data-sonner-toast]:not([data-type="loading"]):not([data-promise="true"])::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.06);
+  pointer-events: none;
+}
+
+.dark [data-sonner-toast]:not([data-type="loading"]):not([data-promise="true"])::before {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+/* Animated countdown progress bar */
 [data-sonner-toast]:not([data-type="loading"]):not([data-promise="true"])::after {
   content: "";
   position: absolute;
@@ -368,30 +418,36 @@ the compact, professional shape language of the shared components. */
   left: 0;
   right: 0;
   height: 3px;
-  background: currentColor;
-  opacity: 0.35;
+  z-index: 10;
   transform-origin: left center;
   animation: sonner-countdown var(--toast-duration, 4000ms) linear forwards;
+  pointer-events: none;
 }
 
 [data-sonner-toast][data-type="success"]::after {
-  background: #10b981;
-  opacity: 0.85;
+  background: linear-gradient(90deg, #10b981, #34d399);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.45);
 }
 
 [data-sonner-toast][data-type="error"]::after {
-  background: #f43f5e;
-  opacity: 0.85;
+  background: linear-gradient(90deg, #ef4444, #f87171);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.45);
 }
 
 [data-sonner-toast][data-type="warning"]::after {
-  background: #f59e0b;
-  opacity: 0.85;
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.45);
 }
 
 [data-sonner-toast][data-type="info"]::after {
-  background: #0ea5e9;
-  opacity: 0.85;
+  background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+  box-shadow: 0 0 10px rgba(14, 165, 233, 0.45);
+}
+
+[data-sonner-toast][data-type="default"]::after,
+[data-sonner-toast]:not([data-type])::after {
+  background: linear-gradient(90deg, var(--primary), #818cf8);
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.35);
 }
 
 /* Pause countdown progress bar on hover */

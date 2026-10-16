@@ -62,22 +62,30 @@ export function SyllabusProgramSections({
             </div>
           </CardHeader>
 
-          {/* 8-Semester Grid */}
+          {/* Semester Grid: Dynamic slots based on program durationYears or max semester */}
           <CardContent className="grid grid-cols-1 gap-4 p-4 sm:p-5 sm:grid-cols-2 lg:grid-cols-4 bg-muted/5">
-            {SEMESTERS.map((sem) => (
-              <SemesterSlot
-                key={sem}
-                semester={sem}
-                items={group.bySemester.get(sem) ?? []}
-                programId={group.program?.id ?? null}
-                variant={variant}
-                onUpload={onUpload}
-                uploading={uploading}
-                onPreview={onPreview}
-                onEdit={onEdit}
-                onDelete={onDelete}
-              />
-            ))}
+            {(() => {
+              const semCount = group.program?.durationYears
+                ? group.program.durationYears * 2
+                : group.bySemester.size > 0
+                ? Math.max(8, ...Array.from(group.bySemester.keys()))
+                : 8;
+              const semList = Array.from({ length: semCount }, (_, i) => i + 1);
+              return semList.map((sem) => (
+                <SemesterSlot
+                  key={sem}
+                  semester={sem}
+                  items={group.bySemester.get(sem) ?? []}
+                  programId={group.program?.id ?? null}
+                  variant={variant}
+                  onUpload={onUpload}
+                  uploading={uploading}
+                  onPreview={onPreview}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                />
+              ));
+            })()}
           </CardContent>
         </Card>
       ))}

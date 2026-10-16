@@ -34,8 +34,8 @@ export async function parseSyllabusForm(
 
   if (!semesterRaw) return { error: "Semester is required" };
   const semester = Number.parseInt(semesterRaw, 10);
-  if (!Number.isFinite(semester) || semester < 1 || semester > 8) {
-    return { error: "Semester must be between 1 and 8" };
+  if (!Number.isFinite(semester) || semester < 1 || semester > 12) {
+    return { error: "Semester must be between 1 and 12" };
   }
 
   if (programId) {

@@ -14,6 +14,7 @@ import { StudentShell } from "@/app/components/student/StudentShell";
 import { TimetableGrid, type TimetableItem } from "@/app/components/timetable/TimetableGrid";
 import { getColorForSubject, formatTime } from "@/app/lib/timetable-layout";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
@@ -364,11 +365,18 @@ export default function StudentSchedulesPage() {
                                       <span className="text-xs font-bold text-foreground truncate">
                                         {c.subject.name}
                                       </span>
-                                      <Badge variant="outline" className="text-[10px] py-0 px-1.5 bg-muted/50">
+                                      <Badge
+                                        className={cn(
+                                          "text-[10px] py-0 px-1.5 border-0 font-semibold",
+                                          c.type === "Practical"
+                                            ? "bg-purple-500/15 text-purple-700 dark:text-purple-400"
+                                            : "bg-sky-500/15 text-sky-700 dark:text-sky-400"
+                                        )}
+                                      >
                                         {c.type === "Practical" ? "Lab" : "Lecture"}
                                       </Badge>
                                       {c.group && (
-                                        <Badge variant="secondary" className="text-[10px] py-0 px-1">
+                                        <Badge className="text-[10px] py-0 px-1 border-0 bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 font-semibold">
                                           Group {c.group}
                                         </Badge>
                                       )}
@@ -435,7 +443,14 @@ export default function StudentSchedulesPage() {
                                   <h4 className="text-xs sm:text-sm font-bold text-foreground">
                                     {c.subject.name}
                                   </h4>
-                                  <Badge variant="outline" className="text-[10px] py-0 px-1.5 bg-muted/60">
+                                  <Badge
+                                    className={cn(
+                                      "text-[10px] py-0 px-1.5 border-0 font-semibold",
+                                      c.type === "Practical"
+                                        ? "bg-purple-500/15 text-purple-700 dark:text-purple-400"
+                                        : "bg-sky-500/15 text-sky-700 dark:text-sky-400"
+                                    )}
+                                  >
                                     {c.type === "Practical" ? "Lab" : "Lecture"}
                                   </Badge>
                                 </div>

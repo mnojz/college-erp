@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { ProfileHero } from "@/app/components/student/ProfileHero";
 import { StudentShell } from "@/app/components/student/StudentShell";
 import {
@@ -236,14 +237,12 @@ export default function StudentPage() {
   const [editForm, setEditForm] = useState<EditFormState | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [editError, setEditError] = useState("");
-  const [editSuccess, setEditSuccess] = useState("");
   const [error, setError] = useState("");
 
   /** Open the self-service edit popup pre-filled with the current profile. */
   function openEditModal() {
     if (!profile) return;
     setEditError("");
-    setEditSuccess("");
     setEditForm({
       gender: profile.gender ?? "",
       nationality: profile.nationality ?? "",
@@ -344,11 +343,11 @@ export default function StudentPage() {
       setEditForm((current) =>
         current ? { ...current, currentPassword: "", newPassword: "" } : current,
       );
-      setEditSuccess(
-        result.pendingReview
-          ? "Submitted for review — an administrator will approve your changes before they appear on your profile."
-          : "Profile updated successfully.",
-      );
+      const msg = result.pendingReview
+        ? "Submitted for review — an administrator will approve your changes before they appear on your profile."
+        : "Profile updated successfully.";
+      toast.success(msg);
+      setShowEdit(false);
     } catch {
       setEditError("Unable to reach the server");
     } finally {
@@ -481,7 +480,7 @@ export default function StudentPage() {
       active="/dashboard"
       name={fullName}
       studentId={profile.rollNumber != null ? String(profile.rollNumber) : profile.enrollmentNumber}
-      avatarUrl={profile.profileImageUrl}
+      avatarUrl={profile.user.pendingAvatarUrl || profile.profileImageUrl}
     >
       <ProfileHero
         name={fullName}
@@ -494,8 +493,9 @@ export default function StudentPage() {
         enrollmentNumber={profile.enrollmentNumber}
         batch={batch !== "Not provided" ? batch : undefined}
         semester={profile.currentSemester}
-        profileImageUrl={profile.profileImageUrl}
+        profileImageUrl={profile.user.pendingAvatarUrl || profile.profileImageUrl}
         reviewStatus={profile.user.profileReviewStatus}
+        avatarPending={Boolean(profile.user.pendingAvatarUrl)}
         onEdit={openEditModal}
       />
 
@@ -638,7 +638,7 @@ export default function StudentPage() {
                   </p>
                 </div>
                 {profile.guardianRelation && (
-                  <Badge variant="outline" className="text-xs font-semibold shrink-0">
+                  <Badge className="text-xs font-semibold shrink-0 border-0 bg-primary/15 text-primary">
                     {profile.guardianRelation}
                   </Badge>
                 )}
@@ -926,7 +926,7 @@ export default function StudentPage() {
                       Permanent Address
                     </span>
                     {profile.permProvinceName && (
-                      <Badge variant="outline" className="text-[10px] font-medium">
+                      <Badge className="text-[10px] font-semibold border-0 bg-primary/15 text-primary">
                         {profile.permProvinceName}
                       </Badge>
                     )}
@@ -959,7 +959,7 @@ export default function StudentPage() {
                       </Badge>
                     ) : (
                       profile.currProvinceName && (
-                        <Badge variant="outline" className="text-[10px] font-medium">
+                        <Badge className="text-[10px] font-semibold border-0 bg-primary/15 text-primary">
                           {profile.currProvinceName}
                         </Badge>
                       )
@@ -1036,7 +1036,7 @@ export default function StudentPage() {
                     Update contact, address, guardian, and security settings.
                   </DialogDescription>
                 </div>
-                <Badge variant="outline" className="text-[11px] font-semibold text-muted-foreground border-border/70 bg-muted/40 self-start sm:self-center shrink-0">
+                <Badge className="text-[11px] font-semibold border-0 bg-primary/15 text-primary self-start sm:self-center shrink-0">
                   {profile.enrollmentNumber}{profile.program?.code ? ` · ${profile.program.code}` : ""}
                 </Badge>
               </div>
@@ -1086,8 +1086,24 @@ export default function StudentPage() {
                     <div className="rounded-xl border border-border/70 bg-card p-4 shadow-2xs">
                       <ProfilePictureUpload
                         currentAvatarUrl={profile.profileImageUrl}
+                        pendingAvatarUrl={profile.user.pendingAvatarUrl}
                         avatarPending={Boolean(profile.user.pendingAvatarUrl)}
                         avatarRejected={Boolean(profile.user.lastAvatarRejectedAt)}
+                        onAvatarUploaded={(dataUrl) => {
+                          setProfile((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  user: {
+                                    ...prev.user,
+                                    pendingAvatarUrl: dataUrl,
+                                    profileReviewStatus: "PENDING_REVIEW",
+                                    lastAvatarRejectedAt: null,
+                                  },
+                                }
+                              : prev
+                          );
+                        }}
                       />
                     </div>
 
@@ -1679,16 +1695,6 @@ export default function StudentPage() {
                       <div>
                         <strong className="font-bold">Error Updating Profile</strong>
                         <p className="mt-0.5">{editError}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {editSuccess && (
-                    <div className="flex items-start gap-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3.5 text-xs text-emerald-700 dark:text-emerald-300">
-                      <IconCheck className="size-4 shrink-0 mt-0.5" />
-                      <div>
-                        <strong className="font-bold">Success</strong>
-                        <p className="mt-0.5">{editSuccess}</p>
                       </div>
                     </div>
                   )}

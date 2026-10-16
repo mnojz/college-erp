@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 
     if (department) AND.push({ departmentName: department });
     if (programId) AND.push({ programId });
-    if (semester && Number.isFinite(semester) && semester >= 1 && semester <= 8) {
+    if (semester && Number.isFinite(semester) && semester >= 1 && semester <= 12) {
       AND.push({ semester });
     }
 

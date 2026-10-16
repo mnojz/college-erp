@@ -42,7 +42,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { TabSwitcher } from "@/app/components/common/TabSwitcher";
 
 type Profile = {
   enrollmentNumber: string;
@@ -410,22 +411,24 @@ export default function StudentAttendancePage() {
           className="space-y-3.5"
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-border/60 pb-2.5">
-            <TabsList className="bg-muted/60 p-1 rounded-xl">
-              <TabsTrigger
-                value="subjects"
-                className="gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-xs"
-              >
-                <IconBook2 size={14} />
-                Subject Breakdown ({enrolledSubjects.length})
-              </TabsTrigger>
-              <TabsTrigger
-                value="timeline"
-                className="gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-xs"
-              >
-                <IconListCheck size={14} />
-                Daily Logs ({groupedByDate.length} Days)
-              </TabsTrigger>
-            </TabsList>
+            <TabSwitcher<"subjects" | "timeline">
+              value={activeTab}
+              onChange={(val) => setActiveTab(val)}
+              tabs={[
+                {
+                  id: "subjects",
+                  label: "Subject Breakdown",
+                  icon: IconBook2,
+                  badge: enrolledSubjects.length,
+                },
+                {
+                  id: "timeline",
+                  label: "Daily Logs",
+                  icon: IconListCheck,
+                  badge: `${groupedByDate.length} Days`,
+                },
+              ]}
+            />
           </div>
 
           {/* ════ TAB 1: SUBJECT BREAKDOWN (Compact Table Layout) ════ */}
@@ -460,7 +463,7 @@ export default function StudentAttendancePage() {
                             {/* Subject Code & Name */}
                             <TableCell className="py-2.5">
                               <div className="flex items-center gap-2">
-                                <Badge variant="outline" className="font-mono text-xs font-bold bg-muted/60 shrink-0 border-transparent">
+                                <Badge className="font-mono text-xs font-bold bg-primary/15 text-primary border-0 shrink-0">
                                   {sub.code}
                                 </Badge>
                                 <span className="text-xs font-semibold text-foreground line-clamp-1" title={sub.name}>
@@ -689,7 +692,7 @@ export default function StudentAttendancePage() {
                           <span className="text-xs font-bold text-foreground">
                             {group.displayDate}
                           </span>
-                          <Badge variant="outline" className="text-[10px] font-semibold uppercase px-1.5 py-0 bg-background/80 shrink-0">
+                          <Badge className="text-[10px] font-semibold uppercase px-1.5 py-0 border-0 bg-primary/15 text-primary shrink-0">
                             {group.weekday}
                           </Badge>
                           <span className="text-[11px] text-muted-foreground shrink-0 hidden sm:inline">

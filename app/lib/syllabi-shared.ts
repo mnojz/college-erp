@@ -13,8 +13,8 @@ export const BLOCKED_EXTENSIONS = [
   ".exe", ".msi", ".bat", ".cmd", ".com", ".scr", ".dll", ".vbs", ".ps1",
 ];
 
-/** Semester 1..8 as the project treats syllabi as program-wide, year-agnostic. */
-export const SEMESTERS: number[] = [1, 2, 3, 4, 5, 6, 7, 8];
+/** Default semesters list (supports up to 10 for 5-year architecture programs). */
+export const SEMESTERS: number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) return "—";
@@ -61,7 +61,7 @@ export type SyllabusDto = {
 
 export type SyllabusMeta = {
   departments: string[];
-  programs: { id: string; name: string; code: string; departmentName: string }[];
+  programs: { id: string; name: string; code: string; departmentName: string; durationYears?: number }[];
 };
 
 /** Alias used by filter toolbars / pages. Same shape as SyllabusMeta. */

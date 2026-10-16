@@ -440,6 +440,8 @@ model Announcement {
   semester           Int?
   subjectId          String?
   teacherId          String?
+  archivedAt         DateTime?
+  archivedBy         String?
   author             User?     @relation(fields: [authorId], references: [id])
   program            Program?  @relation(fields: [programId], references: [id])
   subject            Subject?  @relation(fields: [subjectId], references: [id])
@@ -448,6 +450,7 @@ model Announcement {
   @@index([publishedAt])
   @@index([teacherId])
   @@index([programId, semester])
+  @@index([archivedAt])
 }
 
 model Curriculum {

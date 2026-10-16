@@ -335,7 +335,7 @@ export function StudentSubjectsPanel({ initialProfile }: Props) {
                 <div>
                   {/* Top Bar: Code & Semester Badge */}
                   <div className="flex items-center justify-between gap-2">
-                    <Badge variant="outline" className="font-mono text-xs font-bold bg-muted/60">
+                    <Badge className="font-mono text-xs font-bold bg-primary/15 text-primary border-0">
                       {sub.code}
                     </Badge>
                     <div className="flex items-center gap-1.5">
@@ -450,7 +450,7 @@ export function StudentSubjectsPanel({ initialProfile }: Props) {
                   return (
                     <TableRow key={sub.id} className="hover:bg-muted/30 transition-colors">
                       <TableCell className="py-2.5 font-mono text-xs font-bold">
-                        <Badge variant="outline" className="font-mono text-xs font-bold bg-muted/60">
+                        <Badge className="font-mono text-xs font-bold bg-primary/15 text-primary border-0">
                           {sub.code}
                         </Badge>
                       </TableCell>

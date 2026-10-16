@@ -360,7 +360,7 @@ export default function StudentExamDetailPage() {
       <Card className="rounded-xl">
         <div className="flex items-center justify-between px-4 pt-4">
           <h3 className="font-semibold">Exam Routine</h3>
-          {exam.routinePublishedAt && <Badge variant="outline">Published</Badge>}
+          {exam.routinePublishedAt && <Badge variant="success">Published</Badge>}
         </div>
         <CardContent className="pt-4">
           {routine.length === 0 ? (

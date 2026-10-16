@@ -1164,7 +1164,7 @@ export default function TeacherAttendancePage() {
                                 {student.user.firstName} {student.user.lastName}
                               </span>
                               {inactive && (
-                                <Badge variant="outline" className="text-[10px] bg-muted text-muted-foreground py-0">
+                                <Badge className="text-[10px] bg-rose-500/15 text-rose-700 dark:text-rose-400 border-0 font-semibold py-0">
                                   Inactive
                                 </Badge>
                               )}

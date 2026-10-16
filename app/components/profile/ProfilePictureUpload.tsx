@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { IconCamera, IconLoader2, IconZoomIn } from "@tabler/icons-react";
+import { IconCamera, IconLoader2, IconUser, IconZoomIn } from "@tabler/icons-react";
 import { ProfileImagePreviewModal } from "@/app/components/profile/ProfileImagePreviewModal";
 import {
   BLUR_MIN_VARIANCE,
@@ -27,6 +27,10 @@ type Props = {
   avatarPending: boolean;
   /** The last profile PICTURE submission was rejected (not a data edit). */
   avatarRejected: boolean;
+  /** Server pending avatar URL awaiting review */
+  pendingAvatarUrl?: string | null;
+  /** Callback fired immediately when user confirms cropping & upload */
+  onAvatarUploaded?: (dataUrl: string) => void;
 };
 
 /**
@@ -39,13 +43,23 @@ type Props = {
  *  3. On pass, a Server Action stages the picture as PENDING_REVIEW; an admin
  *     later approves/rejects it at /admin/profile-reviews.
  */
-export function ProfilePictureUpload({ currentAvatarUrl, avatarPending, avatarRejected }: Props) {
+export function ProfilePictureUpload({
+  currentAvatarUrl,
+  avatarPending,
+  avatarRejected,
+  pendingAvatarUrl,
+  onAvatarUploaded,
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState<string | null>(null);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [localAvatarUrl, setLocalAvatarUrl] = useState<string | null>(null);
+
+  const effectiveAvatarUrl = localAvatarUrl || pendingAvatarUrl || currentAvatarUrl;
+  const isPending = Boolean(localAvatarUrl || avatarPending || pendingAvatarUrl);
 
   /** Read a chosen file into a data-URL and open the crop dialog. */
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -101,8 +115,13 @@ export function ProfilePictureUpload({ currentAvatarUrl, avatarPending, avatarRe
         toast.error(res.error ?? "Unable to submit the photo.");
         return;
       }
+
+      // Optimistically update local preview right away
+      setLocalAvatarUrl(croppedDataUrl);
+      onAvatarUploaded?.(croppedDataUrl);
+
       toast.success(
-        "Photo submitted! An administrator will review it shortly — you'll be notified when it goes live.",
+        "Photo uploaded! It is displayed temporarily and will become permanent once approved by an administrator.",
       );
       router.refresh();
     } catch (err) {
@@ -118,37 +137,50 @@ export function ProfilePictureUpload({ currentAvatarUrl, avatarPending, avatarRe
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2 text-base">
           Profile Photo
-          {avatarPending && <Badge variant="secondary">Pending review</Badge>}
-          {avatarRejected && <Badge variant="destructive">Last photo rejected</Badge>}
+          {isPending && (
+            <Badge className="border-0 bg-amber-500/15 text-amber-700 dark:text-amber-400 font-semibold text-xs">
+              Pending review
+            </Badge>
+          )}
+          {avatarRejected && !isPending && (
+            <Badge className="border-0 bg-rose-500/15 text-rose-700 dark:text-rose-400 font-semibold text-xs">
+              Last photo rejected
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-wrap items-center gap-4">
-        {currentAvatarUrl ? (
+        {effectiveAvatarUrl ? (
           <button
             type="button"
             onClick={() => setShowPreview(true)}
             className="group relative size-20 rounded-xl border border-border/80 overflow-hidden cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-transform duration-200 hover:scale-[1.03] shadow-xs"
-            title="Click to view full photo"
+            title={isPending ? "Click to view temporary photo (pending review)" : "Click to view full photo"}
             aria-label="View enlarged profile photo"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={currentAvatarUrl}
-              alt="Current profile photo"
+              src={effectiveAvatarUrl}
+              alt="Profile photo preview"
               className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center text-white backdrop-blur-[1px]">
               <IconZoomIn className="size-5 drop-shadow-md" aria-hidden="true" />
             </div>
+            {isPending && (
+              <div className="absolute bottom-0 inset-x-0 bg-black/65 backdrop-blur-xs py-0.5 text-center">
+                <span className="text-[9px] font-bold text-amber-300 tracking-wider uppercase">Pending</span>
+              </div>
+            )}
           </button>
         ) : (
-          <span
-            className="flex size-20 items-center justify-center rounded-xl border bg-primary/10 text-sm font-semibold text-primary"
+          <div
+            className="flex size-20 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground shadow-2xs border border-border/50"
             role="img"
-            aria-label="No profile photo yet"
+            aria-label="Profile photo placeholder"
           >
-            No photo
-          </span>
+            <IconUser className="size-10 text-muted-foreground/60" stroke={1.5} />
+          </div>
         )}
         <div className="grid gap-2">
           <Button
@@ -192,9 +224,10 @@ export function ProfilePictureUpload({ currentAvatarUrl, avatarPending, avatarRe
       <ProfileImagePreviewModal
         open={showPreview}
         onOpenChange={setShowPreview}
-        imageUrl={currentAvatarUrl}
+        imageUrl={effectiveAvatarUrl}
         name="Profile Photo"
-        subtitle="Current active profile photo"
+        subtitle={isPending ? "Temporary photo awaiting administrator review" : "Current active profile photo"}
+        badge={isPending ? "Pending Review" : undefined}
       />
     </Card>
   );

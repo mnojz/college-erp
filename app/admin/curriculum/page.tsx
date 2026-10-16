@@ -21,7 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { TabSwitcher } from "@/app/components/common/TabSwitcher";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { StudentCourseStructurePanel } from "@/app/components/academics/StudentCourseStructurePanel";
@@ -438,83 +439,67 @@ export default function AdminCurriculumPage() {
     }));
   }
 
-  // ─── Standard Template Generator ─────────────────────────────────
-  function applyTemplate(type: "4-year" | "2-year") {
-    const yearsCount = type === "4-year" ? 4 : 2;
-    const newYears: DraftYear[] = [];
-    for (let y = 1; y <= yearsCount; y++) {
-      const sem1 = (y - 1) * 2 + 1;
-      const sem2 = (y - 1) * 2 + 2;
-      newYears.push({
-        label: `Year ${y}`,
-        semesters: [
-          { label: `Semester ${sem1}`, courses: [] },
-          { label: `Semester ${sem2}`, courses: [] },
-        ],
-      });
-    }
-    setDraft((d) => ({
-      ...d,
-      years: newYears,
-    }));
-    toast.success(`Generated standard ${type} academic structure`);
-  }
 
   function handleDiscard() {
     setDraft(JSON.parse(JSON.stringify(originalDraft)));
     toast.info("Unsaved changes discarded");
   }
 
-  // ─── JSON Sample Generator & Importer ────────────────────────────
+  // ─── JSON Sample Generator, Exporter & Importer ────────────────────
   function downloadSampleCurriculumJson() {
     const sample = {
-      years: [
+      program: selectedProgram?.code || "BE. ARCH",
+      courses: [
         {
-          label: "Year 1",
-          semesters: [
-            {
-              label: "Semester 1",
-              courses: [
-                { code: "MTH101", name: "Engineering Mathematics I", credits: 3 },
-                { code: "PHY101", name: "Engineering Physics", credits: 4, hasTheory: true, hasPractical: true },
-                { code: "CS101", name: "Computer Programming", credits: 3, hasPractical: true },
-                { code: "ENG101", name: "Communication Skills", credits: 2 },
-              ],
-            },
-            {
-              label: "Semester 2",
-              courses: [
-                { code: "MTH102", name: "Engineering Mathematics II", credits: 3 },
-                { code: "CS102", name: "Object Oriented Programming", credits: 4, hasTheory: true, hasPractical: true },
-                { code: "EE101", name: "Basic Electrical Engineering", credits: 3 },
-              ],
-            },
-          ],
+          code: "AR111",
+          name: "Basic Design I",
+          credits: 4,
+          year: 1,
+          semester: 1,
+          type: "core",
+          hasTheory: true,
+          hasPractical: true,
         },
         {
-          label: "Year 2",
-          semesters: [
-            {
-              label: "Semester 3",
-              courses: [
-                { code: "CS201", name: "Data Structures & Algorithms", credits: 4, hasTheory: true, hasPractical: true },
-                { code: "CS202", name: "Digital Logic", credits: 3 },
-              ],
-            },
-            {
-              label: "Semester 4",
-              courses: [
-                { code: "CS203", name: "Database Management Systems", credits: 4, hasTheory: true, hasPractical: true },
-                { code: "CS204", name: "Operating Systems", credits: 3 },
-              ],
-            },
-          ],
+          code: "SH112",
+          name: "Engineering Mathematics I",
+          credits: 3,
+          year: 1,
+          semester: 1,
+          type: "core",
+          hasTheory: true,
+          hasPractical: false,
+        },
+        {
+          code: "AR121",
+          name: "Architectural Graphics I",
+          credits: 3,
+          year: 1,
+          semester: 2,
+          type: "core",
+          hasTheory: false,
+          hasPractical: true,
         },
       ],
-      electives: [
-        { group: "ELECTIVE_I", code: "CS401", name: "Machine Learning", credits: 3 },
-        { group: "ELECTIVE_I", code: "CS402", name: "Cloud Computing", credits: 3 },
-        { group: "ELECTIVE_II", code: "CS403", name: "Cybersecurity & Cryptography", credits: 3 },
+      elective_groups: [
+        {
+          group_id: 1,
+          name: "Elective I",
+          target_semester: 7,
+          required_credits: 3,
+          options: [
+            {
+              code: "AR4701",
+              name: "Light Weight Construction Materials and Building Technology",
+              credits: 3,
+            },
+            {
+              code: "AR4702",
+              name: "Disaster Risk Management in Traditional Settlement",
+              credits: 3,
+            },
+          ],
+        },
       ],
     };
 
@@ -532,6 +517,69 @@ export default function AdminCurriculumPage() {
     toast.success("Sample curriculum JSON downloaded.");
   }
 
+  function exportCurriculumJson() {
+    if (draft.years.length === 0) {
+      toast.error("No curriculum data to export.");
+      return;
+    }
+
+    let globalSem = 0;
+    const courses = draft.years.flatMap((y, yIdx) =>
+      y.semesters.flatMap((s) => {
+        globalSem += 1;
+        return s.courses.map((c) => ({
+          code: c.code || null,
+          name: c.name,
+          credits: c.credits,
+          year: yIdx + 1,
+          semester: globalSem,
+          type: c.hasPractical && !c.hasTheory ? "practical" : "core",
+          hasTheory: c.hasTheory,
+          hasPractical: c.hasPractical,
+        }));
+      }),
+    );
+
+    const groupMap = new Map<string, DraftElective[]>();
+    for (const el of draft.electives) {
+      const arr = groupMap.get(el.group) ?? [];
+      arr.push(el);
+      groupMap.set(el.group, arr);
+    }
+
+    let gIdx = 1;
+    const elective_groups = Array.from(groupMap.entries()).map(([grp, options]) => ({
+      group_id: gIdx++,
+      name: grp === "ELECTIVE_I" ? "Elective I" : grp === "ELECTIVE_II" ? "Elective II" : grp,
+      target_semester: grp === "ELECTIVE_II" ? 8 : 7,
+      required_credits: 3,
+      options: options.map((opt) => ({
+        code: opt.code || null,
+        name: opt.name,
+        credits: opt.credits,
+      })),
+    }));
+
+    const exportData = {
+      program: selectedProgram?.code || "CURRICULUM",
+      courses,
+      elective_groups,
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${selectedProgram?.code || "curriculum"}_structure.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Curriculum JSON exported successfully.");
+  }
+
   function parseCurriculumJson(jsonContent: string): Draft {
     let parsed: any;
     try {
@@ -545,16 +593,23 @@ export default function AdminCurriculumPage() {
       else if (parsed.data) parsed = parsed.data;
     }
 
-    // Support flat course list: [{ semester: 1, code: "...", name: "..." }]
-    if (
-      Array.isArray(parsed) &&
-      parsed.length > 0 &&
-      (parsed[0].semester !== undefined || parsed[0].semesterNo !== undefined)
-    ) {
+    // 1. Support the new flexible & functional format:
+    // { courses: [ { code, name, credits, year, semester, type, hasTheory, hasPractical } ], elective_groups: [ ... ] }
+    const rawCourseList = Array.isArray(parsed?.courses)
+      ? parsed.courses
+      : Array.isArray(parsed) &&
+        parsed.length > 0 &&
+        (parsed[0].semester !== undefined || parsed[0].semesterNo !== undefined)
+      ? parsed
+      : null;
+
+    if (rawCourseList) {
       const yearMap = new Map<number, Map<number, DraftCourse[]>>();
-      for (const item of parsed) {
-        const semNo = Number(item.semester ?? item.semesterNo ?? 1);
-        const yearNo = Math.ceil(semNo / 2) || 1;
+
+      for (const item of rawCourseList) {
+        const semNo = Number(item.semester ?? item.semesterNo ?? 1) || 1;
+        const yearNo = Number(item.year) > 0 ? Number(item.year) : Math.ceil(semNo / 2) || 1;
+
         if (!yearMap.has(yearNo)) yearMap.set(yearNo, new Map());
         const semMap = yearMap.get(yearNo)!;
         if (!semMap.has(semNo)) semMap.set(semNo, []);
@@ -566,10 +621,21 @@ export default function AdminCurriculumPage() {
         const credits = Number.isFinite(Number(item.credits ?? item.credit))
           ? Number(item.credits ?? item.credit)
           : 3;
+
         const valTh = item.hasTheory ?? item.th ?? item.theory;
         const valPr = item.hasPractical ?? item.pr ?? item.practical;
+
         let hasTheory = valTh !== undefined ? Boolean(valTh) : true;
         let hasPractical = valPr !== undefined ? Boolean(valPr) : false;
+
+        const typeStr = String(item.type || "").toLowerCase();
+        if (typeStr === "practical" || typeStr === "lab") {
+          if (valTh === undefined) hasTheory = false;
+          hasPractical = true;
+        } else if (typeStr === "theory" && valPr === undefined) {
+          hasPractical = false;
+        }
+
         if (!hasTheory && !hasPractical) hasTheory = true;
 
         semMap.get(semNo)!.push({ code, name, credits, hasTheory, hasPractical });
@@ -590,110 +656,59 @@ export default function AdminCurriculumPage() {
         });
       }
 
+      // Parse elective_groups or electives
+      const parsedElectives: DraftElective[] = [];
+      const rawElectiveGroups = Array.isArray(parsed?.elective_groups)
+        ? parsed.elective_groups
+        : Array.isArray(parsed?.electives)
+        ? parsed.electives
+        : [];
+
+      for (const grp of rawElectiveGroups) {
+        if (Array.isArray(grp.options)) {
+          // Group object: { group_id: 1, name: "...", options: [...] }
+          const rawGroup = String(grp.name || grp.group || (grp.group_id ? `ELECTIVE_${grp.group_id}` : "ELECTIVE_I")).trim().toUpperCase();
+          const group: DraftElective["group"] =
+            rawGroup.includes("II") || rawGroup.includes("2") ? "ELECTIVE_II" : "ELECTIVE_I";
+
+          for (const opt of grp.options) {
+            const name = String(opt.name || opt.title || "").trim();
+            if (!name) continue;
+            const code = String(opt.code || "").trim().toUpperCase();
+            const credits = Number.isFinite(Number(opt.credits ?? opt.credit))
+              ? Number(opt.credits ?? opt.credit)
+              : 3;
+            parsedElectives.push({ group, code, name, credits });
+          }
+        } else if (grp && typeof grp === "object") {
+          // Flat elective item: { group: "ELECTIVE_I", code: "...", name: "..." }
+          const rawGroup = String(grp.group || "ELECTIVE_I").trim().toUpperCase();
+          const group: DraftElective["group"] =
+            rawGroup.includes("II") || rawGroup.includes("2") ? "ELECTIVE_II" : "ELECTIVE_I";
+          const code = String(grp.code || "").trim().toUpperCase();
+          const name = String(grp.name || grp.title || "").trim();
+          const credits = Number.isFinite(Number(grp.credits ?? grp.credit))
+            ? Number(grp.credits ?? grp.credit)
+            : 3;
+          if (name) {
+            parsedElectives.push({ group, code, name, credits });
+          }
+        }
+      }
+
+      if (generatedYears.length === 0) {
+        throw new Error("No valid courses found in JSON.");
+      }
+
       return {
         years: generatedYears,
-        electives: [],
+        electives: parsedElectives,
       };
     }
 
-    let rawYears: any[] = [];
-    let rawElectives: any[] = [];
-
-    if (Array.isArray(parsed)) {
-      rawYears = parsed;
-    } else if (parsed && typeof parsed === "object") {
-      rawYears = Array.isArray(parsed.years) ? parsed.years : [];
-      rawElectives = Array.isArray(parsed.electives) ? parsed.electives : [];
-    } else {
-      throw new Error("JSON must contain an object with 'years' or an array of years.");
-    }
-
-    if (rawYears.length === 0) {
-      throw new Error("No academic years found in the JSON file.");
-    }
-
-    const parsedYears: DraftYear[] = rawYears.map((rawY: any, yi: number) => {
-      const yearLabel = String(rawY.label || rawY.name || `Year ${yi + 1}`).trim();
-      const rawSemesters = Array.isArray(rawY.semesters) ? rawY.semesters : [];
-
-      const parsedSemesters: DraftSemester[] = rawSemesters.map((rawS: any, si: number) => {
-        const semLabel = String(rawS.label || rawS.name || `Semester ${yi * 2 + si + 1}`).trim();
-        const rawCourses = Array.isArray(rawS.courses)
-          ? rawS.courses
-          : Array.isArray(rawS.subjects)
-          ? rawS.subjects
-          : [];
-
-        const parsedCourses: DraftCourse[] = rawCourses
-          .map((rawC: any) => {
-            const code = String(rawC.code || rawC.courseCode || "").trim().toUpperCase();
-            const name = String(rawC.name || rawC.title || rawC.courseName || "").trim();
-            const credits = Number.isFinite(Number(rawC.credits ?? rawC.credit ?? rawC.cr))
-              ? Number(rawC.credits ?? rawC.credit ?? rawC.cr)
-              : 3;
-
-            // Make th and pr fields optional
-            const hasThSpecified =
-              rawC.hasTheory !== undefined || rawC.th !== undefined || rawC.theory !== undefined;
-            const hasPrSpecified =
-              rawC.hasPractical !== undefined || rawC.pr !== undefined || rawC.practical !== undefined;
-
-            const valTh = rawC.hasTheory ?? rawC.th ?? rawC.theory;
-            const valPr = rawC.hasPractical ?? rawC.pr ?? rawC.practical;
-
-            let hasTheory = hasThSpecified ? Boolean(valTh) : true;
-            let hasPractical = hasPrSpecified ? Boolean(valPr) : false;
-
-            if (!hasTheory && !hasPractical) {
-              hasTheory = true;
-            }
-
-            return {
-              code,
-              name,
-              credits,
-              hasTheory,
-              hasPractical,
-            };
-          })
-          .filter((c: DraftCourse) => c.name.length > 0);
-
-        return {
-          label: semLabel,
-          courses: parsedCourses,
-        };
-      });
-
-      return {
-        label: yearLabel,
-        semesters: parsedSemesters,
-      };
-    });
-
-    const parsedElectives: DraftElective[] = rawElectives
-      .map((rawE: any) => {
-        const rawGroup = String(rawE.group || "ELECTIVE_I").trim().toUpperCase();
-        const group: DraftElective["group"] =
-          rawGroup.includes("II") || rawGroup.includes("2") ? "ELECTIVE_II" : "ELECTIVE_I";
-        const code = String(rawE.code || "").trim().toUpperCase();
-        const name = String(rawE.name || rawE.title || "").trim();
-        const credits = Number.isFinite(Number(rawE.credits ?? rawE.credit))
-          ? Number(rawE.credits ?? rawE.credit)
-          : 3;
-
-        return {
-          group,
-          code,
-          name,
-          credits,
-        };
-      })
-      .filter((e: DraftElective) => e.name.length > 0);
-
-    return {
-      years: parsedYears,
-      electives: parsedElectives,
-    };
+    throw new Error(
+      'Invalid curriculum JSON format. The JSON must contain a "courses" array, e.g. { "courses": [{ "code": "AR111", "name": "Basic Design I", "credits": 4, "year": 1, "semester": 1, "type": "core" }], "elective_groups": [...] }',
+    );
   }
 
   async function handleImportJson(e: React.ChangeEvent<HTMLInputElement>) {
@@ -741,6 +756,41 @@ export default function AdminCurriculumPage() {
       }
     }
 
+    let globalSem = 0;
+    const courses = draft.years.flatMap((y, yIdx) =>
+      y.semesters.flatMap((s) => {
+        globalSem += 1;
+        return s.courses.map((c) => ({
+          code: c.code || null,
+          name: c.name,
+          credits: c.credits,
+          year: yIdx + 1,
+          semester: globalSem,
+          type: c.hasPractical && !c.hasTheory ? "practical" : "core",
+          hasTheory: c.hasTheory,
+          hasPractical: c.hasPractical,
+        }));
+      }),
+    );
+
+    const groupMap = new Map<string, DraftElective[]>();
+    for (const el of draft.electives) {
+      const arr = groupMap.get(el.group) ?? [];
+      arr.push(el);
+      groupMap.set(el.group, arr);
+    }
+
+    let gIdx = 1;
+    const elective_groups = Array.from(groupMap.entries()).map(([grp, options]) => ({
+      group_id: gIdx++,
+      name: grp === "ELECTIVE_I" ? "Elective I" : grp === "ELECTIVE_II" ? "Elective II" : grp,
+      options: options.map((opt) => ({
+        code: opt.code || null,
+        name: opt.name,
+        credits: opt.credits,
+      })),
+    }));
+
     setError("");
     setSaving(true);
     startProgress();
@@ -750,8 +800,8 @@ export default function AdminCurriculumPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           programId,
-          years: draft.years,
-          electives: draft.electives,
+          courses,
+          elective_groups,
         }),
       });
       const data = await res.json();
@@ -881,16 +931,16 @@ export default function AdminCurriculumPage() {
               {selectedProgram && (
                 <div className="flex items-center gap-2 shrink-0">
                   {isDirty ? (
-                    <Badge variant="outline" className="text-xs py-0.5 px-2 bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 font-semibold animate-pulse">
+                    <Badge className="text-xs py-0.5 px-2 bg-amber-500/15 text-amber-700 dark:text-amber-400 border-0 font-semibold animate-pulse">
                       ● Unsaved Changes
                     </Badge>
                   ) : hasCurriculum ? (
-                    <Badge variant="outline" className="text-xs py-0.5 px-2 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 font-semibold">
+                    <Badge className="text-xs py-0.5 px-2 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-0 font-semibold">
                       <IconCheck size={12} className="mr-1 inline" />
                       Published
                     </Badge>
                   ) : (
-                    <Badge variant="outline" className="text-xs py-0.5 px-2 bg-muted/60 text-muted-foreground border-border/70 font-medium">
+                    <Badge className="text-xs py-0.5 px-2 bg-sky-500/15 text-sky-700 dark:text-sky-400 border-0 font-semibold">
                       Draft
                     </Badge>
                   )}
@@ -928,12 +978,15 @@ export default function AdminCurriculumPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={addYear}
+                onClick={exportCurriculumJson}
+                disabled={draft.years.length === 0}
                 className="h-8.5 gap-1.5 text-xs font-semibold"
+                title="Export current curriculum as functional JSON"
               >
-                <IconPlus size={14} />
-                <span>Add Year</span>
+                <IconDownload size={14} />
+                <span>Export JSON</span>
               </Button>
+
 
               {isDirty && (
                 <Button
@@ -989,22 +1042,22 @@ export default function AdminCurriculumPage() {
           className="space-y-4"
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-border/60 pb-2.5">
-            <TabsList className="bg-muted/60 p-1.5 rounded-xl h-11">
-              <TabsTrigger
-                value="builder"
-                className="gap-2 px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg h-8 sm:h-8.5 data-[state=active]:bg-background data-[state=active]:shadow-xs"
-              >
-                <IconPencil size={15} />
-                Curriculum Builder
-              </TabsTrigger>
-              <TabsTrigger
-                value="preview"
-                className="gap-2 px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg h-8 sm:h-8.5 data-[state=active]:bg-background data-[state=active]:shadow-xs"
-              >
-                <IconEye size={15} />
-                Course Structure Preview
-              </TabsTrigger>
-            </TabsList>
+            <TabSwitcher
+              value={activeTab}
+              onChange={setActiveTab}
+              tabs={[
+                {
+                  id: "builder",
+                  label: "Curriculum Builder",
+                  icon: IconPencil,
+                },
+                {
+                  id: "preview",
+                  label: "Course Structure Preview",
+                  icon: IconEye,
+                },
+              ]}
+            />
 
             {/* Quick Helper Text */}
             <span className="text-xs text-muted-foreground hidden md:inline-block">
@@ -1064,6 +1117,18 @@ export default function AdminCurriculumPage() {
                     />
                   </div>
 
+                  {/* Add Year Button */}
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={addYear}
+                    className="h-9 gap-1.5 text-xs font-semibold shrink-0 cursor-pointer"
+                    title="Add a new academic year to curriculum"
+                  >
+                    <IconPlus size={14} />
+                    <span>Add Year</span>
+                  </Button>
+
                   {/* Expand/Collapse All Buttons */}
                   <Button
                     type="button"
@@ -1110,41 +1175,14 @@ export default function AdminCurriculumPage() {
                   No Curriculum Defined Yet
                 </h3>
                 <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1 mb-5">
-                  Get started by scaffolding a standardized degree framework or start manually by adding your first academic year.
+                  Get started manually by adding your first academic year or import a curriculum JSON file.
                 </p>
 
-                <div className="flex flex-wrap items-center justify-center gap-3">
+                <div className="flex items-center justify-center">
                   <Button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="gap-1.5 text-xs font-semibold"
-                  >
-                    <IconUpload size={15} />
-                    Import from JSON File
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={downloadSampleCurriculumJson}
-                    className="gap-1.5 text-xs font-semibold"
-                  >
-                    <IconDownload size={15} />
-                    Download Sample JSON
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => applyTemplate("4-year")}
-                    className="gap-1.5 text-xs font-semibold"
-                  >
-                    <IconSparkles size={15} />
-                    Scaffold 4-Year
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
                     onClick={addYear}
-                    className="gap-1.5 text-xs font-semibold"
+                    className="gap-1.5 text-xs font-semibold cursor-pointer"
                   >
                     <IconPlus size={15} />
                     Add Year

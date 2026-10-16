@@ -460,7 +460,7 @@ export function ProfileReviewClient({
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">
-                          <Badge variant="outline" className="text-xs font-semibold bg-card">
+                          <Badge className="text-xs font-semibold border-0 bg-primary/15 text-primary">
                             {roleBadge}
                           </Badge>
                           <Badge
@@ -669,7 +669,7 @@ export function ProfileReviewClient({
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="font-bold text-sm text-foreground truncate">{name}</p>
-                            <Badge variant="outline" className="text-[10px] font-semibold bg-muted/40 shrink-0">
+                            <Badge className="text-[10px] font-semibold border-0 bg-primary/15 text-primary shrink-0">
                               {roleBadge}
                             </Badge>
                           </div>

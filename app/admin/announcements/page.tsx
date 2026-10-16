@@ -11,6 +11,8 @@ import { FileDropzone } from "@/app/components/common/FileDropzone";
 import { AnnouncementsBoard } from "@/app/components/announcements/AnnouncementsBoard";
 import {
   IconAlertTriangle,
+  IconArchive,
+  IconArchiveOff,
   IconPaperclip,
   IconPencil,
   IconPlus,
@@ -37,6 +39,8 @@ type AnnouncementItem = {
   attachmentFileName: string | null;
   attachmentMimeType: string | null;
   attachmentSize: number | null;
+  archivedAt?: string | null;
+  archivedBy?: string | null;
 };
 
 type EditingNotice = {
@@ -161,24 +165,66 @@ export default function AdminAnnouncementsPage() {
     }
   }
 
+  async function handleRestore(target: AnnouncementItem) {
+    setError("");
+    setSaving(true);
+    try {
+      const res = await fetch("/api/announcements", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: target.id, restore: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Failed to restore announcement");
+        toast.error(data.error ?? "Failed to restore announcement");
+        return;
+      }
+      setAnnouncements((prev) =>
+        prev.map((a) => (a.id === target.id ? { ...a, archivedAt: null, archivedBy: null } : a))
+      );
+      toast.success("Announcement restored to active bulletins.");
+    } catch {
+      setError("Failed to restore announcement");
+      toast.error("Failed to restore announcement");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleDelete() {
     if (!deletingAnnouncement) return;
     setError("");
     setSaving(true);
+    const isAlreadyArchived = Boolean(deletingAnnouncement.archivedAt);
     try {
-      const res = await fetch(`/api/announcements?id=${deletingAnnouncement.id}`, { method: "DELETE" });
+      const endpoint = isAlreadyArchived
+        ? `/api/announcements?id=${deletingAnnouncement.id}&permanent=1`
+        : `/api/announcements?id=${deletingAnnouncement.id}`;
+      const res = await fetch(endpoint, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Failed to delete announcement");
         toast.error(data.error ?? "Failed to delete announcement");
         return;
       }
-      setAnnouncements((prev) => prev.filter((a) => a.id !== deletingAnnouncement.id));
-      toast.success("Announcement deleted successfully.");
+      if (isAlreadyArchived) {
+        setAnnouncements((prev) => prev.filter((a) => a.id !== deletingAnnouncement.id));
+        toast.success("Announcement permanently deleted.");
+      } else {
+        setAnnouncements((prev) =>
+          prev.map((a) =>
+            a.id === deletingAnnouncement.id
+              ? { ...a, archivedAt: new Date().toISOString() }
+              : a
+          )
+        );
+        toast.success("Announcement moved to archive.");
+      }
       setDeletingAnnouncement(null);
     } catch {
-      setError("Failed to delete announcement");
-      toast.error("Failed to delete announcement");
+      setError("Failed to process request");
+      toast.error("Failed to process request");
     } finally {
       setSaving(false);
     }
@@ -212,6 +258,42 @@ export default function AdminAnnouncementsPage() {
         }
         renderCardActions={(_notice, a) => {
           const attachmentMeta = attachmentMetaOf(a);
+          const isArchived = Boolean(a.archivedAt);
+
+          if (isArchived) {
+            return (
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 hover:text-emerald-700 dark:text-emerald-400"
+                  title="Restore Announcement"
+                  aria-label="Restore Announcement"
+                  onClick={() => handleRestore(a)}
+                  disabled={saving}
+                >
+                  <IconArchiveOff size={14} aria-hidden="true" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  className="border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
+                  title="Permanently Delete Announcement"
+                  aria-label="Permanently Delete Announcement"
+                  onClick={() => {
+                    setError("");
+                    setDeletingAnnouncement(a);
+                  }}
+                  disabled={saving}
+                >
+                  <IconTrash size={14} aria-hidden="true" />
+                </Button>
+              </div>
+            );
+          }
+
           return (
             <div className="flex items-center gap-1">
               <Button
@@ -238,15 +320,15 @@ export default function AdminAnnouncementsPage() {
                 type="button"
                 variant="outline"
                 size="icon-sm"
-                className="border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
-                title="Delete Announcement"
-                aria-label="Delete Announcement"
+                className="border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 hover:text-amber-800 dark:text-amber-400"
+                title="Archive Announcement"
+                aria-label="Archive Announcement"
                 onClick={() => {
                   setError("");
                   setDeletingAnnouncement(a);
                 }}
               >
-                <IconTrash size={14} aria-hidden="true" />
+                <IconArchive size={14} aria-hidden="true" />
               </Button>
             </div>
           );
@@ -442,24 +524,41 @@ export default function AdminAnnouncementsPage() {
         </AdminModal>
       )}
 
-      {/* Modal 3: Delete Announcement Confirmation */}
+      {/* Modal 3: Delete / Archive Announcement Confirmation */}
       {deletingAnnouncement && (
         <AdminModal
-          title="Delete Announcement"
+          title={deletingAnnouncement.archivedAt ? "Permanently Delete Announcement" : "Archive Announcement"}
           onClose={() => setDeletingAnnouncement(null)}
         >
           <div className="grid gap-3 text-sm text-muted-foreground">
             <p>
-              Are you sure you want to delete the notice <strong>&ldquo;{deletingAnnouncement.title}&rdquo;</strong>?
+              Are you sure you want to {deletingAnnouncement.archivedAt ? "permanently delete" : "archive"} the notice <strong>&ldquo;{deletingAnnouncement.title}&rdquo;</strong>?
             </p>
-            <p className="m-0 flex items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3.5 py-2.5 text-[13px] font-medium text-amber-600 dark:text-amber-400">
-              <IconAlertTriangle size={14} aria-hidden="true" />
-              This bulletin will be removed from the public portal and all dashboards.
-            </p>
+            {deletingAnnouncement.archivedAt ? (
+              <p className="m-0 flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-[13px] font-medium text-destructive">
+                <IconAlertTriangle size={14} aria-hidden="true" className="shrink-0" />
+                This will permanently delete the notice and any attachment from the database. This action cannot be undone.
+              </p>
+            ) : (
+              <p className="m-0 flex items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3.5 py-2.5 text-[13px] font-medium text-amber-700 dark:text-amber-400">
+                <IconAlertTriangle size={14} aria-hidden="true" className="shrink-0" />
+                This notice will be moved to the archive and hidden from all public portals and dashboards. You can restore or permanently delete it later from the Archived filter.
+              </p>
+            )}
             {error && <p className="m-0 text-[13px] text-destructive" style={{ marginTop: 12 }}>{error}</p>}
             <div className="flex flex-wrap justify-end gap-2.5" style={{ marginTop: "20px" }}>
-              <Button variant="destructive" type="button" onClick={handleDelete} disabled={saving}>
-                {saving ? "Deleting…" : "Yes, Delete Notice"}
+              <Button
+                variant={deletingAnnouncement.archivedAt ? "destructive" : "default"}
+                type="button"
+                onClick={handleDelete}
+                disabled={saving}
+                className={!deletingAnnouncement.archivedAt ? "bg-amber-600 hover:bg-amber-700 text-white" : ""}
+              >
+                {saving
+                  ? "Processing…"
+                  : deletingAnnouncement.archivedAt
+                    ? "Yes, Permanently Delete"
+                    : "Yes, Archive Announcement"}
               </Button>
               <Button variant="outline" type="button" onClick={() => setDeletingAnnouncement(null)} disabled={saving}>
                 Cancel

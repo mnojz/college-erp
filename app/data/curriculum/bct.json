@@ -1,146 +1,493 @@
 {
-  "code": "BCT",
-  "name": "B.E. Degree in Computer Engineering",
-  "department": "Department of Computer & Electronics Engineering",
-  "program": "B.E. Degree in Computer Engineering",
-  "years": [
+  "program": "BCT",
+  "courses": [
     {
-      "year": "First Year",
-      "semesters": [
+      "code": "AR111",
+      "name": "Engineering Drawing",
+      "credits": 2,
+      "year": 1,
+      "semester": 1,
+      "type": "core"
+    },
+    {
+      "code": "SH112",
+      "name": "Engineering Math I",
+      "credits": 3,
+      "year": 1,
+      "semester": 1,
+      "type": "core"
+    },
+    {
+      "code": "SH113",
+      "name": "Engineering Physics",
+      "credits": 3,
+      "year": 1,
+      "semester": 1,
+      "type": "core"
+    },
+    {
+      "code": "EE114",
+      "name": "Basic Electrical Engineering",
+      "credits": 3,
+      "year": 1,
+      "semester": 1,
+      "type": "core"
+    },
+    {
+      "code": "CT115",
+      "name": "Programming in C",
+      "credits": 3,
+      "year": 1,
+      "semester": 1,
+      "type": "core"
+    },
+    {
+      "code": "ME116",
+      "name": "Workshop Technology",
+      "credits": 1,
+      "year": 1,
+      "semester": 1,
+      "type": "core"
+    },
+    {
+      "code": "SH121",
+      "name": "Engineering Math II",
+      "credits": 3,
+      "year": 1,
+      "semester": 2,
+      "type": "core"
+    },
+    {
+      "code": "SH122",
+      "name": "Engineering Chemistry",
+      "credits": 3,
+      "year": 1,
+      "semester": 2,
+      "type": "core"
+    },
+    {
+      "code": "ME123",
+      "name": "Thermodynamics",
+      "credits": 3,
+      "year": 1,
+      "semester": 2,
+      "type": "core"
+    },
+    {
+      "code": "CE124",
+      "name": "Applied Mechanics",
+      "credits": 3,
+      "year": 1,
+      "semester": 2,
+      "type": "core"
+    },
+    {
+      "code": "CT125",
+      "name": "Object Oriented Programming",
+      "credits": 3,
+      "year": 1,
+      "semester": 2,
+      "type": "core"
+    },
+    {
+      "code": "CT126",
+      "name": "Discrete Structure",
+      "credits": 3,
+      "year": 1,
+      "semester": 2,
+      "type": "core"
+    },
+    {
+      "code": "SH231",
+      "name": "Engineering Math III",
+      "credits": 3,
+      "year": 2,
+      "semester": 3,
+      "type": "core"
+    },
+    {
+      "code": "CT232",
+      "name": "Data Structure and Algorithm",
+      "credits": 3,
+      "year": 2,
+      "semester": 3,
+      "type": "core"
+    },
+    {
+      "code": "CT233",
+      "name": "Theory of Computation",
+      "credits": 3,
+      "year": 2,
+      "semester": 3,
+      "type": "core"
+    },
+    {
+      "code": "EE234",
+      "name": "Electrical Circuit Theory",
+      "credits": 3,
+      "year": 2,
+      "semester": 3,
+      "type": "core"
+    },
+    {
+      "code": "EX235",
+      "name": "Digital Logic",
+      "credits": 3,
+      "year": 2,
+      "semester": 3,
+      "type": "core"
+    },
+    {
+      "code": "EX236",
+      "name": "Electromagnetics",
+      "credits": 3,
+      "year": 2,
+      "semester": 3,
+      "type": "core"
+    },
+    {
+      "code": "SH241",
+      "name": "Applied Mathematics",
+      "credits": 3,
+      "year": 2,
+      "semester": 4,
+      "type": "core"
+    },
+    {
+      "code": "EX242",
+      "name": "Microprocessor",
+      "credits": 3,
+      "year": 2,
+      "semester": 4,
+      "type": "core"
+    },
+    {
+      "code": "CT243",
+      "name": "Algorithmic Mathematics",
+      "credits": 3,
+      "year": 2,
+      "semester": 4,
+      "type": "core"
+    },
+    {
+      "code": "EE244",
+      "name": "Electrical machine",
+      "credits": 3,
+      "year": 2,
+      "semester": 4,
+      "type": "core"
+    },
+    {
+      "code": "EX245",
+      "name": "Electronic Device and Circuit",
+      "credits": 3,
+      "year": 2,
+      "semester": 4,
+      "type": "core"
+    },
+    {
+      "code": "SH246",
+      "name": "Communication English",
+      "credits": 3,
+      "year": 2,
+      "semester": 4,
+      "type": "core"
+    },
+    {
+      "code": "SH351",
+      "name": "Probability and Statistic",
+      "credits": 3,
+      "year": 3,
+      "semester": 5,
+      "type": "core"
+    },
+    {
+      "code": "EX352",
+      "name": "Instrumentation",
+      "credits": 3,
+      "year": 3,
+      "semester": 5,
+      "type": "core"
+    },
+    {
+      "code": "EX353",
+      "name": "Computer Graphics",
+      "credits": 3,
+      "year": 3,
+      "semester": 5,
+      "type": "core"
+    },
+    {
+      "code": "CT354",
+      "name": "Object Oriented Software Engineering",
+      "credits": 3,
+      "year": 3,
+      "semester": 5,
+      "type": "core"
+    },
+    {
+      "code": "CT355",
+      "name": "Computer Architecture and Design",
+      "credits": 3,
+      "year": 3,
+      "semester": 5,
+      "type": "core"
+    },
+    {
+      "code": "CT356",
+      "name": "Operating System",
+      "credits": 3,
+      "year": 3,
+      "semester": 5,
+      "type": "core"
+    },
+    {
+      "code": "CT361",
+      "name": "Project and Organization Management",
+      "credits": 3,
+      "year": 3,
+      "semester": 6,
+      "type": "core"
+    },
+    {
+      "code": "CT362",
+      "name": "Research Methodology",
+      "credits": 2,
+      "year": 3,
+      "semester": 6,
+      "type": "core"
+    },
+    {
+      "code": "CT363",
+      "name": "Artificial Intelligence",
+      "credits": 3,
+      "year": 3,
+      "semester": 6,
+      "type": "core"
+    },
+    {
+      "code": "CT364",
+      "name": "Database Management System",
+      "credits": 3,
+      "year": 3,
+      "semester": 6,
+      "type": "core"
+    },
+    {
+      "code": "EX365",
+      "name": "Communication System",
+      "credits": 3,
+      "year": 3,
+      "semester": 6,
+      "type": "core"
+    },
+    {
+      "code": "SH366",
+      "name": "Engineering Economics",
+      "credits": 3,
+      "year": 3,
+      "semester": 6,
+      "type": "core"
+    },
+    {
+      "code": "CT367",
+      "name": "Minor Project",
+      "credits": 3,
+      "year": 3,
+      "semester": 6,
+      "type": "core"
+    },
+    {
+      "code": "CT471",
+      "name": "Computer Networks",
+      "credits": 3,
+      "year": 4,
+      "semester": 7,
+      "type": "core"
+    },
+    {
+      "code": "CT472",
+      "name": "Distributed Computing",
+      "credits": 3,
+      "year": 4,
+      "semester": 7,
+      "type": "core"
+    },
+    {
+      "code": "CT473",
+      "name": "Information System",
+      "credits": 2,
+      "year": 4,
+      "semester": 7,
+      "type": "core"
+    },
+    {
+      "code": "CT474",
+      "name": "Data Mining and Data Warehousing",
+      "credits": 3,
+      "year": 4,
+      "semester": 7,
+      "type": "core"
+    },
+    {
+      "code": "CT475",
+      "name": "Simulation and Modelling",
+      "credits": 3,
+      "year": 4,
+      "semester": 7,
+      "type": "core"
+    },
+    {
+      "code": "CT476",
+      "name": "Elective-I",
+      "credits": 3,
+      "year": 4,
+      "semester": 7,
+      "type": "core"
+    },
+    {
+      "code": null,
+      "name": "Project - Part A",
+      "credits": 2,
+      "year": 4,
+      "semester": 7,
+      "type": "core"
+    },
+    {
+      "code": "CT481",
+      "name": "Digital Signal Analysis and Processing",
+      "credits": 3,
+      "year": 4,
+      "semester": 8,
+      "type": "core"
+    },
+    {
+      "code": "CE482",
+      "name": "Engineering Professional Practice",
+      "credits": 2,
+      "year": 4,
+      "semester": 8,
+      "type": "core"
+    },
+    {
+      "code": "CT483",
+      "name": "Information Security",
+      "credits": 3,
+      "year": 4,
+      "semester": 8,
+      "type": "core"
+    },
+    {
+      "code": "CT484",
+      "name": "Big Data",
+      "credits": 3,
+      "year": 4,
+      "semester": 8,
+      "type": "core"
+    },
+    {
+      "code": "CT",
+      "name": "Elective-II",
+      "credits": 3,
+      "year": 4,
+      "semester": 8,
+      "type": "core"
+    },
+    {
+      "code": "CT485",
+      "name": "Project - Part B",
+      "credits": 4,
+      "year": 4,
+      "semester": 8,
+      "type": "core"
+    }
+  ],
+  "elective_groups": [
+    {
+      "group_id": 1,
+      "name": "Elective I",
+      "target_semester": 7,
+      "required_credits": 3,
+      "options": [
         {
-          "semester": "Semester I",
-          "credits": 15,
-          "courses": [
-            { "code": "AR 111", "name": "Engineering Drawing", "credits": 2 },
-            { "code": "SH 112", "name": "Engineering Math I", "credits": 3 },
-            { "code": "SH 113", "name": "Engineering Physics", "credits": 3 },
-            { "code": "EE 114", "name": "Basic Electrical Engineering", "credits": 3 },
-            { "code": "CT 115", "name": "Programming in C", "credits": 3 },
-            { "code": "ME 116", "name": "Workshop Technology", "credits": 1 }
-          ]
+          "code": "CT4701",
+          "name": "Multimedia System",
+          "credits": 3
         },
         {
-          "semester": "Semester II",
-          "credits": 18,
-          "courses": [
-            { "code": "SH 121", "name": "Engineering Math II", "credits": 3 },
-            { "code": "SH 122", "name": "Engineering Chemistry", "credits": 3 },
-            { "code": "ME 123", "name": "Thermodynamics", "credits": 3 },
-            { "code": "CE 124", "name": "Applied Mechanics", "credits": 3 },
-            { "code": "CT 125", "name": "Object Oriented Programming", "credits": 3 },
-            { "code": "CT 126", "name": "Discrete Structure", "credits": 3 }
-          ]
+          "code": "CT4702",
+          "name": "Image Processing and Pattern Recognition",
+          "credits": 3
+        },
+        {
+          "code": "CT4703",
+          "name": "Networking with IPV6",
+          "credits": 3
+        },
+        {
+          "code": "CT4704",
+          "name": "Geographical Information System",
+          "credits": 3
+        },
+        {
+          "code": "CT4705",
+          "name": "Agile Software Development",
+          "credits": 3
+        },
+        {
+          "code": "CT4706",
+          "name": "Embedded System",
+          "credits": 3
+        },
+        {
+          "code": "CT4707",
+          "name": "Software Project Management",
+          "credits": 3
+        },
+        {
+          "code": "CT4708",
+          "name": "Internet and Intranet",
+          "credits": 3
         }
       ]
     },
     {
-      "year": "Second Year",
-      "semesters": [
+      "group_id": 2,
+      "name": "Elective II",
+      "target_semester": 8,
+      "required_credits": 3,
+      "options": [
         {
-          "semester": "Semester III",
-          "credits": 18,
-          "courses": [
-            { "code": "SH 231", "name": "Engineering Math III", "credits": 3 },
-            { "code": "CT 232", "name": "Data Structure and Algorithm", "credits": 3 },
-            { "code": "CT 233", "name": "Theory of Computation", "credits": 3 },
-            { "code": "EE 234", "name": "Electrical Circuit Theory", "credits": 3 },
-            { "code": "EX 235", "name": "Digital Logic", "credits": 3 },
-            { "code": "EX 236", "name": "Electromagnetics", "credits": 3 }
-          ]
+          "code": "CT4801",
+          "name": "Enterprise Application Design and Development",
+          "credits": 3
         },
         {
-          "semester": "Semester IV",
-          "credits": 18,
-          "courses": [
-            { "code": "SH 241", "name": "Applied Mathematics", "credits": 3 },
-            { "code": "EX 242", "name": "Microprocessor", "credits": 3 },
-            { "code": "CT 243", "name": "Algorithmic Mathematics", "credits": 3 },
-            { "code": "EE 244", "name": "Electrical machine", "credits": 3 },
-            { "code": "EX 245", "name": "Electronic Device and Circuit", "credits": 3 },
-            { "code": "SH 246", "name": "Communication English", "credits": 3 }
-          ]
-        }
-      ]
-    },
-    {
-      "year": "Third Year",
-      "semesters": [
-        {
-          "semester": "Semester V",
-          "credits": 18,
-          "courses": [
-            { "code": "SH 351", "name": "Probability and Statistic", "credits": 3 },
-            { "code": "EX 352", "name": "Instrumentation", "credits": 3 },
-            { "code": "EX 353", "name": "Computer Graphics", "credits": 3 },
-            { "code": "CT 354", "name": "Object Oriented Software Engineering", "credits": 3 },
-            { "code": "CT 355", "name": "Computer Architecture and Design", "credits": 3 },
-            { "code": "CT 356", "name": "Operating System", "credits": 3 }
-          ]
+          "code": "CT4802",
+          "name": "Internet of Things",
+          "credits": 3
         },
         {
-          "semester": "Semester VI",
-          "credits": 20,
-          "courses": [
-            { "code": "CT 361", "name": "Project and Organization Management", "credits": 3 },
-            { "code": "CT 362", "name": "Research Methodology", "credits": 2 },
-            { "code": "CT 363", "name": "Artificial Intelligence", "credits": 3 },
-            { "code": "CT 364", "name": "Database Management System", "credits": 3 },
-            { "code": "EX 365", "name": "Communication System", "credits": 3 },
-            { "code": "SH 366", "name": "Engineering Economics", "credits": 3 },
-            { "code": "CT 367", "name": "Minor Project", "credits": 3 }
-          ]
-        }
-      ]
-    },
-    {
-      "year": "Fourth Year",
-      "semesters": [
-        {
-          "semester": "Semester VII",
-          "credits": 19,
-          "courses": [
-            { "code": "CT 471", "name": "Computer Networks", "credits": 3 },
-            { "code": "CT 472", "name": "Distributed Computing", "credits": 3 },
-            { "code": "CT 473", "name": "Information System", "credits": 2 },
-            { "code": "CT 474", "name": "Data Mining and Data Warehousing", "credits": 3 },
-            { "code": "CT 475", "name": "Simulation and Modelling", "credits": 3 },
-            { "code": "CT 476", "name": "Elective-I", "credits": 3 },
-            { "code": null, "name": "Project - Part A", "credits": 2 }
-          ]
+          "code": "CT4803",
+          "name": "Distributed and Object Oriented Database",
+          "credits": 3
         },
         {
-          "semester": "Semester VIII",
-          "credits": 18,
-          "courses": [
-            { "code": "CT 481", "name": "Digital Signal Analysis and Processing", "credits": 3 },
-            { "code": "CE 482", "name": "Engineering Professional Practice", "credits": 2 },
-            { "code": "CT 483", "name": "Information Security", "credits": 3 },
-            { "code": "CT 484", "name": "Big Data", "credits": 3 },
-            { "code": "CT", "name": "Elective-II", "credits": 3 },
-            { "code": "CT 485", "name": "Project - Part B", "credits": 4 }
-          ]
+          "code": "CT4804",
+          "name": "e-Government system",
+          "credits": 3
+        },
+        {
+          "code": "CT4805",
+          "name": "Web Technology",
+          "credits": 3
+        },
+        {
+          "code": "CT4806",
+          "name": "Machine Learning",
+          "credits": 3
         }
       ]
     }
-  ],
-  "electives": {
-    "electiveI": [
-      { "code": "CT 4701", "name": "Multimedia System", "credits": 3 },
-      { "code": "CT 4702", "name": "Image Processing and Pattern Recognition", "credits": 3 },
-      { "code": "CT 4703", "name": "Networking with IPV6", "credits": 3 },
-      { "code": "CT 4704", "name": "Geographical Information System", "credits": 3 },
-      { "code": "CT 4705", "name": "Agile Software Development", "credits": 3 },
-      { "code": "CT 4706", "name": "Embedded System", "credits": 3 },
-      { "code": "CT 4707", "name": "Software Project Management", "credits": 3 },
-      { "code": "CT 4708", "name": "Internet and Intranet", "credits": 3 }
-    ],
-    "electiveII": [
-      { "code": "CT 4801", "name": "Enterprise Application Design and Development", "credits": 3 },
-      { "code": "CT 4802", "name": "Internet of Things", "credits": 3 },
-      { "code": "CT 4803", "name": "Distributed and Object Oriented Database", "credits": 3 },
-      { "code": "CT 4804", "name": "e-Government system", "credits": 3 },
-      { "code": "CT 4805", "name": "Web Technology", "credits": 3 },
-      { "code": "CT 4806", "name": "Machine Learning", "credits": 3 }
-    ]
-  }
+  ]
 }

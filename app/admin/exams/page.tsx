@@ -332,7 +332,13 @@ export default function AdminExamsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from({ length: 8 }, (_, i) => i + 1).map((n) => (
+                    {Array.from(
+                      {
+                        length:
+                          (programs.find((p) => p.id === formProgramId)?.durationYears ?? 4) * 2,
+                      },
+                      (_, i) => i + 1,
+                    ).map((n) => (
                       <SelectItem key={n} value={String(n)}>
                         Semester {n}
                       </SelectItem>

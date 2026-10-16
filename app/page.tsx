@@ -250,7 +250,7 @@ function HomeContent() {
         <div className="mx-auto max-w-7xl space-y-12">
           {/* Section Header */}
           <div className="text-center max-w-2xl mx-auto space-y-3">
-            <Badge variant="outline" className="text-xs font-semibold px-3.5 py-1 bg-card border-border/80">
+            <Badge className="text-xs font-semibold px-3.5 py-1 border-0 bg-primary/15 text-primary">
               Open Campus Gateways
             </Badge>
             <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-foreground">
@@ -315,7 +315,7 @@ function HomeContent() {
         <div className="mx-auto max-w-7xl space-y-12">
           {/* Section Heading */}
           <div className="text-center max-w-2xl mx-auto space-y-3">
-            <Badge variant="outline" className="text-xs font-semibold px-3.5 py-1 bg-muted/40">
+            <Badge className="text-xs font-semibold px-3.5 py-1 border-0 bg-primary/15 text-primary">
               Role-Specific Workspaces
             </Badge>
             <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-foreground">

@@ -15,6 +15,7 @@ export async function GET() {
         name: true,
         code: true,
         departmentName: true,
+        durationYears: true,
       },
     });
     const departments = [

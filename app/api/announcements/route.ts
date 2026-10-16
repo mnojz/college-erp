@@ -59,6 +59,8 @@ const ANNOUNCEMENT_SELECT = {
   attachmentFileName: true,
   attachmentMimeType: true,
   attachmentSize: true,
+  archivedAt: true,
+  archivedBy: true,
 } as const;
 
 /** Accepts both multipart/form-data (with optional file) and JSON bodies. */
@@ -173,17 +175,28 @@ async function teachesGroup(
  */
 export async function GET(request: Request) {
   const session = await getSession();
-  const mine = new URL(request.url).searchParams.get("mine") === "1";
+  const searchParams = new URL(request.url).searchParams;
+  const mine = searchParams.get("mine") === "1";
+  const archivedParam = searchParams.get("archived");
 
   try {
     let where: Prisma.AnnouncementWhereInput;
     if (mine) {
       if (!session) return NextResponse.json({ announcements: [] });
-      where = { authorId: session.userId };
+      where = {
+        authorId: session.userId,
+        ...(archivedParam === "1" ? { archivedAt: { not: null } } : archivedParam === "0" ? { archivedAt: null } : {}),
+      };
     } else if (session?.role === "ADMIN") {
-      where = {};
+      where =
+        archivedParam === "1"
+          ? { archivedAt: { not: null } }
+          : archivedParam === "0"
+            ? { archivedAt: null }
+            : {};
     } else if (session?.role === "TEACHER") {
       where = {
+        archivedAt: null,
         OR: [{ teacherId: null, publishedAt: { not: null, lte: new Date() } }, { authorId: session.userId }],
       };
     } else if (session?.role === "STUDENT") {
@@ -194,12 +207,13 @@ export async function GET(request: Request) {
       where =
         student?.programId != null && student.currentSemester != null
           ? {
+              archivedAt: null,
               publishedAt: { not: null, lte: new Date() },
               OR: [{ teacherId: null }, { programId: student.programId, semester: student.currentSemester }],
             }
-          : { teacherId: null, publishedAt: { not: null, lte: new Date() } };
+          : { archivedAt: null, teacherId: null, publishedAt: { not: null, lte: new Date() } };
     } else {
-      where = { teacherId: null, publishedAt: { not: null, lte: new Date() } };
+      where = { archivedAt: null, teacherId: null, publishedAt: { not: null, lte: new Date() } };
     }
 
     const announcements = await prisma.announcement.findMany({
@@ -449,7 +463,7 @@ export async function DELETE(request: Request) {
   try {
     const existing = await prisma.announcement.findUnique({
       where: { id },
-      select: { id: true, teacherId: true },
+      select: { id: true, teacherId: true, archivedAt: true },
     });
     if (!existing) {
       return NextResponse.json({ error: "Announcement not found" }, { status: 404 });
@@ -465,10 +479,86 @@ export async function DELETE(request: Request) {
       }
     }
 
-    await prisma.announcement.delete({ where: { id } });
-    return NextResponse.json({ success: true, message: "Announcement deleted successfully" });
+    const permanentParam = searchParams.get("permanent") === "1" || searchParams.get("permanent") === "true";
+
+    // If notice is already archived or permanent deletion was requested:
+    if (existing.archivedAt || permanentParam) {
+      await prisma.announcement.delete({ where: { id } });
+      return NextResponse.json({ success: true, permanent: true, message: "Announcement permanently deleted" });
+    }
+
+    // Otherwise, archive the announcement
+    const archived = await prisma.announcement.update({
+      where: { id },
+      data: {
+        archivedAt: new Date(),
+        archivedBy: session.userId,
+      },
+      select: ANNOUNCEMENT_SELECT,
+    });
+    return NextResponse.json({
+      success: true,
+      permanent: false,
+      archived: true,
+      announcement: archived,
+      message: "Announcement archived successfully",
+    });
   } catch (error) {
     console.error("DELETE /api/announcements error:", error);
     return NextResponse.json({ error: "Unable to delete announcement" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  const session = await getSession();
+  if (!session || (session.role !== "ADMIN" && session.role !== "TEACHER")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  try {
+    const body = (await request.json()) as { id?: string; restore?: boolean; action?: string };
+    const { id, restore, action } = body;
+    if (!id) {
+      return NextResponse.json({ error: "Announcement ID is required" }, { status: 400 });
+    }
+
+    const existing = await prisma.announcement.findUnique({
+      where: { id },
+      select: { id: true, teacherId: true, archivedAt: true },
+    });
+    if (!existing) {
+      return NextResponse.json({ error: "Announcement not found" }, { status: 404 });
+    }
+
+    if (session.role === "TEACHER") {
+      const teacher = await prisma.teacher.findUnique({
+        where: { userId: session.userId },
+        select: { id: true },
+      });
+      if (!teacher || existing.teacherId !== teacher.id) {
+        return NextResponse.json({ error: "You can only restore your own announcements" }, { status: 403 });
+      }
+    }
+
+    if (restore || action === "restore") {
+      const restored = await prisma.announcement.update({
+        where: { id },
+        data: {
+          archivedAt: null,
+          archivedBy: null,
+        },
+        select: ANNOUNCEMENT_SELECT,
+      });
+      return NextResponse.json({
+        success: true,
+        announcement: restored,
+        message: "Announcement restored successfully",
+      });
+    }
+
+    return NextResponse.json({ error: "No recognized action" }, { status: 400 });
+  } catch (error) {
+    console.error("PATCH /api/announcements error:", error);
+    return NextResponse.json({ error: "Unable to restore announcement" }, { status: 500 });
   }
 }

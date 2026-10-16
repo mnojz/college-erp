@@ -114,11 +114,16 @@ export function SyllabusForm({
               <SelectValue placeholder="Select a semester" />
             </SelectTrigger>
             <SelectContent>
-              {SEMESTERS.map((s) => (
-                <SelectItem key={s} value={String(s)}>
-                  Semester {s}
-                </SelectItem>
-              ))}
+              {(() => {
+                const selectedProg = programs.find((p) => p.id === values.programId);
+                const count = selectedProg?.durationYears ? selectedProg.durationYears * 2 : 10;
+                const semList = Array.from({ length: count }, (_, i) => i + 1);
+                return semList.map((s) => (
+                  <SelectItem key={s} value={String(s)}>
+                    Semester {s}
+                  </SelectItem>
+                ));
+              })()}
             </SelectContent>
           </Select>
         </div>

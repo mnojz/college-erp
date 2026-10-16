@@ -141,7 +141,7 @@ function ProfileImagePreviewContent({
             </DialogDescription>
           </div>
           {badge && (
-            <Badge variant="outline" className="text-[11px] font-semibold border-border/70 bg-muted/40 shrink-0">
+            <Badge className="text-[11px] font-semibold border-0 bg-primary/15 text-primary shrink-0">
               {badge}
             </Badge>
           )}

@@ -711,17 +711,13 @@ export default function AdminTeachingPage() {
               {/* Daily Break Status / Edit Button */}
               <Button
                 type="button"
-                variant="outline"
                 size="sm"
                 onClick={openEditBreak}
                 disabled={!selectedProgramId || !selectedSemester}
-                className={cn(
-                  "h-9 gap-1.5 text-xs font-semibold",
-                  breakFor ? "border-amber-500/40 text-amber-700 dark:text-amber-400 bg-amber-500/5 hover:bg-amber-500/10" : "",
-                )}
+                className="h-9 gap-1.5 text-xs font-semibold border-0 bg-muted hover:bg-muted/80 text-primary shadow-2xs cursor-pointer"
                 title={breakFor ? "Edit the campus daily break window" : "Configure daily campus break"}
               >
-                <IconCoffee size={15} className="text-amber-500" />
+                <IconCoffee size={15} className="text-primary" />
                 {breakFor ? (
                   <>
                     Break: {formatTime(breakFor.startTime)} – {formatTime(breakFor.endTime)}
@@ -757,43 +753,12 @@ export default function AdminTeachingPage() {
         {/* ── Weekly Matrix Timetable ── */}
         <Card className="rounded-xl border border-border/70 shadow-xs overflow-hidden bg-card">
           <CardHeader className="border-b border-border/60 bg-muted/20 px-4 py-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <CardTitle className="text-sm font-bold flex items-center gap-2">
-                  <span>Weekly Matrix Timetable</span>
-                  <Badge variant="outline" className="font-mono text-xs">
-                    {selectedProgram?.code} · Semester {selectedSemester}
-                  </Badge>
-                </CardTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Click any empty time slot on a weekday to schedule a class, or click a block to edit.
-                </p>
-              </div>
-
-              {/* Legend */}
-              <div className="flex flex-wrap items-center gap-2 text-[11px] font-medium text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <span className="size-2.5 rounded-xs bg-primary/70" />
-                  Lecture
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="size-2.5 rounded-xs bg-violet-500/70" />
-                  Practical / Lab
-                </span>
-                {breakFor && (
-                  <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
-                    <span className="size-2.5 rounded-xs bg-amber-500/50" />
-                    Campus Break
-                  </span>
-                )}
-                {conflictedBlocks.size > 0 && (
-                  <span className="flex items-center gap-1.5 text-destructive font-bold">
-                    <span className="size-2.5 rounded-xs bg-destructive animate-ping" />
-                    Overlap Conflict
-                  </span>
-                )}
-              </div>
-            </div>
+            <CardTitle className="text-sm font-bold flex items-center gap-2">
+              <span>Weekly Matrix Timetable</span>
+              <Badge variant="outline" className="font-mono text-xs">
+                {selectedProgram?.code} · Semester {selectedSemester}
+              </Badge>
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-4 sm:p-5">
             <TimetableGrid

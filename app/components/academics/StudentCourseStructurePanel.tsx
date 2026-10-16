@@ -471,10 +471,15 @@ export function StudentCourseStructurePanel({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {(["ELECTIVE_I", "ELECTIVE_II"] as const).map((groupKey) => {
+                {Array.from(new Set(curriculum.electives.map((e) => e.group))).map((groupKey) => {
                   const items = curriculum.electives.filter((e) => e.group === groupKey);
                   if (items.length === 0) return null;
-                  const label = groupKey === "ELECTIVE_I" ? "Elective I" : "Elective II";
+                  const label =
+                    groupKey === "ELECTIVE_I"
+                      ? "Elective I"
+                      : groupKey === "ELECTIVE_II"
+                      ? "Elective II"
+                      : groupKey;
 
                   return (
                     <Card
@@ -483,7 +488,7 @@ export function StudentCourseStructurePanel({
                     >
                       <div className="flex items-center justify-between mb-3 pb-2 border-b border-border/50">
                         <span className="text-xs font-bold text-foreground">{label}</span>
-                        <Badge variant="outline" className="text-[10px] bg-muted/40">
+                        <Badge className="text-[10px] border-0 bg-primary/15 text-primary">
                           Choice of 1 Course
                         </Badge>
                       </div>

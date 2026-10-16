@@ -37,6 +37,8 @@ export type AnnouncementItem = {
   attachmentFileName?: string | null;
   attachmentMimeType?: string | null;
   attachmentSize?: number | null;
+  archivedAt?: string | null;
+  archivedBy?: string | null;
 };
 
 export function toNoticeDetailData(a: AnnouncementItem): NoticeDetailData {
@@ -94,7 +96,7 @@ export type AnnouncementsBoardProps<T extends AnnouncementItem = AnnouncementIte
   emptyStateMessage?: string;
 };
 
-type FilterCategory = "all" | "campus" | "class" | "files" | "mine";
+type FilterCategory = "all" | "campus" | "class" | "files" | "mine" | "archived";
 type SortOption = "newest" | "oldest" | "alpha";
 type ViewMode = "grid" | "list";
 
@@ -156,14 +158,22 @@ export function AnnouncementsBoard<T extends AnnouncementItem = AnnouncementItem
   const loading = externalLoading !== undefined ? externalLoading : internalLoading;
   const error = externalError !== undefined ? externalError : internalError;
 
-  // Compute metrics
+  // Compute metrics (excluding archived from active counts)
   const stats = useMemo(() => {
+    let activeTotal = 0;
     let campusCount = 0;
     let classCount = 0;
     let filesCount = 0;
     let myCount = 0;
+    let archivedCount = 0;
 
     for (const item of rawList) {
+      if (item.archivedAt) {
+        archivedCount++;
+        continue;
+      }
+
+      activeTotal++;
       const isClass = Boolean(item.subject || item.teacherId);
       if (isClass) classCount++;
       else campusCount++;
@@ -173,11 +183,12 @@ export function AnnouncementsBoard<T extends AnnouncementItem = AnnouncementItem
     }
 
     return {
-      total: rawList.length,
+      total: activeTotal,
       campus: campusCount,
       class: classCount,
       files: filesCount,
       mine: myCount,
+      archived: archivedCount,
     };
   }, [rawList, currentUserId]);
 
@@ -187,13 +198,22 @@ export function AnnouncementsBoard<T extends AnnouncementItem = AnnouncementItem
 
     return rawList
       .filter((item) => {
-        // Category filter
-        const isClass = Boolean(item.subject || item.teacherId);
-        if (activeCategory === "campus" && isClass) return false;
-        if (activeCategory === "class" && !isClass) return false;
-        if (activeCategory === "files" && !item.attachmentFileName) return false;
-        if (activeCategory === "mine" && currentUserId && item.authorId !== currentUserId) {
-          return false;
+        const isArchived = Boolean(item.archivedAt);
+
+        // When "archived" category is selected: ONLY show archived notices
+        if (activeCategory === "archived") {
+          if (!isArchived) return false;
+        } else {
+          // Under ALL OTHER filters (including "all" / "All Bulletins"): NEVER show archived notices
+          if (isArchived) return false;
+
+          const isClass = Boolean(item.subject || item.teacherId);
+          if (activeCategory === "campus" && isClass) return false;
+          if (activeCategory === "class" && !isClass) return false;
+          if (activeCategory === "files" && !item.attachmentFileName) return false;
+          if (activeCategory === "mine" && currentUserId && item.authorId !== currentUserId) {
+            return false;
+          }
         }
 
         // Search query filter
@@ -422,13 +442,28 @@ export function AnnouncementsBoard<T extends AnnouncementItem = AnnouncementItem
               type="button"
               onClick={() => setActiveCategory("mine")}
               className={cn(
-                "rounded-md px-2.5 py-1 font-medium transition-colors",
+                "rounded-md px-2.5 py-1 font-medium transition-colors cursor-pointer",
                 activeCategory === "mine"
                   ? "bg-primary text-primary-foreground shadow-2xs"
                   : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
               )}
             >
               My Notices ({stats.mine})
+            </button>
+          )}
+
+          {(variant === "admin" || stats.archived > 0) && (
+            <button
+              type="button"
+              onClick={() => setActiveCategory("archived")}
+              className={cn(
+                "rounded-md px-2.5 py-1 font-medium transition-colors cursor-pointer",
+                activeCategory === "archived"
+                  ? "bg-amber-600 text-white shadow-2xs dark:bg-amber-500"
+                  : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              Archived ({stats.archived})
             </button>
           )}
 

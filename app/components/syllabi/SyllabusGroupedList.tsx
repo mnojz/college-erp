@@ -4,19 +4,19 @@ import { useMemo } from "react";
 import { type SyllabusDto } from "@/app/lib/syllabi-shared";
 
 type Syllabus = SyllabusDto;
-type Program = { id: string; name: string; code: string; departmentName: string };
+type Program = { id: string; name: string; code: string; departmentName: string; durationYears?: number };
 
 export interface ProgramGroup {
   /** Stable React key: program id, or "__unassigned__" for rows without a program. */
   key: string;
-  program: { id: string | null; name: string; code: string; departmentName: string } | null;
+  program: { id: string | null; name: string; code: string; departmentName: string; durationYears?: number } | null;
   bySemester: Map<number, Syllabus[]>;
 }
 
 /**
  * Groups a flat syllabus list into PROGRAM sections (Computer, Civil,
  * Architecture, …). Each program owning at least one syllabus becomes its own
- * section showing all 8 semester slots (empty slots render a placeholder).
+ * section showing all semester slots (e.g. 10 for architecture, 8 for 4-year programs).
  * Program-less rows land in a final "Unassigned" section. Known programs are
  * sorted by department then name, so newly added programs automatically get
  * their own section without further changes.
@@ -38,6 +38,7 @@ export function useSyllabusProgramGroups(
             name: p.name,
             code: p.code,
             departmentName: p.departmentName,
+            durationYears: p.durationYears,
           },
           items: [],
         });
@@ -57,6 +58,7 @@ export function useSyllabusProgramGroups(
                 name: known.name,
                 code: known.code,
                 departmentName: known.departmentName,
+                durationYears: known.durationYears,
               }
             : {
                 // Orphan row: syllabus references a program missing from meta,
