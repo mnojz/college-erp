@@ -69,14 +69,32 @@ function ProfileImagePreviewContent({
     setPan({ x: 0, y: 0 });
   };
 
-  // Wheel to zoom in / out
+  // Wheel to zoom in / out with touchpad dampening
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     if (!imageUrl) return;
     e.preventDefault();
-    const delta = e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP;
+
+    const isPinch = e.ctrlKey;
+    const isWheelClick =
+      !isPinch &&
+      (e.deltaMode === 1 ||
+        (e.deltaMode === 0 &&
+          Math.abs(e.deltaY) >= 50 &&
+          Number.isInteger(e.deltaY) &&
+          Math.abs(e.deltaY) % 10 === 0));
+
+    let delta: number;
+    if (isWheelClick) {
+      delta = e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP;
+    } else {
+      const factor = isPinch ? 0.008 : 0.002;
+      delta = -e.deltaY * factor;
+      delta = Math.max(-0.15, Math.min(0.15, delta));
+    }
+
     setZoom((prev) => {
       const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, +(prev + delta).toFixed(2)));
-      if (next <= 1) {
+      if (next <= 1 && prev > 1) {
         setPan({ x: 0, y: 0 });
       }
       return next;

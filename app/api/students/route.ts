@@ -107,6 +107,12 @@ type CreateStudentBody = {
   nationality?: unknown;
   religion?: unknown;
   category?: unknown;
+  phone?: unknown;
+  bloodGroup?: unknown;
+  emergencyContact?: unknown;
+  guardianRelation?: unknown;
+  guardianPhone?: unknown;
+  guardianEmail?: unknown;
 };
 
 type UpdateStudentBody = {
@@ -131,6 +137,12 @@ type UpdateStudentBody = {
   nationality?: unknown;
   religion?: unknown;
   category?: unknown;
+  phone?: unknown;
+  bloodGroup?: unknown;
+  emergencyContact?: unknown;
+  guardianRelation?: unknown;
+  guardianPhone?: unknown;
+  guardianEmail?: unknown;
 };
 
 /** Valid StudentStatus values, for payload validation. */
@@ -154,10 +166,17 @@ export async function POST(request: Request) {
   const lastName = typeof body.lastName === "string" ? body.lastName.trim() : "";
   const enrollmentNumber = typeof body.enrollmentNumber === "string" ? body.enrollmentNumber.trim() : "";
   const registrationId = typeof body.registrationId === "string" ? body.registrationId.trim() : "";
-  // Rolls are integers in the DB, but the form keeps them as text so typing
-  // doesn't fight the input — parse here and let the caller reject non-numbers.
-  const rollRaw = typeof body.rollNumber === "string" ? body.rollNumber.trim() : "";
-  const rollNumber = rollRaw === "" ? null : /^\d+$/.test(rollRaw) ? Number(rollRaw) : NaN;
+  // Rolls are integers in the DB, but callers may pass either a number or a text string.
+  // Validate that if provided, it resolves strictly to a positive whole integer.
+  const rollRaw =
+    typeof body.rollNumber === "number"
+      ? Number.isInteger(body.rollNumber) && body.rollNumber > 0
+        ? String(body.rollNumber)
+        : "NaN"
+      : typeof body.rollNumber === "string"
+        ? body.rollNumber.trim()
+        : "";
+  const rollNumber = rollRaw === "" ? null : /^\d+$/.test(rollRaw) && Number(rollRaw) > 0 ? Number(rollRaw) : NaN;
   const profileImageUrl = typeof body.profileImageUrl === "string" ? body.profileImageUrl.trim() : undefined;
   const admissionDate = typeof body.admissionDate === "string" ? new Date(body.admissionDate) : null;
   const programId = typeof body.programId === "string" ? body.programId : undefined;
@@ -251,8 +270,17 @@ export async function PUT(request: Request) {
   const lastName = typeof body.lastName === "string" ? body.lastName.trim() : "";
   const enrollmentNumber = typeof body.enrollmentNumber === "string" ? body.enrollmentNumber.trim() : "";
   const registrationId = typeof body.registrationId === "string" ? body.registrationId.trim() : "";
-  const rollRaw = typeof body.rollNumber === "string" ? body.rollNumber.trim() : "";
-  const rollNumber = rollRaw === "" ? null : /^\d+$/.test(rollRaw) ? Number(rollRaw) : NaN;
+  // Rolls are integers in the DB, but callers may pass either a number or a text string.
+  // Validate that if provided, it resolves strictly to a positive whole integer.
+  const rollRaw =
+    typeof body.rollNumber === "number"
+      ? Number.isInteger(body.rollNumber) && body.rollNumber > 0
+        ? String(body.rollNumber)
+        : "NaN"
+      : typeof body.rollNumber === "string"
+        ? body.rollNumber.trim()
+        : "";
+  const rollNumber = rollRaw === "" ? null : /^\d+$/.test(rollRaw) && Number(rollRaw) > 0 ? Number(rollRaw) : NaN;
   const profileImageUrl = typeof body.profileImageUrl === "string" ? (body.profileImageUrl.trim() || null) : null;
   const admissionDate = typeof body.admissionDate === "string" ? new Date(body.admissionDate) : null;
   const programId = typeof body.programId === "string" && body.programId ? body.programId : null;
@@ -350,6 +378,12 @@ export async function PUT(request: Request) {
           nationality,
           religion,
           category,
+          phone: typeof body.phone === "string" ? body.phone.trim() || null : undefined,
+          bloodGroup: typeof body.bloodGroup === "string" ? body.bloodGroup.trim() || null : undefined,
+          emergencyContact: typeof body.emergencyContact === "string" ? body.emergencyContact.trim() || null : undefined,
+          guardianRelation: typeof body.guardianRelation === "string" ? body.guardianRelation.trim() || null : undefined,
+          guardianPhone: typeof body.guardianPhone === "string" ? body.guardianPhone.trim() || null : undefined,
+          guardianEmail: typeof body.guardianEmail === "string" ? body.guardianEmail.trim() || null : undefined,
           ...(status ? { status } : {}),
         },
         select: {

@@ -6,11 +6,6 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ProfileHero } from "@/app/components/student/ProfileHero";
 import { StudentShell } from "@/app/components/student/StudentShell";
-import {
-  NoticeDetailData,
-  NoticeDetailModal,
-} from "@/app/components/common/NoticeDetailModal";
-import { NoticePostCard } from "@/app/components/common/NoticePostCard";
 import { ProfilePictureUpload } from "@/app/components/profile/ProfilePictureUpload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,7 +53,6 @@ import {
   IconDroplet,
   IconEdit,
   IconHome,
-  IconLayoutList,
   IconLoader2,
   IconLock,
   IconMail,
@@ -182,57 +176,9 @@ const GUARDIAN_RELATIONS = [
   "Other",
 ];
 
-type Announcement = {
-  id: string;
-  title: string;
-  body: string;
-  publishedAt: string | null;
-  createdAt: string;
-  teacherId: string | null;
-  semester: number | null;
-  author: { firstName: string; lastName: string } | null;
-  subject: { id: string; name: string; code: string } | null;
-  program: { id: string; name: string; code: string } | null;
-  attachmentFileName: string | null;
-  attachmentMimeType: string | null;
-  attachmentSize: number | null;
-};
-
-/** Raw announcement row → client-safe notice shape for cards/modal. */
-function toNotice(a: Announcement): NoticeDetailData {
-  return {
-    id: a.id,
-    title: a.title,
-    body: a.body,
-    publishedAt: a.publishedAt,
-    createdAt: a.createdAt,
-    author: a.author,
-    scope:
-      a.teacherId && a.subject && a.program && a.semester != null
-        ? {
-            subjectName: a.subject.name,
-            subjectCode: a.subject.code,
-            programName: a.program.name,
-            programCode: a.program.code,
-            semester: a.semester,
-          }
-        : null,
-    attachment:
-      a.attachmentFileName && a.attachmentSize !== null
-        ? {
-            fileName: a.attachmentFileName,
-            mimeType: a.attachmentMimeType ?? "application/octet-stream",
-            size: a.attachmentSize,
-          }
-        : null,
-  };
-}
-
 export default function StudentPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [selectedNotice, setSelectedNotice] = useState<NoticeDetailData | null>(null);
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState<EditFormState | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -369,17 +315,6 @@ export default function StudentPage() {
       .catch(() => setError("Unable to reach the server"))
       .finally(() => {
         doneProgress();
-      });
-
-    // Campus bulletins + teacher notices scoped to this student's program/semester.
-    fetch("/api/announcements")
-      .then(async (response) => {
-        if (!response.ok) return;
-        const result = await response.json();
-        setAnnouncements(result.announcements ?? []);
-      })
-      .catch(() => {
-        // announcements are non-critical; profile already loaded
       });
   }, [router]);
 
@@ -813,7 +748,7 @@ export default function StudentPage() {
                     Class Roll Number
                   </span>
                   <p className="font-mono font-semibold text-foreground mt-0.5">
-                    {profile.rollNumber != null ? `#${profile.rollNumber}` : "Not assigned"}
+                    {profile.rollNumber != null ? profile.rollNumber : "Not assigned"}
                   </p>
                 </div>
 
@@ -992,34 +927,6 @@ export default function StudentPage() {
           </Card>
         </div>
       </div>
-
-      {announcements.length > 0 && (
-        <section className="mt-7">
-          <header className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold tracking-tight">Notice</h2>
-            </div>
-            <Button asChild variant="ghost" aria-label="View all notices">
-              <Link href="/student/notice">
-                <IconLayoutList size={16} aria-hidden="true" />
-                View All ({announcements.length})
-              </Link>
-            </Button>
-          </header>
-
-          {/* Latest announcements — 2 cards by default */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {announcements.slice(0, 2).map((a) => (
-              <NoticePostCard
-                key={a.id}
-                notice={toNotice(a)}
-                onOpen={() => setSelectedNotice(toNotice(a))}
-                compact
-              />
-            ))}
-          </div>
-        </section>
-      )}
 
       {showEdit && editForm && (
         <Dialog open={showEdit} onOpenChange={(open) => !open && setShowEdit(false)}>
@@ -1736,9 +1643,6 @@ export default function StudentPage() {
             </form>
           </DialogContent>
         </Dialog>
-      )}
-      {selectedNotice && (
-        <NoticeDetailModal notice={selectedNotice} onClose={() => setSelectedNotice(null)} />
       )}
     </StudentShell>
   );

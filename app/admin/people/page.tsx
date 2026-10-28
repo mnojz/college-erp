@@ -47,6 +47,7 @@ import {
   type SortOption,
 } from "@/app/components/common/SortControl";
 import { ImageUploadCrop } from "@/app/components/common/ImageUploadCrop";
+import { SubjectAssigner } from "@/app/components/admin/SubjectAssigner";
 import { cn } from "cn";
 
 type TeacherItem = {
@@ -270,263 +271,6 @@ function AccountStatusBadge({ status }: { status: string }) {
   );
 }
 
-/**
- * Subject-assignment picker for the teacher create/edit modals.
- *
- * Shows only the subjects already assigned to the teacher as removable chips,
- * plus a dedicated "Assign Subject" button. Clicking it expands a searchable
- * catalog of ALL subjects — assigned ones appear disabled ("Assigned"),
- * unassigned ones are added on click. The parent's assignedIds drives both
- * lists, so assigning/removing instantly updates the chips.
- */
-function SubjectAssigner({
-  subjects,
-  assignedIds,
-  onChange,
-}: {
-  subjects: SubjectOption[];
-  assignedIds: string[];
-  onChange: (next: string[]) => void;
-}) {
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [semesterFilter, setSemesterFilter] = useState("ALL");
-  const [programFilter, setProgramFilter] = useState("ALL");
-
-  const assigned = subjects.filter((s) => assignedIds.includes(s.id));
-  const q = query.trim().toLowerCase();
-  const visible = subjects.filter((s) => {
-    if (programFilter !== "ALL" && (s.program?.code ?? "") !== programFilter) return false;
-    if (semesterFilter !== "ALL" && String(s.semester) !== semesterFilter) return false;
-    if (!q) return true;
-    return (
-      s.code.toLowerCase().includes(q) ||
-      s.name.toLowerCase().includes(q) ||
-      (s.program?.code ?? "").toLowerCase().includes(q) ||
-      (s.program?.name ?? "").toLowerCase().includes(q)
-    );
-  });
-
-  // Distinct semesters present across the catalog (for the filter dropdown).
-  const semesters = useMemo(
-    () => Array.from(new Set(subjects.map((s) => s.semester))).sort((a, b) => a - b),
-    [subjects],
-  );
-
-  // Distinct programs present across the catalog (for the filter dropdown).
-  const programs = useMemo(() => {
-    const byCode = new Map<string, { code: string; name: string }>();
-    for (const s of subjects) {
-      if (s.program && !byCode.has(s.program.code)) {
-        byCode.set(s.program.code, s.program);
-      }
-    }
-    return Array.from(byCode.values()).sort((a, b) => a.code.localeCompare(b.code));
-  }, [subjects]);
-
-  const filtersActive = programFilter !== "ALL" || semesterFilter !== "ALL";
-  const activeFilterLabel = [
-    programFilter !== "ALL" ? `program ${programFilter}` : "",
-    semesterFilter !== "ALL" ? `semester ${semesterFilter}` : "",
-    q ? `“${query.trim()}”` : "",
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
-  return (
-    <div className="grid gap-2">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <Label>Assigned subjects</Label>
-        <span className="text-xs text-muted-foreground">
-          Drives automatic class scheduling
-        </span>
-      </div>
-
-      {assigned.length === 0 ? (
-        <p className="text-xs text-muted-foreground">
-          No subjects assigned yet. Click “Assign Subject” below to add one.
-        </p>
-      ) : (
-        <div className="flex flex-wrap gap-1.5">
-          {assigned.map((s) => (
-            <Badge key={s.id} variant="secondary" className="h-auto gap-1.5 py-1 pr-1 font-normal">
-              <span className="font-semibold">{s.code}</span>
-              <span className="text-muted-foreground">{s.name}</span>
-              <span className="text-muted-foreground/70">
-                · Sem {s.semester}
-                {s.program ? ` · ${s.program.code}` : ""}
-              </span>
-              <button
-                type="button"
-                title={`Remove ${s.code} from this teacher`}
-                aria-label={`Remove ${s.code}`}
-                onClick={() => onChange(assignedIds.filter((id) => id !== s.id))}
-                className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-foreground/10"
-              >
-                <IconX size={12} aria-hidden="true" />
-              </button>
-            </Badge>
-          ))}
-        </div>
-      )}
-
-      <div className="flex items-center gap-2.5">
-        <Button
-          type="button"
-          variant={pickerOpen ? "secondary" : "outline"}
-          size="sm"
-          onClick={() => setPickerOpen((v) => !v)}
-        >
-          {pickerOpen ? (
-            "Done"
-          ) : (
-            <>
-              <IconPlus size={15} aria-hidden="true" />
-              Assign Subject
-            </>
-          )}
-        </Button>
-        {assigned.length > 0 && (
-          <span className="text-xs text-muted-foreground">
-            {assigned.length} of {subjects.length} assigned
-          </span>
-        )}
-      </div>
-
-      {pickerOpen && (
-        <div className="grid gap-2.5 rounded-lg border bg-card p-3">
-          {/* Full-width search */}
-          <div className="relative">
-            <IconSearch
-              size={15}
-              aria-hidden="true"
-              className="pointer-events-none absolute top-1/2 left-2.5 z-[1] -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              type="text"
-              placeholder="Search by code, name, or program…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="pl-8"
-            />
-          </div>
-
-          {/* Program + semester filters */}
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]">
-            <div className="grid gap-1">
-              <Label className="text-xs text-muted-foreground">Program</Label>
-              <Select value={programFilter} onValueChange={setProgramFilter}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent position="popper">
-                  <SelectItem value="ALL">All programs</SelectItem>
-                  {programs.map((p) => (
-                    <SelectItem key={p.code} value={p.code}>
-                      {p.code} — {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-1">
-              <Label className="text-xs text-muted-foreground">Semester</Label>
-              <Select value={semesterFilter} onValueChange={setSemesterFilter}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent position="popper">
-                  <SelectItem value="ALL">All semesters</SelectItem>
-                  {semesters.map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      Semester {n}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {filtersActive && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setProgramFilter("ALL");
-                  setSemesterFilter("ALL");
-                }}
-                title="Clear filters"
-                className="self-end"
-              >
-                <IconX size={13} aria-hidden="true" />
-                Clear
-              </Button>
-            )}
-          </div>
-
-          {/* Catalog list */}
-          <div>
-            <div className="flex items-center justify-between pb-1">
-              <span className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                Subjects
-              </span>
-              <span className="text-[11px] text-muted-foreground">
-                {visible.length} of {subjects.length}
-              </span>
-            </div>
-            <div className="grid max-h-56 gap-0.5 overflow-y-auto">
-              {visible.length === 0 ? (
-                <p className="px-1 py-2 text-[13px] text-muted-foreground">
-                  {subjects.length === 0
-                    ? "No subjects yet — publish a curriculum first."
-                    : `No subjects match: ${activeFilterLabel || "current filters"}.`}
-                </p>
-              ) : (
-                visible.map((s) => {
-                  const isAssigned = assignedIds.includes(s.id);
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      disabled={isAssigned}
-                      onClick={() => onChange([...assignedIds, s.id])}
-                      title={isAssigned ? "Already assigned" : `Assign ${s.code} · ${s.name}`}
-                      className={cn(
-                        "flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
-                        isAssigned ? "cursor-default opacity-55" : "hover:bg-accent",
-                      )}
-                    >
-                      <span className="min-w-0 truncate">
-                        <span className="font-semibold">{s.code}</span> · {s.name}
-                        <span className="text-muted-foreground">
-                          {" "}
-                          — {s.program?.code ?? ""} · Sem {s.semester}
-                        </span>
-                      </span>
-                      {isAssigned ? (
-                        <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-muted-foreground">
-                          <IconCircleCheck size={15} aria-hidden="true" />
-                          Assigned
-                        </span>
-                      ) : (
-                        <IconPlus
-                          size={15}
-                          className="shrink-0 text-muted-foreground"
-                          aria-hidden="true"
-                        />
-                      )}
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function AdminPeoplePage() {
   const router = useRouter();
@@ -585,10 +329,11 @@ export default function AdminPeoplePage() {
     ["asc", "desc"],
   );
 
-  // Person profile modal (read-only detail view: attendance, results, semesters)
+  // Person profile modal (unified view & edit: overview, attendance, results, progression)
   const [profileModal, setProfileModal] = useState<{
     kind: "student" | "teacher";
     id: string;
+    initialMode?: "view" | "edit";
   } | null>(null);
 
   // Create Modals
@@ -596,10 +341,6 @@ export default function AdminPeoplePage() {
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [teacherForm, setTeacherForm] = useState(teacherEmpty);
   const [studentForm, setStudentForm] = useState(studentEmpty);
-
-  // Edit Modals
-  const [editingTeacher, setEditingTeacher] = useState<{ id: string } & typeof teacherEmpty | null>(null);
-  const [editingStudent, setEditingStudent] = useState<{ id: string } & typeof studentEmpty | null>(null);
 
   // Delete Confirmation Modal
   const [deletingTarget, setDeletingTarget] = useState<DeleteTarget | null>(null);
@@ -712,6 +453,18 @@ export default function AdminPeoplePage() {
     }
   }
 
+  async function loadTeachers() {
+    try {
+      const res = await fetch("/api/teachers");
+      const data = await res.json();
+      if (res.ok) {
+        setTeachers(data.teachers ?? []);
+      }
+    } catch {
+      // silent
+    }
+  }
+
   // Debounce the search box so a request isn't fired on every keystroke.
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedStudentSearch(studentSearch), 300);
@@ -765,13 +518,6 @@ export default function AdminPeoplePage() {
     [programs, studentForm.programId],
   );
   const createStudentSemestersCount = createStudentProgram ? createStudentProgram.durationYears * 2 : 0;
-
-  // Derived semester count for student edit form
-  const editStudentProgram = useMemo(
-    () => programs.find((p) => p.id === editingStudent?.programId),
-    [programs, editingStudent?.programId],
-  );
-  const editStudentSemestersCount = editStudentProgram ? editStudentProgram.durationYears * 2 : 0;
 
   // Filtered teachers
   const filteredTeachers = useMemo(() => {
@@ -871,45 +617,14 @@ export default function AdminPeoplePage() {
     setStudentSearch("");
   }
 
-  // Open Edit Teacher modal
+  // Open Edit Teacher modal (unified profile viewer/editor)
   function openEditTeacher(teacher: TeacherItem) {
-    setError("");
-    setEditingTeacher({
-      id: teacher.id,
-      firstName: teacher.user.firstName,
-      lastName: teacher.user.lastName,
-      email: teacher.user.email,
-      password: "",
-      employeeNo: teacher.employeeNo,
-      profileImageUrl: teacher.profileImageUrl || "",
-      subjectIds: (teacher.subjectTeachers ?? []).map((st) => st.subject.id),
-      status: teacher.user.status,
-    });
+    setProfileModal({ kind: "teacher", id: teacher.id, initialMode: "edit" });
   }
 
-  // Open Edit Student modal
+  // Open Edit Student modal (unified profile viewer/editor)
   function openEditStudent(student: StudentItem) {
-    setError("");
-    setEditingStudent({
-      id: student.id,
-      firstName: student.user.firstName,
-      lastName: student.user.lastName,
-      email: student.user.email,
-      password: "",
-      enrollmentNumber: student.enrollmentNumber,
-      registrationId: student.registrationId,
-      rollNumber: String(student.rollNumber ?? ""),
-      admissionDate: student.admissionDate ? new Date(student.admissionDate).toISOString().slice(0, 10) : "",
-      programId: student.programId || "",
-      currentSemester: student.currentSemester ? String(student.currentSemester) : "1",
-      profileImageUrl: student.profileImageUrl || "",
-      status: student.status || "ACTIVE",
-      userStatus: student.user.status,
-      gender: student.gender || "",
-      nationality: student.nationality || "",
-      religion: student.religion || "",
-      category: student.category || "",
-    });
+    setProfileModal({ kind: "student", id: student.id, initialMode: "edit" });
   }
 
   // Handle Create Teacher
@@ -944,49 +659,6 @@ export default function AdminPeoplePage() {
     }
   }
 
-  // Handle Update Teacher
-  async function handleUpdateTeacher(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!editingTeacher) return;
-    setError("");
-    setSaving(true);
-    try {
-      const payload: Record<string, string | string[] | undefined> = {
-        id: editingTeacher.id,
-        firstName: editingTeacher.firstName,
-        lastName: editingTeacher.lastName,
-        email: editingTeacher.email,
-        employeeNo: editingTeacher.employeeNo,
-        profileImageUrl: editingTeacher.profileImageUrl || undefined,
-        subjectIds: editingTeacher.subjectIds,
-        status: editingTeacher.status,
-      };
-      if (editingTeacher.password) {
-        payload.password = editingTeacher.password;
-      }
-
-      const res = await fetch("/api/teachers", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Failed to update teacher account");
-        return;
-      }
-      const refresh = await fetch("/api/teachers");
-      const refreshData = await refresh.json();
-      setTeachers(refreshData.teachers ?? []);
-      setEditingTeacher(null);
-      toast.success(`Profile updated for ${data.teacher.user.firstName} ${data.teacher.user.lastName}.`);
-    } catch {
-      setError("Failed to update teacher account");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   // Handle Create Student
   async function handleCreateStudent(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -1014,56 +686,6 @@ export default function AdminPeoplePage() {
       toast.success(`Student account created for ${data.student.user.firstName} ${data.student.user.lastName}.`);
     } catch {
       setError("Failed to create student account");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  // Handle Update Student
-  async function handleUpdateStudent(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!editingStudent) return;
-    setError("");
-    setSaving(true);
-    try {
-      const payload: Record<string, string | number | undefined> = {
-        id: editingStudent.id,
-        firstName: editingStudent.firstName,
-        lastName: editingStudent.lastName,
-        email: editingStudent.email,
-        enrollmentNumber: editingStudent.enrollmentNumber,
-        registrationId: editingStudent.registrationId,
-        rollNumber: editingStudent.rollNumber || undefined,
-        admissionDate: editingStudent.admissionDate,
-        programId: editingStudent.programId || undefined,
-        currentSemester: editingStudent.currentSemester ? Number(editingStudent.currentSemester) : undefined,
-        profileImageUrl: editingStudent.profileImageUrl || undefined,
-        gender: editingStudent.gender || undefined,
-        nationality: editingStudent.nationality || undefined,
-        religion: editingStudent.religion || undefined,
-        category: editingStudent.category || undefined,
-        status: editingStudent.status,
-        userStatus: editingStudent.userStatus,
-      };
-      if (editingStudent.password) {
-        payload.password = editingStudent.password;
-      }
-
-      const res = await fetch("/api/students", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Failed to update student account");
-        return;
-      }
-      await loadStudents(studentPage);
-      setEditingStudent(null);
-      toast.success(`Student profile updated for ${data.student.user.firstName} ${data.student.user.lastName}.`);
-    } catch {
-      setError("Failed to update student account");
     } finally {
       setSaving(false);
     }
@@ -1325,7 +947,7 @@ export default function AdminPeoplePage() {
                   />
                   <Input
                     type="text"
-                    placeholder="Search name, roll, reg #…"
+                    placeholder="Search name, roll, reg ID…"
                     value={studentSearch}
                     onChange={(e) => setStudentSearch(e.target.value)}
                     className="pl-8"
@@ -1558,7 +1180,7 @@ export default function AdminPeoplePage() {
                       <TableCell>
                         {s.rollNumber ? (
                           <span className="font-mono text-[13px] text-muted-foreground">
-                            #{s.rollNumber}
+                            {s.rollNumber}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">—</span>
@@ -1730,115 +1352,7 @@ export default function AdminPeoplePage() {
           </AdminModal>
         )}
 
-        {/* Modal 2: Edit Teacher */}
-        {editingTeacher && (
-          <AdminModal
-            title={`Edit Teacher: ${editingTeacher.firstName} ${editingTeacher.lastName}`}
-            wide
-            onClose={() => setEditingTeacher(null)}
-          >
-            <form className="grid gap-4" onSubmit={handleUpdateTeacher}>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="te-first">First name</Label>
-                  <Input
-                    id="te-first"
-                    type="text"
-                    value={editingTeacher.firstName}
-                    onChange={(e) => setEditingTeacher({ ...editingTeacher, firstName: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="te-last">Last name</Label>
-                  <Input
-                    id="te-last"
-                    type="text"
-                    value={editingTeacher.lastName}
-                    onChange={(e) => setEditingTeacher({ ...editingTeacher, lastName: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="te-emp">Employee ID number</Label>
-                  <Input
-                    id="te-emp"
-                    type="text"
-                    value={editingTeacher.employeeNo}
-                    onChange={(e) => setEditingTeacher({ ...editingTeacher, employeeNo: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="te-email">Email address</Label>
-                  <Input
-                    id="te-email"
-                    type="email"
-                    value={editingTeacher.email}
-                    onChange={(e) => setEditingTeacher({ ...editingTeacher, email: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="te-password">Change password (optional)</Label>
-                  <Input
-                    id="te-password"
-                    type="password"
-                    placeholder="Leave blank to keep existing password"
-                    value={editingTeacher.password}
-                    onChange={(e) => setEditingTeacher({ ...editingTeacher, password: e.target.value })}
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="te-status">Account status</Label>
-                  <Select
-                    value={editingTeacher.status}
-                    onValueChange={(status) => setEditingTeacher({ ...editingTeacher, status })}
-                  >
-                    <SelectTrigger id="te-status" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent position="popper">
-                      <SelectItem value="ACTIVE">Active — can sign in</SelectItem>
-                      <SelectItem value="INACTIVE">Inactive — sign-in blocked</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <ImageUploadCrop
-                label="Profile Photo (Crop to Square)"
-                value={editingTeacher.profileImageUrl || ""}
-                onChange={(val) => setEditingTeacher({ ...editingTeacher, profileImageUrl: val })}
-              />
-
-              <SubjectAssigner
-                subjects={subjects}
-                assignedIds={editingTeacher.subjectIds}
-                onChange={(next) =>
-                  setEditingTeacher((t) => (t ? { ...t, subjectIds: next } : t))
-                }
-              />
-
-              {error && <p className="text-[13px] text-destructive">{error}</p>}
-
-              <div className="flex flex-wrap justify-end gap-2.5">
-                <Button type="submit" disabled={saving}>
-                  {saving ? "Saving Changes…" : "Save Changes"}
-                </Button>
-                <Button variant="outline" type="button" onClick={() => setEditingTeacher(null)}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </AdminModal>
-        )}
 
         {/* Modal 3: Create Student */}
         {showStudentModal && (
@@ -2093,271 +1607,7 @@ export default function AdminPeoplePage() {
           </AdminModal>
         )}
 
-        {/* Modal 4: Edit Student */}
-        {editingStudent && (
-          <AdminModal
-            title={`Edit Student: ${editingStudent.firstName} ${editingStudent.lastName}`}
-            wide
-            onClose={() => setEditingStudent(null)}
-          >
-            <form className="grid gap-4" onSubmit={handleUpdateStudent}>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="se-first">First name</Label>
-                  <Input
-                    id="se-first"
-                    type="text"
-                    value={editingStudent.firstName}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, firstName: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="se-last">Last name</Label>
-                  <Input
-                    id="se-last"
-                    type="text"
-                    value={editingStudent.lastName}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, lastName: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="se-email">Email address</Label>
-                  <Input
-                    id="se-email"
-                    type="email"
-                    value={editingStudent.email}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, email: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="se-password">Change password (optional)</Label>
-                  <Input
-                    id="se-password"
-                    type="password"
-                    placeholder="Leave blank to keep existing"
-                    value={editingStudent.password}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, password: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="se-enrollment">Enrollment number</Label>
-                  <Input
-                    id="se-enrollment"
-                    type="text"
-                    value={editingStudent.enrollmentNumber}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, enrollmentNumber: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="se-registration">Registration ID</Label>
-                  <Input
-                    id="se-registration"
-                    type="text"
-                    value={editingStudent.registrationId}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, registrationId: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="se-roll">Roll number (optional)</Label>
-                  <Input
-                    id="se-roll"
-                    type="text"
-                    value={editingStudent.rollNumber}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, rollNumber: e.target.value })}
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="se-admission">Admission date</Label>
-                  <Input
-                    id="se-admission"
-                    type="date"
-                    value={editingStudent.admissionDate}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, admissionDate: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="se-program">Academic program</Label>
-                  <Select
-                    value={editingStudent.programId || undefined}
-                    onValueChange={(programId) =>
-                      setEditingStudent({ ...editingStudent, programId, currentSemester: "1" })
-                    }
-                  >
-                    <SelectTrigger id="se-program" className="w-full">
-                      <SelectValue placeholder="No program assigned yet" />
-                    </SelectTrigger>
-                    <SelectContent position="popper">
-                      {programs.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.code} — {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid gap-1.5">
-                  <Label htmlFor="se-semester">Current semester</Label>
-                  <Select
-                    value={editingStudent.currentSemester || undefined}
-                    onValueChange={(currentSemester) =>
-                      setEditingStudent({ ...editingStudent, currentSemester })
-                    }
-                    disabled={!editingStudent.programId}
-                  >
-                    <SelectTrigger id="se-semester" className="w-full">
-                      <SelectValue
-                        placeholder={
-                          editingStudent.programId ? "Select semester" : "Pick program first"
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent position="popper">
-                      {Array.from({ length: editStudentSemestersCount }, (_, i) => i + 1).map((n) => (
-                        <SelectItem key={n} value={String(n)}>
-                          Semester {n}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="se-status">Enrollment status</Label>
-                  <Select
-                    value={editingStudent.status}
-                    onValueChange={(status) => setEditingStudent({ ...editingStudent, status })}
-                  >
-                    <SelectTrigger id="se-status" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent position="popper">
-                      <SelectItem value="ACTIVE">Active</SelectItem>
-                      <SelectItem value="INACTIVE">Inactive</SelectItem>
-                      <SelectItem value="GRADUATED">Graduated</SelectItem>
-                      <SelectItem value="SUSPENDED">Suspended</SelectItem>
-                      <SelectItem value="DROPPED">Dropped</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="se-access">Account access</Label>
-                  <Select
-                    value={editingStudent.userStatus}
-                    onValueChange={(userStatus) =>
-                      setEditingStudent({ ...editingStudent, userStatus })
-                    }
-                  >
-                    <SelectTrigger id="se-access" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent position="popper">
-                      <SelectItem value="ACTIVE">Active — can sign in</SelectItem>
-                      <SelectItem value="INACTIVE">Inactive — sign-in blocked</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <p className="text-xs text-muted-foreground">
-                Personal information below is critical — only admins can set it, students cannot
-                change it later.
-              </p>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="se-gender">Gender</Label>
-                  <Select
-                    value={editingStudent.gender || "UNSPECIFIED"}
-                    onValueChange={(v) =>
-                      setEditingStudent({ ...editingStudent, gender: v === "UNSPECIFIED" ? "" : v })
-                    }
-                  >
-                    <SelectTrigger id="se-gender" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent position="popper">
-                      <SelectItem value="UNSPECIFIED">Not specified</SelectItem>
-                      <SelectItem value="Male">Male</SelectItem>
-                      <SelectItem value="Female">Female</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="se-category">Category</Label>
-                  <Input
-                    id="se-category"
-                    type="text"
-                    placeholder="e.g. Open, Reserved"
-                    value={editingStudent.category}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, category: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="se-nationality">Nationality</Label>
-                  <Input
-                    id="se-nationality"
-                    type="text"
-                    placeholder="e.g. Nepali"
-                    value={editingStudent.nationality}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, nationality: e.target.value })}
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="se-religion">Religion</Label>
-                  <Input
-                    id="se-religion"
-                    type="text"
-                    placeholder="e.g. Hindu"
-                    value={editingStudent.religion}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, religion: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <ImageUploadCrop
-                label="Profile Photo (Crop to Square)"
-                value={editingStudent.profileImageUrl || ""}
-                onChange={(val) => setEditingStudent({ ...editingStudent, profileImageUrl: val })}
-              />
-
-              {error && <p className="text-[13px] text-destructive">{error}</p>}
-
-              <div className="flex flex-wrap justify-end gap-2.5">
-                <Button type="submit" disabled={saving}>
-                  {saving ? "Saving Changes…" : "Save Changes"}
-                </Button>
-                <Button variant="outline" type="button" onClick={() => setEditingStudent(null)}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </AdminModal>
-        )}
 
         {/* Modal 5: Delete Confirmation */}
         {deletingTarget && (
@@ -2553,11 +1803,11 @@ export default function AdminPeoplePage() {
             <PersonProfileModal
               kind="teacher"
               id={t.id}
+              initialMode={profileModal.initialMode ?? "view"}
+              programs={programs}
+              allSubjects={subjects}
               onClose={() => setProfileModal(null)}
-              onEditProfile={() => {
-                setProfileModal(null);
-                openEditTeacher(t);
-              }}
+              onSaved={() => void loadTeachers()}
               dangerSection={
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-muted/30 px-4 py-3">
@@ -2632,11 +1882,11 @@ export default function AdminPeoplePage() {
             <PersonProfileModal
               kind="student"
               id={s.id}
+              initialMode={profileModal.initialMode ?? "view"}
+              programs={programs}
+              allSubjects={subjects}
               onClose={() => setProfileModal(null)}
-              onEditProfile={() => {
-                setProfileModal(null);
-                openEditStudent(s);
-              }}
+              onSaved={() => void loadStudents(studentPage)}
               dangerSection={
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-muted/30 px-4 py-3">

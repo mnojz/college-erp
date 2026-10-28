@@ -248,7 +248,7 @@ export function MaterialPreviewModal({ material, onClose, onEdit }: MaterialPrev
                 {material.title}
               </DialogTitle>
               <div className="pt-0.5">
-                <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-medium">
+                <Badge className="text-[10px] h-5 px-2 font-medium border-0 bg-primary/15 text-primary">
                   {materialTypeLabel(material.materialType)}
                 </Badge>
               </div>
@@ -359,7 +359,7 @@ export function MaterialPreviewModal({ material, onClose, onEdit }: MaterialPrev
         )}
 
         {/* Bottom Details Footer Strip */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-border/50 pt-2.5 text-xs text-muted-foreground">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 text-xs text-muted-foreground">
           <div className="flex flex-wrap items-center gap-2">
             {material.subject && (
               <span className="inline-flex items-center gap-1 font-medium text-foreground">
@@ -373,7 +373,7 @@ export function MaterialPreviewModal({ material, onClose, onEdit }: MaterialPrev
               </span>
             )}
             {material.topic && (
-              <span className="rounded-md border border-border bg-muted/30 px-2 py-0.5 text-[11px]">
+              <span className="rounded-md border-0 bg-muted px-2 py-0.5 text-[11px] text-muted-foreground font-medium">
                 Topic: {material.topic}
               </span>
             )}

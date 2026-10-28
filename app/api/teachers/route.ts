@@ -22,6 +22,10 @@ type UpdateTeacherBody = {
   lastName?: unknown;
   employeeNo?: unknown;
   profileImageUrl?: unknown;
+  qualification?: unknown;
+  bio?: unknown;
+  office?: unknown;
+  phone?: unknown;
   subjectIds?: unknown;
   // Portal access — ACTIVE users can sign in, INACTIVE are locked out.
   status?: unknown;
@@ -205,11 +209,20 @@ export async function PUT(request: Request) {
         data: userData,
       });
 
+      const qualification = typeof body.qualification === "string" ? body.qualification.trim() || null : undefined;
+      const bio = typeof body.bio === "string" ? body.bio.trim() || null : undefined;
+      const office = typeof body.office === "string" ? body.office.trim() || null : undefined;
+      const phone = typeof body.phone === "string" ? body.phone.trim() || null : undefined;
+
       const updated = await tx.teacher.update({
         where: { id },
         data: {
           employeeNo,
           profileImageUrl: profileImageUrl || null,
+          ...(qualification !== undefined ? { qualification } : {}),
+          ...(bio !== undefined ? { bio } : {}),
+          ...(office !== undefined ? { office } : {}),
+          ...(phone !== undefined ? { phone } : {}),
         },
         select: {
           id: true,

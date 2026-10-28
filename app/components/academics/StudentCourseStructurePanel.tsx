@@ -71,11 +71,13 @@ type Curriculum = {
 interface Props {
   defaultProgramId?: string;
   currentSemester?: number | null;
+  hideProgramSelector?: boolean;
 }
 
 export function StudentCourseStructurePanel({
   defaultProgramId,
   currentSemester,
+  hideProgramSelector = false,
 }: Props) {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
@@ -200,51 +202,53 @@ export function StudentCourseStructurePanel({
   return (
     <div className="space-y-5">
       {/* ── Top Toolbar: Program Selection & Degree Overview ── */}
-      <Card className="rounded-xl border border-border/70 p-4 shadow-xs bg-card">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center">
-            <Select
-              value={selectedId || undefined}
-              onValueChange={setProgramId}
-              disabled={programOptions.length === 0}
-            >
-              <SelectTrigger className="w-full sm:w-80 h-9 text-xs font-medium">
-                <IconLayersLinked size={14} className="text-primary mr-1.5 shrink-0" />
-                <SelectValue placeholder="Select Program..." />
-              </SelectTrigger>
-              <SelectContent>
-                {programOptions.map((p) => (
-                  <SelectItem key={p.id} value={p.id} className="text-xs">
-                    {p.name} ({p.code})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Quick Metrics Bar */}
-          {selectedProgram && (
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge
-                variant="outline"
-                className="text-xs sm:text-sm py-1.5 px-3 bg-primary/10 text-primary border-transparent font-bold rounded-lg"
+      {!hideProgramSelector && (
+        <Card className="rounded-xl border border-border/70 p-4 shadow-xs bg-card">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center">
+              <Select
+                value={selectedId || undefined}
+                onValueChange={setProgramId}
+                disabled={programOptions.length === 0}
               >
-                <IconSparkles size={14} className="mr-1.5" />
-                {totalDegreeCredits} Total Credits
-              </Badge>
-              {currentSemester != null && (
+                <SelectTrigger className="w-full sm:w-80 h-9 text-xs font-medium">
+                  <IconLayersLinked size={14} className="text-primary mr-1.5 shrink-0" />
+                  <SelectValue placeholder="Select Program..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {programOptions.map((p) => (
+                    <SelectItem key={p.id} value={p.id} className="text-xs">
+                      {p.name} ({p.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Quick Metrics Bar */}
+            {selectedProgram && (
+              <div className="flex flex-wrap items-center gap-2">
                 <Badge
                   variant="outline"
-                  className="text-xs sm:text-sm py-1.5 px-3 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-transparent font-bold rounded-lg"
+                  className="text-xs sm:text-sm py-1.5 px-3 bg-primary/10 text-primary border-transparent font-bold rounded-lg"
                 >
-                  <IconCheck size={14} className="mr-1.5 text-emerald-500" />
-                  Your Semester: {currentSemester}
+                  <IconSparkles size={14} className="mr-1.5" />
+                  {totalDegreeCredits} Total Credits
                 </Badge>
-              )}
-            </div>
-          )}
-        </div>
-      </Card>
+                {currentSemester != null && (
+                  <Badge
+                    variant="outline"
+                    className="text-xs sm:text-sm py-1.5 px-3 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-transparent font-bold rounded-lg"
+                  >
+                    <IconCheck size={14} className="mr-1.5 text-emerald-500" />
+                    Your Semester: {currentSemester}
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* ── Filter Toolbar: Year Pills & Course Search ── */}
       <Card className="p-3 sm:p-3.5 rounded-xl border border-border/70 shadow-xs bg-card">

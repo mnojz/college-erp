@@ -191,7 +191,7 @@ export function ProfileHero({
             {rollNumber != null && (
               <div className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-muted/40 px-2.5 py-1 text-xs">
                 <span className="text-muted-foreground font-medium">Roll No:</span>
-                <span className="font-mono font-bold text-foreground">#{rollNumber}</span>
+                <span className="font-mono font-bold text-foreground">{rollNumber}</span>
               </div>
             )}
 

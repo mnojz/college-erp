@@ -262,12 +262,12 @@ export default function AdminAnnouncementsPage() {
 
           if (isArchived) {
             return (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   size="icon-sm"
-                  className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 hover:text-emerald-700 dark:text-emerald-400"
+                  className="bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 dark:text-emerald-400 border-0"
                   title="Restore Announcement"
                   aria-label="Restore Announcement"
                   onClick={() => handleRestore(a)}
@@ -277,9 +277,9 @@ export default function AdminAnnouncementsPage() {
                 </Button>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   size="icon-sm"
-                  className="border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
+                  className="bg-destructive/15 text-destructive hover:bg-destructive/25 border-0"
                   title="Permanently Delete Announcement"
                   aria-label="Permanently Delete Announcement"
                   onClick={() => {
@@ -295,11 +295,12 @@ export default function AdminAnnouncementsPage() {
           }
 
           return (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="icon-sm"
+                className="bg-primary/10 text-primary hover:bg-primary/20 border-0"
                 title="Edit Announcement"
                 aria-label="Edit Announcement"
                 onClick={() => {
@@ -318,9 +319,9 @@ export default function AdminAnnouncementsPage() {
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="icon-sm"
-                className="border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 hover:text-amber-800 dark:text-amber-400"
+                className="bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 dark:text-amber-400 border-0"
                 title="Archive Announcement"
                 aria-label="Archive Announcement"
                 onClick={() => {
@@ -379,7 +380,7 @@ export default function AdminAnnouncementsPage() {
                 <span className="text-xs font-medium text-foreground">Attachment</span>
                 <FileDropzone
                   id="notice-create-attachment"
-                  className="flex-1 min-h-[140px]"
+                  className="flex-1 min-h-35"
                   accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/ogg,video/quicktime,application/pdf"
                   file={form.file}
                   onFileChange={(file) => setForm({ ...form, file })}
@@ -489,7 +490,7 @@ export default function AdminAnnouncementsPage() {
                 )}
                 <FileDropzone
                   id="notice-edit-attachment"
-                  className="flex-1 min-h-[120px]"
+                  className="flex-1 min-h-30"
                   accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/ogg,video/quicktime,application/pdf"
                   file={editingAnnouncement.file}
                   onFileChange={(file) =>
@@ -535,12 +536,12 @@ export default function AdminAnnouncementsPage() {
               Are you sure you want to {deletingAnnouncement.archivedAt ? "permanently delete" : "archive"} the notice <strong>&ldquo;{deletingAnnouncement.title}&rdquo;</strong>?
             </p>
             {deletingAnnouncement.archivedAt ? (
-              <p className="m-0 flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-[13px] font-medium text-destructive">
+              <p className="m-0 flex items-center gap-2 rounded-lg bg-destructive/15 px-3.5 py-2.5 text-[13px] font-medium text-destructive">
                 <IconAlertTriangle size={14} aria-hidden="true" className="shrink-0" />
                 This will permanently delete the notice and any attachment from the database. This action cannot be undone.
               </p>
             ) : (
-              <p className="m-0 flex items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3.5 py-2.5 text-[13px] font-medium text-amber-700 dark:text-amber-400">
+              <p className="m-0 flex items-center gap-2 rounded-lg bg-amber-500/15 px-3.5 py-2.5 text-[13px] font-medium text-amber-800 dark:text-amber-300">
                 <IconAlertTriangle size={14} aria-hidden="true" className="shrink-0" />
                 This notice will be moved to the archive and hidden from all public portals and dashboards. You can restore or permanently delete it later from the Archived filter.
               </p>

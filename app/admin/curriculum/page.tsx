@@ -21,8 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { TabSwitcher } from "@/app/components/common/TabSwitcher";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { StudentCourseStructurePanel } from "@/app/components/academics/StudentCourseStructurePanel";
@@ -105,8 +103,8 @@ export default function AdminCurriculumPage() {
   const [error, setError] = useState("");
   const [saveTimestamp, setSaveTimestamp] = useState(Date.now());
 
-  // Navigation & View state
-  const [activeTab, setActiveTab] = useState<"builder" | "preview">("builder");
+  // Navigation & View state (defaults to safe read-only viewer mode)
+  const [isEditing, setIsEditing] = useState(false);
   const [yearFilter, setYearFilter] = useState<"ALL" | number>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [collapsedYears, setCollapsedYears] = useState<Record<number, boolean>>({});
@@ -208,7 +206,10 @@ export default function AdminCurriculumPage() {
   }, []);
 
   useEffect(() => {
-    if (programId) void loadCurriculum(programId);
+    if (programId) {
+      setIsEditing(false);
+      void loadCurriculum(programId);
+    }
   }, [programId, loadCurriculum]);
 
   // ─── Selected Program Details ────────────────────────────────────
@@ -445,78 +446,7 @@ export default function AdminCurriculumPage() {
     toast.info("Unsaved changes discarded");
   }
 
-  // ─── JSON Sample Generator, Exporter & Importer ────────────────────
-  function downloadSampleCurriculumJson() {
-    const sample = {
-      program: selectedProgram?.code || "BE. ARCH",
-      courses: [
-        {
-          code: "AR111",
-          name: "Basic Design I",
-          credits: 4,
-          year: 1,
-          semester: 1,
-          type: "core",
-          hasTheory: true,
-          hasPractical: true,
-        },
-        {
-          code: "SH112",
-          name: "Engineering Mathematics I",
-          credits: 3,
-          year: 1,
-          semester: 1,
-          type: "core",
-          hasTheory: true,
-          hasPractical: false,
-        },
-        {
-          code: "AR121",
-          name: "Architectural Graphics I",
-          credits: 3,
-          year: 1,
-          semester: 2,
-          type: "core",
-          hasTheory: false,
-          hasPractical: true,
-        },
-      ],
-      elective_groups: [
-        {
-          group_id: 1,
-          name: "Elective I",
-          target_semester: 7,
-          required_credits: 3,
-          options: [
-            {
-              code: "AR4701",
-              name: "Light Weight Construction Materials and Building Technology",
-              credits: 3,
-            },
-            {
-              code: "AR4702",
-              name: "Disaster Risk Management in Traditional Settlement",
-              credits: 3,
-            },
-          ],
-        },
-      ],
-    };
-
-    const blob = new Blob([JSON.stringify(sample, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${selectedProgram?.code || "curriculum"}_template.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast.success("Sample curriculum JSON downloaded.");
-  }
-
+  // ─── JSON Exporter & Importer ──────────────────────────────────────
   function exportCurriculumJson() {
     if (draft.years.length === 0) {
       toast.error("No curriculum data to export.");
@@ -737,8 +667,8 @@ export default function AdminCurriculumPage() {
   }
 
   // ─── Save & Publish ──────────────────────────────────────────────
-  async function handleSave() {
-    if (!programId) return;
+  async function handleSave(): Promise<boolean> {
+    if (!programId) return false;
 
     // Client-side validation: check for invalid courses
     for (const y of draft.years) {
@@ -746,11 +676,11 @@ export default function AdminCurriculumPage() {
         for (const c of s.courses) {
           if (!c.name.trim()) {
             toast.error("Every course must have a title.");
-            return;
+            return false;
           }
           if (!c.hasTheory && !c.hasPractical) {
             toast.error(`Course "${c.name}" must have at least Theory (TH) or Practical (PR) enabled.`);
-            return;
+            return false;
           }
         }
       }
@@ -808,15 +738,17 @@ export default function AdminCurriculumPage() {
       if (!res.ok) {
         setError(data.error ?? "Unable to save curriculum");
         toast.error(data.error ?? "Unable to save curriculum");
-        return;
+        return false;
       }
       setHasCurriculum(true);
       setOriginalDraft(JSON.parse(JSON.stringify(draft)));
       setSaveTimestamp(Date.now());
       toast.success("Curriculum published successfully!");
+      return true;
     } catch {
       setError("Unable to reach the server");
       toast.error("Network error while saving curriculum");
+      return false;
     } finally {
       setSaving(false);
       doneProgress();
@@ -906,9 +838,9 @@ export default function AdminCurriculumPage() {
               onChange={handleImportJson}
             />
 
-            {/* Program Picker with clean status */}
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <div className="w-full sm:w-80">
+            {/* Program Picker with quick metrics */}
+            <div className="flex flex-wrap items-center gap-3 flex-1 min-w-0">
+              <div className="w-full sm:w-72">
                 <Select
                   value={programId}
                   onValueChange={setProgramId}
@@ -929,19 +861,16 @@ export default function AdminCurriculumPage() {
               </div>
 
               {selectedProgram && (
-                <div className="flex items-center gap-2 shrink-0">
-                  {isDirty ? (
-                    <Badge className="text-xs py-0.5 px-2 bg-amber-500/15 text-amber-700 dark:text-amber-400 border-0 font-semibold animate-pulse">
+                <div className="flex items-center gap-2">
+                  <Badge className="text-xs py-1 px-2.5 bg-primary/15 text-primary border-0 font-semibold rounded-lg">
+                    {metrics.totalCredits} Credits
+                  </Badge>
+                  <Badge className="text-xs py-1 px-2.5 bg-muted/60 text-muted-foreground border-0 font-semibold rounded-lg">
+                    {metrics.totalSemesters} Semesters
+                  </Badge>
+                  {isDirty && (
+                    <Badge className="text-xs py-1 px-2.5 bg-amber-500/15 text-amber-700 dark:text-amber-400 border-0 font-semibold animate-pulse rounded-lg">
                       ● Unsaved Changes
-                    </Badge>
-                  ) : hasCurriculum ? (
-                    <Badge className="text-xs py-0.5 px-2 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-0 font-semibold">
-                      <IconCheck size={12} className="mr-1 inline" />
-                      Published
-                    </Badge>
-                  ) : (
-                    <Badge className="text-xs py-0.5 px-2 bg-sky-500/15 text-sky-700 dark:text-sky-400 border-0 font-semibold">
-                      Draft
                     </Badge>
                   )}
                 </div>
@@ -950,127 +879,148 @@ export default function AdminCurriculumPage() {
 
             {/* Actions Bar */}
             <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={downloadSampleCurriculumJson}
-                className="h-8.5 gap-1.5 text-xs font-semibold"
-                title="Download sample JSON template"
-              >
-                <IconDownload size={14} />
-                <span>Sample JSON</span>
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => fileInputRef.current?.click()}
-                className="h-8.5 gap-1.5 text-xs font-semibold"
-                title="Upload JSON file to populate curriculum"
-              >
-                <IconUpload size={14} />
-                <span>Import JSON</span>
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={exportCurriculumJson}
-                disabled={draft.years.length === 0}
-                className="h-8.5 gap-1.5 text-xs font-semibold"
-                title="Export current curriculum as functional JSON"
-              >
-                <IconDownload size={14} />
-                <span>Export JSON</span>
-              </Button>
-
-
-              {isDirty && (
+              {!isEditing ? (
                 <Button
                   type="button"
-                  variant="ghost"
                   size="sm"
-                  onClick={handleDiscard}
-                  className="h-8.5 gap-1 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setIsEditing(true)}
+                  disabled={loading || programs.length === 0}
+                  className="h-8.5 gap-1.5 text-xs font-semibold shadow-xs cursor-pointer"
                 >
-                  <IconArrowBackUp size={14} />
-                  <span>Discard</span>
+                  <IconPencil size={14} />
+                  <span>Edit Curriculum</span>
                 </Button>
-              )}
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="h-8.5 gap-1.5 text-xs font-semibold cursor-pointer"
+                    title="Upload JSON file to populate curriculum"
+                  >
+                    <IconUpload size={14} />
+                    <span>Import JSON</span>
+                  </Button>
 
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleSave}
-                disabled={saving || loadingCurriculum}
-                className={cn(
-                  "h-8.5 gap-1.5 text-xs font-semibold transition-all",
-                  isDirty ? "shadow-sm shadow-primary/20" : "",
-                )}
-              >
-                {saving ? (
-                  <>
-                    <IconLoader2 size={14} className="animate-spin" />
-                    <span>Saving…</span>
-                  </>
-                ) : (
-                  <>
-                    <IconDeviceFloppy size={14} />
-                    <span>Save & Publish</span>
-                  </>
-                )}
-              </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={exportCurriculumJson}
+                    disabled={draft.years.length === 0}
+                    className="h-8.5 gap-1.5 text-xs font-semibold cursor-pointer"
+                    title="Export current curriculum as functional JSON"
+                  >
+                    <IconDownload size={14} />
+                    <span>Export JSON</span>
+                  </Button>
+
+                  {isDirty && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleDiscard}
+                      className="h-8.5 gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      <IconArrowBackUp size={14} />
+                      <span>Discard</span>
+                    </Button>
+                  )}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (isDirty) {
+                        if (confirm("You have unsaved changes. Discard and return to view mode?")) {
+                          handleDiscard();
+                          setIsEditing(false);
+                        }
+                      } else {
+                        setIsEditing(false);
+                      }
+                    }}
+                    className="h-8.5 gap-1.5 text-xs cursor-pointer"
+                  >
+                    <IconEye size={14} />
+                    <span>Done</span>
+                  </Button>
+
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={async () => {
+                      const ok = await handleSave();
+                      if (ok) setIsEditing(false);
+                    }}
+                    disabled={saving || loadingCurriculum}
+                    className={cn(
+                      "h-8.5 gap-1.5 text-xs font-semibold transition-all shadow-sm shadow-primary/20 cursor-pointer",
+                    )}
+                  >
+                    {saving ? (
+                      <>
+                        <IconLoader2 size={14} className="animate-spin" />
+                        <span>Saving…</span>
+                      </>
+                    ) : (
+                      <>
+                        <IconDeviceFloppy size={14} />
+                        <span>Save &amp; Publish</span>
+                      </>
+                    )}
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </Card>
 
         {/* Error notification */}
         {error && (
-          <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive font-medium">
+          <div className="flex items-center gap-2 rounded-xl bg-destructive/15 p-3 text-xs text-destructive font-medium border-0">
             <IconAlertCircle size={16} className="shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        {/* ── Tabs: Curriculum Builder vs Student View Preview ── */}
-        <Tabs
-          value={activeTab}
-          onValueChange={(val) => setActiveTab(val as "builder" | "preview")}
-          className="space-y-4"
-        >
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-border/60 pb-2.5">
-            <TabSwitcher
-              value={activeTab}
-              onChange={setActiveTab}
-              tabs={[
-                {
-                  id: "builder",
-                  label: "Curriculum Builder",
-                  icon: IconPencil,
-                },
-                {
-                  id: "preview",
-                  label: "Course Structure Preview",
-                  icon: IconEye,
-                },
-              ]}
-            />
-
-            {/* Quick Helper Text */}
-            <span className="text-xs text-muted-foreground hidden md:inline-block">
-              {activeTab === "builder"
-                ? "Interactive curriculum design: configure years, semesters, credits & courses"
-                : "Live student & faculty visualization matching the academic portal"}
-            </span>
+        {/* Main Content: Viewer Mode by Default, or Interactive Builder when Editing */}
+        {!isEditing ? (
+          <div className="space-y-4">
+            {hasCurriculum || draft.years.length > 0 ? (
+              <StudentCourseStructurePanel
+                key={`${programId}-${saveTimestamp}`}
+                defaultProgramId={programId}
+                hideProgramSelector
+              />
+            ) : (
+              <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 p-10 text-center flex flex-col items-center justify-center space-y-3">
+                <IconLayersLinked size={32} className="text-muted-foreground/50" />
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-foreground">
+                    No curriculum defined yet for {selectedProgram?.code ?? "this program"}
+                  </p>
+                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                    Configure the academic years, semesters, core subjects, and elective groups to publish the official degree structure.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => setIsEditing(true)}
+                  className="gap-1.5 text-xs font-semibold h-8.5 cursor-pointer"
+                >
+                  <IconPencil size={14} />
+                  <span>Start Building Curriculum</span>
+                </Button>
+              </div>
+            )}
           </div>
-
-          {/* ══════════════════════════════════════════════════════════ */}
-          {/* TAB 1: CURRICULUM BUILDER                                  */}
-          {/* ══════════════════════════════════════════════════════════ */}
-          <TabsContent value="builder" className="m-0 outline-hidden space-y-5">
+        ) : (
+          <div className="space-y-5">
             {/* Filter & Search Bar */}
             <Card className="p-3 sm:p-3.5 rounded-xl border border-border/70 shadow-xs bg-card">
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
@@ -1659,48 +1609,8 @@ export default function AdminCurriculumPage() {
                 </CardContent>
               </Card>
             )}
-          </TabsContent>
-
-          {/* ══════════════════════════════════════════════════════════ */}
-          {/* TAB 2: COURSE STRUCTURE PREVIEW (Reusing Academic Panel)   */}
-          {/* ══════════════════════════════════════════════════════════ */}
-          <TabsContent value="preview" className="m-0 outline-hidden space-y-4">
-            {/* Context Notification Banner */}
-            <Card className="rounded-xl border border-border/70 p-3.5 bg-linear-to-r from-primary/5 via-card to-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-              <div className="flex items-center gap-2.5">
-                <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                  <IconEye size={18} />
-                </div>
-                <div>
-                  <h4 className="text-xs sm:text-sm font-semibold text-foreground">
-                    Live Student & Faculty Course Structure
-                  </h4>
-                  <p className="text-[11px] sm:text-xs text-muted-foreground">
-                    This view uses the identical student component to render your published degree structure.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setActiveTab("builder")}
-                  className="gap-1.5 text-xs font-semibold h-8"
-                >
-                  <IconPencil size={14} />
-                  Edit in Builder
-                </Button>
-              </div>
-            </Card>
-
-            {/* Embedded StudentCourseStructurePanel */}
-            <StudentCourseStructurePanel
-              key={`${programId}-${saveTimestamp}`}
-              defaultProgramId={programId}
-            />
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
       </div>
     </AdminShell>
   );

@@ -289,7 +289,7 @@ export function AnnouncementsBoard<T extends AnnouncementItem = AnnouncementItem
       <div className="flex flex-col gap-3 rounded-xl border border-border/70 bg-card p-3 shadow-2xs">
         <div className="flex flex-wrap items-center justify-between gap-3">
           {/* Search Input */}
-          <div className="relative min-w-[240px] flex-1">
+          <div className="relative min-w-60 flex-1">
             <IconSearch
               size={16}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
@@ -482,7 +482,7 @@ export function AnnouncementsBoard<T extends AnnouncementItem = AnnouncementItem
 
       {/* Error alert */}
       {error && (
-        <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
+        <div className="rounded-xl bg-destructive/15 p-4 text-sm font-medium text-destructive border-0">
           <p className="font-semibold">Unable to display notices</p>
           <p className="mt-0.5 text-xs opacity-90">{error}</p>
         </div>
